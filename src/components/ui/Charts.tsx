@@ -122,13 +122,13 @@ export function ScoreRing({
         {children ?? (
           <>
             <span
-              className="font-mono leading-none font-bold"
+              className="font-mono leading-none font-medium"
               style={{ fontSize: size * 0.28, color }}
             >
               <AnimatedNumber value={score} format={false} />
             </span>
             {label && (
-              <span className="mt-1 font-mono text-[10px] font-semibold tracking-[0.08em] text-ink-4 uppercase">
+              <span className="mt-1 text-[11px] font-medium text-ink-4">
                 {label}
               </span>
             )}
@@ -217,10 +217,10 @@ export function Donut({
         })}
       </svg>
       <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
-        <span className="font-mono text-[26px] leading-none font-bold text-ink">
+        <span className="font-mono text-[30px] leading-none font-medium text-ink">
           <AnimatedNumber value={centerValue} />
         </span>
-        <span className="mt-1 font-mono text-[9.5px] font-semibold tracking-[0.1em] text-ink-4 uppercase">
+        <span className="mt-1 text-[11px] font-medium text-ink-4">
           {centerLabel}
         </span>
       </div>
@@ -310,7 +310,7 @@ export function Sparkline({
   const stepX = width / (data.length - 1);
   const y = (v: number) => height - 2 - (v / max) * (height - 4);
   const points = data.map((v, i) => `${i * stepX},${y(v)}`).join(' ');
-  const areaPath = `M 0,${height} L ${points.split(' ').join(' L ')} L ${width},${height} Z`;
+  const areaPath = `M 0,${height} L ${points.split(' ').join('L')} L ${width},${height} Z`;
 
   return (
     <svg width={width} height={height} className="overflow-visible" aria-hidden="true">
@@ -349,7 +349,7 @@ export function ColumnChart({
       <div className="flex items-end gap-1.5" style={{ height }}>
         {data.map((d, i) => (
           <div key={d.label} className="group flex min-w-0 flex-1 flex-col items-center justify-end gap-1.5">
-            <span className="font-mono text-[10.5px] font-bold text-ink-3 opacity-0 transition-opacity group-hover:opacity-100">
+            <span className="font-mono text-[11px] font-medium text-ink-3 opacity-0 transition-opacity group-hover:opacity-100">
               {formatValue(d.value)}
             </span>
             <motion.div

@@ -8,25 +8,25 @@
       name="description"
       content="Cockpit operacional do Centro de Sucesso ao Aluno da UniAnchieta: radares de risco, Health Score explicável e acolhimento humanizado com SLA."
     />
-    <meta name="theme-color" content="#003A70" media="(prefers-color-scheme: light)" />
-    <meta name="theme-color" content="#0a0b0d" media="(prefers-color-scheme: dark)" />
+    <meta name="theme-color" content="#f3f4f6" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#0c0d0f" media="(prefers-color-scheme: dark)" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
-      href="https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,300..800;1,14..32,300..800&family=JetBrains+Mono:wght@400;500;600;700&display=swap"
+      href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500;600&display=swap"
       rel="stylesheet"
     />
     <script>
       // Apply the persisted theme before first paint to avoid a flash of the wrong palette.
       (function () {
         try {
+          // The store JSON-encodes its values, so the raw entry is '"dark"',
+          // quotes included. Comparing the raw string against 'dark' silently
+          // never matched, which is why the pre-paint pass used to disagree
+          // with the app and flash the wrong palette.
           var stored = localStorage.getItem('csa.v3.theme');
-          var theme =
-            stored === 'light' || stored === 'dark'
-              ? stored
-              : window.matchMedia('(prefers-color-scheme: dark)').matches
-                ? 'dark'
-                : 'light';
+          // Light is the default. Dark is opt-in, never inherited from the OS.
+          var theme = stored === 'dark' || stored === '"dark"' ? 'dark' : 'light';
           document.documentElement.classList.toggle('dark', theme === 'dark');
           document.documentElement.style.colorScheme = theme;
         } catch (e) {

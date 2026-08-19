@@ -21,14 +21,7 @@ import {
 } from '../components/ui/Surfaces';
 import { Button } from '../components/ui/Button';
 import { Chip, SearchInput, Segmented, Select } from '../components/ui/Fields';
-import {
-  Avatar,
-  CaseStatusBadge,
-  CohortBadge,
-  ModalityBadge,
-  PriorityBadge,
-  RadarBadge,
-} from '../components/ui/Badges';
+import { Avatar, PriorityBadge, RadarBadge } from '../components/ui/Badges';
 import { SlaPill } from '../components/domain/SlaPill';
 import { CaseWorkflow } from '../components/domain/CaseWorkflow';
 import { RADARS, RADAR_ORDER } from '../lib/radars';
@@ -193,12 +186,10 @@ export function QueueView({
       initial="initial"
       animate="animate"
       exit="exit"
-      className="space-y-5"
+      className="space-y-4"
     >
       <PageHeader
-        eyebrow="Unidade de trabalho do especialista"
         title="Fila de Atendimento"
-        description="Cada intervenção relevante vira um caso acompanhável, com SLA em horas úteis, freio de réguas concorrentes e registro obrigatório de causa, intervenção, resultado e próximo passo."
         actions={
           <>
             <Button
@@ -252,10 +243,8 @@ export function QueueView({
             )}
           </Button>
 
-          <label className="ml-auto flex items-center gap-2">
-            <span className="font-mono text-[10px] font-bold tracking-[0.08em] text-ink-4 uppercase">
-              Ordenar
-            </span>
+          <label className="ml-auto flex shrink-0 items-center gap-2">
+            <span className="text-[12px] text-ink-3">Ordenar</span>
             <Select
               value={sort}
               onChange={(e) => setSort(e.target.value as SortKey)}
@@ -271,9 +260,9 @@ export function QueueView({
         </div>
 
         {showFilters && (
-          <div className="flex flex-wrap items-center gap-x-4 gap-y-2.5 rounded-lg border border-hairline bg-surface-2 p-3.5">
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-2.5 rounded-lg bg-surface-2 p-3.5">
             <div className="flex flex-wrap items-center gap-1.5">
-              <span className="mr-1 font-mono text-[10px] font-bold tracking-[0.08em] text-ink-4 uppercase">
+              <span className="mr-1 text-[11px] font-medium text-ink-4">
                 Radar
               </span>
               <Chip active={radarFilter === 'todos'} onClick={() => setRadarFilter('todos')}>
@@ -294,7 +283,7 @@ export function QueueView({
             <span className="hidden h-5 w-px bg-hairline sm:block" />
 
             <div className="flex flex-wrap items-center gap-1.5">
-              <span className="mr-1 font-mono text-[10px] font-bold tracking-[0.08em] text-ink-4 uppercase">
+              <span className="mr-1 text-[11px] font-medium text-ink-4">
                 Prioridade
               </span>
               <Chip active={priorityFilter === 'todas'} onClick={() => setPriorityFilter('todas')}>
@@ -336,9 +325,9 @@ export function QueueView({
       {/* ---- Split pane -------------------------------------------------- */}
       <div className="grid gap-5 xl:grid-cols-[minmax(340px,400px)_minmax(0,1fr)]">
         {/* Master list */}
-        <Card padded={false} className="flex max-h-[calc(100vh-260px)] min-h-[420px] flex-col overflow-hidden">
+        <Card padded={false} className="flex h-[calc(100vh-188px)] min-h-[480px] flex-col overflow-hidden">
           <div className="flex shrink-0 items-center justify-between border-b border-hairline bg-surface-2 px-4 py-2.5">
-            <span className="font-mono text-[10.5px] font-bold tracking-[0.08em] text-ink-3 uppercase">
+            <span className="text-[11px] font-medium text-ink-3">
               {filtered.length} {filtered.length === 1 ? 'caso' : 'casos'}
             </span>
             <span className="font-mono text-[10.5px] text-ink-4">
@@ -410,35 +399,22 @@ export function QueueView({
                     active={isActive}
                     tone={!isActive && sla.state === 'breach' ? 'crit' : 'plain'}
                   >
-                    <div className="space-y-2 p-3.5 pl-4">
-                      <div className="flex items-start gap-2.5">
-                        <Avatar initials={student.initials} size="sm" tone={student.status} />
-                        <div className="min-w-0 flex-1">
-                          <div className="flex items-baseline justify-between gap-2">
-                            <span className="truncate text-[12.5px] font-bold text-ink">
-                              {student.name}
-                            </span>
-                            <SlaPill kase={kase} size="xs" />
-                          </div>
-                          <p className="mt-0.5 line-clamp-2 text-[11.5px] leading-snug text-ink-3">
-                            {kase.title}
-                          </p>
+                    <div className="flex items-center gap-3 px-4 py-3">
+                      <Avatar initials={student.initials} size="sm" tone={student.status} />
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-baseline justify-between gap-2">
+                          <span className="truncate text-[13px] font-semibold text-ink">
+                            {student.name}
+                          </span>
+                          <SlaPill kase={kase} size="xs" />
                         </div>
-                      </div>
-
-                      <div className="flex flex-wrap items-center gap-1.5">
-                        <PriorityBadge priority={kase.priority} solid={kase.priority === 'Crítico'} />
-                        <CaseStatusBadge status={kase.status} />
-                        <RadarBadge radar={kase.radar} />
-                        <ModalityBadge modality={student.modality} />
-                        {student.cohort === 'Calouro' && <CohortBadge cohort="Calouro" />}
-                      </div>
-
-                      <div className="flex items-center justify-between font-mono text-[10px] text-ink-4">
-                        <span>{kase.protocol}</span>
-                        <span>
-                          RA {student.ra} · score {student.healthScore}
-                        </span>
+                        <div className="mt-0.5 flex items-center gap-2.5">
+                          <span className="min-w-0 flex-1 truncate text-[12px] text-ink-3">
+                            {kase.title}
+                          </span>
+                          <PriorityBadge priority={kase.priority} />
+                          <RadarBadge radar={kase.radar} />
+                        </div>
                       </div>
                     </div>
                   </Row>
@@ -449,7 +425,7 @@ export function QueueView({
         </Card>
 
         {/* Detail */}
-        <Card padded={false} className="flex max-h-[calc(100vh-260px)] min-h-[420px] flex-col overflow-hidden">
+        <Card padded={false} className="flex h-[calc(100vh-188px)] min-h-[480px] flex-col overflow-hidden">
           {active ? (
             <CaseWorkflow
               kase={active}

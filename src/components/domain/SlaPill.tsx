@@ -28,7 +28,7 @@ export function SlaPill({
   const sla = slaStatus(kase, now, settings.businessHours);
 
   const tone = {
-    ok: { text: 'text-ink-2', bar: 'var(--brand-2)', Icon: Clock },
+    ok: { text: 'text-ink-2', bar: 'var(--ink-4)', Icon: Clock },
     warning: { text: 'text-warn-ink', bar: 'var(--warn)', Icon: AlertTriangle },
     breach: { text: 'text-crit-ink', bar: 'var(--crit)', Icon: AlertTriangle },
     closed: { text: 'text-ink-4', bar: 'var(--ink-4)', Icon: CheckCircle2 },
@@ -39,8 +39,8 @@ export function SlaPill({
       <span
         title={`SLA de ${kase.slaHours} h úteis · ${sla.label}`}
         className={[
-          'inline-flex items-center gap-1.5 font-mono font-bold whitespace-nowrap',
-          size === 'xs' ? 'text-[11px]' : 'text-[12px]',
+          'inline-flex items-center gap-1.5 font-mono font-medium whitespace-nowrap',
+          size === 'xs' ? 'text-[11px]' : 'text-[12.5px]',
           tone.text,
         ].join(' ')}
       >
@@ -48,7 +48,7 @@ export function SlaPill({
         {sla.state === 'closed' ? 'Encerrado' : sla.compact}
       </span>
       {showBar && sla.state !== 'closed' && (
-        <div className="h-[3px] w-full overflow-hidden rounded-full bg-track">
+        <div className="h-0.5 w-full overflow-hidden rounded-full bg-track">
           <div
             className="h-full rounded-full transition-[width] duration-500"
             style={{ width: `${Math.max(3, sla.consumed * 100)}%`, backgroundColor: tone.bar }}
@@ -59,20 +59,17 @@ export function SlaPill({
   );
 }
 
-/** Verbose variant for a case header, where there is room to spell it out. */
-export function SlaBanner({ kase, onBand = false }: { kase: Case; onBand?: boolean }) {
+/** Verbose variant for a case header, where there is room to spell it out.
+    A countdown, not a badge: ink and weight carry the state. Only a breach
+    earns a fill, because only a breach is an emergency. */
+export function SlaBanner({ kase }: { kase: Case }) {
   const now = useClock();
   const { settings } = useApp();
   const sla = slaStatus(kase, now, settings.businessHours);
 
   if (sla.state === 'closed') {
     return (
-      <span
-        className={[
-          'inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 font-mono text-[11px] font-bold',
-          onBand ? 'border-band-line bg-band-inset text-band-ink-2' : 'border-hairline bg-surface-2 text-ink-3',
-        ].join(' ')}
-      >
+      <span className="inline-flex items-center gap-1.5 text-[12.5px] font-medium text-ink-3">
         <CheckCircle2 className="h-3.5 w-3.5" />
         Caso encerrado
       </span>
@@ -81,20 +78,14 @@ export function SlaBanner({ kase, onBand = false }: { kase: Case; onBand?: boole
 
   const style =
     sla.state === 'breach'
-      ? onBand
-        ? 'border-white/25 bg-crit/30 text-white'
-        : 'border-crit-border bg-crit-soft text-crit-ink'
+      ? 'rounded-full bg-crit px-2.5 py-1 text-white'
       : sla.state === 'warning'
-        ? onBand
-          ? 'border-white/25 bg-warn/25 text-white'
-          : 'border-warn-border bg-warn-soft text-warn-ink'
-        : onBand
-          ? 'border-band-line bg-band-inset text-band-ink'
-          : 'border-hairline bg-surface-2 text-ink-2';
+        ? 'text-warn-ink'
+        : 'text-ink-2';
 
   return (
     <span
-      className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 font-mono text-[11px] font-bold whitespace-nowrap ${style}`}
+      className={`inline-flex items-center gap-1.5 font-mono text-[12.5px] font-medium whitespace-nowrap ${style}`}
     >
       {sla.state === 'breach' ? (
         <AlertTriangle className="h-3.5 w-3.5" />

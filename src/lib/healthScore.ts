@@ -195,6 +195,16 @@ export function classify(score: number): HealthStatus {
   return 'Crítico';
 }
 
+/**
+ * The distribution ramp: green → yellow → orange → red.
+ *
+ * This is the one deliberate exception to the monochrome rule, and it is
+ * confined to the distribution chart and its legend. A pie of four bands has to
+ * be read as an ordered scale at a glance from across a desk, and the universal
+ * traffic-light ramp does that with no legend lookup. Everywhere else — table
+ * rows, badges, meters — status stays a dot plus a word, because there the
+ * colour would repeat forty times per screen instead of four.
+ */
 export const SCORE_BANDS: {
   status: HealthStatus;
   label: string;
@@ -214,21 +224,21 @@ export const SCORE_BANDS: {
     label: 'Atenção',
     range: [61, 80],
     token: 'warn',
-    hex: (d) => (d ? '#d3a03c' : '#b45309'),
+    hex: (d) => (d ? '#e0b341' : '#ca8a04'),
   },
   {
     status: 'Risco',
     label: 'Risco',
     range: [41, 60],
     token: 'risk',
-    hex: (d) => (d ? '#e07a45' : '#c2410c'),
+    hex: (d) => (d ? '#f0844a' : '#ea580c'),
   },
   {
     status: 'Crítico',
     label: 'Crítico',
     range: [0, 40],
     token: 'crit',
-    hex: (d) => (d ? '#e05561' : '#be123c'),
+    hex: (d) => (d ? '#e0554b' : '#b42318'),
   },
 ];
 

@@ -27,14 +27,14 @@ const KIND_META: Record<
   TimelineEvent['kind'],
   { Icon: typeof Activity; tone: string; ring: string }
 > = {
-  matricula: { Icon: GraduationCap, tone: 'text-brand-text', ring: 'border-brand-border bg-brand-soft' },
-  academico: { Icon: BookOpen, tone: 'text-ink-2', ring: 'border-hairline bg-surface-2' },
-  financeiro: { Icon: Wallet, tone: 'text-ink-2', ring: 'border-hairline bg-surface-2' },
-  engajamento: { Icon: Activity, tone: 'text-ink-2', ring: 'border-hairline bg-surface-2' },
-  atendimento: { Icon: MessageSquare, tone: 'text-ink-2', ring: 'border-hairline bg-surface-2' },
-  alerta: { Icon: RadarIcon, tone: 'text-crit-ink', ring: 'border-crit-border bg-crit-soft' },
-  intervencao: { Icon: HeartHandshake, tone: 'text-brand-text', ring: 'border-brand-border bg-brand-soft' },
-  marco: { Icon: Flag, tone: 'text-ok-ink', ring: 'border-ok-border bg-ok-soft' },
+  matricula: { Icon: GraduationCap, tone: 'text-ink-2', ring: 'bg-surface-2' },
+  academico: { Icon: BookOpen, tone: 'text-ink-3', ring: 'bg-surface-2' },
+  financeiro: { Icon: Wallet, tone: 'text-ink-3', ring: 'bg-surface-2' },
+  engajamento: { Icon: Activity, tone: 'text-ink-3', ring: 'bg-surface-2' },
+  atendimento: { Icon: MessageSquare, tone: 'text-ink-3', ring: 'bg-surface-2' },
+  alerta: { Icon: RadarIcon, tone: 'text-crit-ink', ring: 'bg-crit-soft' },
+  intervencao: { Icon: HeartHandshake, tone: 'text-brand-text', ring: 'bg-brand-soft' },
+  marco: { Icon: Flag, tone: 'text-ink-2', ring: 'bg-surface-2' },
 };
 
 export function Timeline({ events, limit }: { events: TimelineEvent[]; limit?: number }) {
@@ -65,24 +65,24 @@ export function Timeline({ events, limit }: { events: TimelineEvent[]; limit?: n
         return (
           <li key={event.id} className="relative flex gap-3 pb-5 last:pb-0">
             <span
-              className={`relative z-10 flex h-7 w-7 shrink-0 items-center justify-center rounded-full border ${meta.ring}`}
+              className={`relative z-10 flex h-7 w-7 shrink-0 items-center justify-center rounded-full ${meta.ring}`}
             >
               <meta.Icon className={`h-3.5 w-3.5 ${meta.tone}`} />
             </span>
 
             <div className="min-w-0 flex-1 pt-0.5">
               <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
-                <p className="text-[12.5px] leading-snug font-bold text-ink">{event.title}</p>
+                <p className="text-[12.5px] leading-snug font-semibold text-ink">{event.title}</p>
                 <span className="shrink-0 font-mono text-[10.5px] text-ink-4">{stamp(event.at)}</span>
               </div>
               <p className="mt-1 text-[12px] leading-relaxed text-ink-3">{event.detail}</p>
               <div className="mt-1.5 flex items-center gap-2">
-                <span className="inline-flex items-center gap-1 font-mono text-[10px] font-bold tracking-[0.06em] text-ink-4 uppercase">
+                <span className="inline-flex items-center gap-1 text-[11px] font-medium text-ink-4">
                   <BadgeCheck className="h-3 w-3" />
                   {event.author}
                 </span>
                 {event.tag && (
-                  <span className="rounded border border-hairline bg-surface-2 px-1.5 py-px font-mono text-[9.5px] font-bold tracking-[0.06em] text-ink-4 uppercase">
+                  <span className="rounded bg-surface-2 px-1.5 py-px text-[11px] font-medium text-ink-4">
                     {event.tag}
                   </span>
                 )}

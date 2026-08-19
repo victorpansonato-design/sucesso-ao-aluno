@@ -131,7 +131,7 @@ export function GovernanceView() {
                         onChange={(e) => setWeight(dimension, Number(e.target.value))}
                         className="h-1.5 w-40 cursor-pointer accent-[var(--brand)]"
                       />
-                      <span className="w-12 shrink-0 text-right font-mono text-[13px] font-bold text-ink">
+                      <span className="w-12 shrink-0 text-right font-mono text-[13px] font-semibold text-ink">
                         {weights[dimension]}%
                       </span>
                     </div>
@@ -151,12 +151,12 @@ export function GovernanceView() {
 
               <div className="flex flex-wrap items-center justify-between gap-3 border-t border-hairline pt-4">
                 <div className="flex items-center gap-2">
-                  <span className="font-mono text-[10px] font-bold tracking-[0.08em] text-ink-4 uppercase">
+                  <span className="text-[11px] font-medium text-ink-4">
                     Total
                   </span>
                   <span
                     className={[
-                      'font-mono text-[16px] font-bold',
+                      'font-mono text-[16px] font-semibold',
                       total === 100 ? 'text-ok-ink' : 'text-warn-ink',
                     ].join(' ')}
                   >
@@ -185,13 +185,13 @@ export function GovernanceView() {
             </div>
 
             {/* Live impact */}
-            <aside className="rounded-lg border border-hairline bg-surface-2 p-4">
-              <p className="font-mono text-[10px] font-bold tracking-[0.1em] text-ink-4 uppercase">
+            <aside className="rounded-lg bg-surface-2 p-4">
+              <p className="text-[11px] font-medium text-ink-4">
                 Impacto imediato · {profile === 'EaD' ? 'EaD 100%' : profile}
               </p>
 
               <div className="mt-3.5 text-center">
-                <p className="font-mono text-[34px] leading-none font-bold text-ink">{impact.avg}</p>
+                <p className="font-mono text-[34px] leading-none font-semibold text-ink">{impact.avg}</p>
                 <p className="mt-1 text-[11px] text-ink-3">
                   Health Score médio de {impact.count} alunos
                 </p>
@@ -206,7 +206,7 @@ export function GovernanceView() {
                 ].map((row) => (
                   <div key={row.status} className="flex items-center justify-between gap-2">
                     <HealthBadge status={row.status} />
-                    <span className="font-mono text-[12px] font-bold text-ink">
+                    <span className="font-mono text-[12px] font-semibold text-ink">
                       {row.value}
                       <span className="ml-1.5 font-normal text-ink-4">
                         {percent((row.value / Math.max(1, impact.count)) * 100)}
@@ -255,7 +255,7 @@ export function GovernanceView() {
                         const value = Math.max(1, Math.min(168, Number(e.target.value) || 1));
                         updateSettings({ slaHours: { ...settings.slaHours, [key]: value } });
                       }}
-                      className="w-24 font-mono font-bold"
+                      className="w-24 font-mono font-semibold"
                     />
                     <span className="font-mono text-[11.5px] text-ink-4">horas úteis</span>
                     {settings.slaHours[key] !== RADARS[key].defaultSlaHours && (
@@ -286,7 +286,7 @@ export function GovernanceView() {
                       },
                     })
                   }
-                  className="w-24 font-mono font-bold"
+                  className="w-24 font-mono font-semibold"
                 />
               )}
             </Field>
@@ -306,7 +306,7 @@ export function GovernanceView() {
                       },
                     })
                   }
-                  className="w-24 font-mono font-bold"
+                  className="w-24 font-mono font-semibold"
                 />
               )}
             </Field>
@@ -326,7 +326,7 @@ export function GovernanceView() {
                       },
                     })
                   }
-                  className="w-24 font-mono font-bold"
+                  className="w-24 font-mono font-semibold"
                 />
               )}
             </Field>
@@ -373,7 +373,7 @@ export function GovernanceView() {
                           ),
                         })
                       }
-                      className="w-24 font-mono font-bold"
+                      className="w-24 font-mono font-semibold"
                     />
                     <span className="font-mono text-[11.5px] text-ink-4">dias</span>
                     <Pill tone="info" solid dot={false}>
@@ -421,8 +421,8 @@ export function GovernanceView() {
                 onChange={(v) => updateSettings({ lgpdStrict: v })}
               />
 
-              <div className="rounded-lg border border-hairline bg-surface-2 p-3.5">
-                <p className="flex items-center gap-1.5 text-[12px] font-bold text-ink">
+              <div className="rounded-lg bg-surface-2 p-3.5">
+                <p className="flex items-center gap-1.5 text-[12px] font-semibold text-ink">
                   <Lock className="h-3.5 w-3.5 text-ink-4" />
                   Réguas suspensas quando o freio está ativo
                 </p>
@@ -475,8 +475,8 @@ export function GovernanceView() {
                 'O Health Score é um indicador orientativo. Toda decisão sensível passa por análise e registro humanos.',
             },
           ].map((item) => (
-            <div key={item.label} className="rounded-lg border border-hairline bg-surface-2 p-3.5">
-              <p className="font-mono text-[9.5px] font-bold tracking-[0.08em] text-ink-4 uppercase">
+            <div key={item.label} className="rounded-lg bg-surface-2 p-3.5">
+              <p className="text-[11px] font-medium text-ink-4">
                 {item.label}
               </p>
               <p className="mt-1.5 text-[11.5px] leading-relaxed text-ink-2">{item.value}</p>
@@ -486,7 +486,7 @@ export function GovernanceView() {
       </Card>
 
       {/* ---- Reset ------------------------------------------------------- */}
-      <Card className="border-crit-border">
+      <Card className="">
         <CardHeader
           eyebrow="Ambiente de demonstração"
           title="Restaurar base de demonstração"

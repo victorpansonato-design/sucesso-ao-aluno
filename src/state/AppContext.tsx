@@ -257,10 +257,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   /* -- Theme ------------------------------------------------------------ */
 
+  // Light is the default, deliberately: it is the palette an attendant looks at
+  // for a full shift under office lighting. The OS preference is not consulted
+  // — dark mode is a choice made in this app, not one inherited from Windows.
   const [theme, setTheme] = useState<'light' | 'dark'>(() => {
     const stored = load<'light' | 'dark' | null>(KEYS.theme, null);
-    if (stored === 'light' || stored === 'dark') return stored;
-    return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+    return stored === 'dark' ? 'dark' : 'light';
   });
 
   useEffect(() => {
@@ -898,7 +900,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         'Interação registrada',
         `Histórico de ${student.name.split(' ')[0]} atualizado.${
           delta !== 0 ? ` Health Score ${delta > 0 ? '+' : ''}${delta} ponto(s).` : ''
-        }${input.nextStepDate ? ' Acompanhamento agendado.' : ''}`,
+        }${input.nextStepDate ? 'Acompanhamento agendado.' : ''}`,
       );
     },
     [studentIndex, currentUser, interactions, settings.weights, appendTimeline, rescoreStudent, toast],

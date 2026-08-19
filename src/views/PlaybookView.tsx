@@ -205,7 +205,6 @@ export function PlaybookView({ actions }: { actions: ShellActions }) {
       <Card tone="band" padded={false}>
         <div className="relative p-5 sm:p-6">
           <CardHeader
-            tone="band"
             eyebrow="Regra de contato humano"
             title="Motivo → Objetivo → Abordagem → Resultado → Próxima ação"
             subtitle="Todo contato segue esta sequência. O atendente não recebe apenas um alerta: recebe contexto, objetivo e recomendação."
@@ -220,12 +219,12 @@ export function PlaybookView({ actions }: { actions: ShellActions }) {
             ].map((step) => (
               <div
                 key={step.n}
-                className="rounded-lg border border-band-line bg-band-inset p-3.5"
+                className="rounded-lg bg-band-inset p-3.5"
               >
-                <p className="font-mono text-[10px] font-bold tracking-[0.1em] text-band-ink-2">
+                <p className="font-mono text-[10px] font-semibold tracking-[0.1em] text-band-ink-2">
                   {step.n}
                 </p>
-                <p className="mt-1.5 text-[13px] font-bold text-band-ink">{step.label}</p>
+                <p className="mt-1.5 text-[13px] font-semibold text-band-ink">{step.label}</p>
                 <p className="mt-1 text-[11px] leading-relaxed text-band-ink-2">{step.detail}</p>
               </div>
             ))}
@@ -255,14 +254,14 @@ export function PlaybookView({ actions }: { actions: ShellActions }) {
                     </Pill>
                     <Pill dot={false}>{radar.specialty}</Pill>
                   </div>
-                  <h3 className="mt-2 text-[15px] leading-snug font-bold text-ink">{protocol.title}</h3>
+                  <h3 className="mt-2 text-[15px] leading-snug font-semibold text-ink">{protocol.title}</h3>
                   <p className="mt-1 max-w-2xl text-[12px] leading-relaxed text-ink-3">
                     {protocol.when}
                   </p>
                 </div>
 
                 <span className="flex shrink-0 items-center gap-2 pt-1">
-                  <span className="hidden font-mono text-[10.5px] font-bold text-ink-4 sm:block">
+                  <span className="hidden font-mono text-[10.5px] font-semibold text-ink-4 sm:block">
                     {isOpen ? 'recolher' : 'ver protocolo'}
                   </span>
                   <motion.span animate={{ rotate: isOpen ? 180 : 0 }} transition={{ duration: 0.2 }}>
@@ -286,14 +285,14 @@ export function PlaybookView({ actions }: { actions: ShellActions }) {
                       </Callout>
 
                       <div>
-                        <p className="flex items-center gap-1.5 font-mono text-[10px] font-bold tracking-[0.1em] text-ink-4 uppercase">
+                        <p className="flex items-center gap-1.5 text-[11px] font-medium text-ink-4">
                           <ListOrdered className="h-3.5 w-3.5" />
                           Passo a passo
                         </p>
                         <ol className="mt-3 space-y-2">
                           {protocol.steps.map((step, i) => (
                             <li key={step} className="flex gap-3">
-                              <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-hairline bg-surface font-mono text-[10px] font-bold text-ink-3">
+                              <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-surface font-mono text-[10px] font-semibold text-ink-3">
                                 {i + 1}
                               </span>
                               <span className="text-[12.5px] leading-relaxed text-ink-2">{step}</span>
@@ -305,7 +304,7 @@ export function PlaybookView({ actions }: { actions: ShellActions }) {
                       <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
                         <div>
                           <div className="flex items-center justify-between gap-3">
-                            <p className="flex items-center gap-1.5 font-mono text-[10px] font-bold tracking-[0.1em] text-ink-4 uppercase">
+                            <p className="flex items-center gap-1.5 text-[11px] font-medium text-ink-4">
                               <MessageSquareQuote className="h-3.5 w-3.5" />
                               Roteiro de abertura
                             </p>
@@ -324,7 +323,7 @@ export function PlaybookView({ actions }: { actions: ShellActions }) {
                               {copied === protocol.radar ? 'Copiado' : 'Copiar'}
                             </Button>
                           </div>
-                          <div className="mt-2.5 rounded-lg border border-hairline bg-surface p-4">
+                          <div className="mt-2.5 rounded-lg bg-surface p-4">
                             <p className="text-[12.5px] leading-relaxed text-ink-2">
                               “{protocol.script}”
                             </p>
@@ -336,8 +335,9 @@ export function PlaybookView({ actions }: { actions: ShellActions }) {
                         </div>
 
                         <div className="space-y-4">
-                          <div className="rounded-lg border border-crit-border bg-crit-soft p-3.5">
-                            <p className="flex items-center gap-1.5 font-mono text-[10px] font-bold tracking-[0.1em] text-crit-ink uppercase">
+                          <div className="relative overflow-hidden rounded-lg bg-surface-2 p-3.5 pl-4">
+                            <span className="absolute inset-y-0 left-0 w-0.5 bg-crit" />
+                            <p className="flex items-center gap-1.5 text-[11px] font-medium text-crit-ink">
                               <Ban className="h-3.5 w-3.5" />
                               Não fazer
                             </p>
@@ -351,8 +351,8 @@ export function PlaybookView({ actions }: { actions: ShellActions }) {
                             </ul>
                           </div>
 
-                          <div className="rounded-lg border border-hairline bg-surface p-3.5">
-                            <p className="font-mono text-[10px] font-bold tracking-[0.1em] text-ink-4 uppercase">
+                          <div className="rounded-lg bg-surface p-3.5">
+                            <p className="text-[11px] font-medium text-ink-4">
                               Registro mínimo obrigatório
                             </p>
                             <p className="mt-2 text-[11.5px] leading-relaxed text-ink-2">
@@ -418,8 +418,8 @@ export function PlaybookView({ actions }: { actions: ShellActions }) {
               guard: 'Score recalculado a cada interação; origem e data de cada sinal ficam registradas.',
             },
           ].map((item) => (
-            <div key={item.risk} className="rounded-lg border border-hairline bg-surface-2 p-3.5">
-              <p className="flex items-center gap-1.5 text-[12px] font-bold text-ink">
+            <div key={item.risk} className="rounded-lg bg-surface-2 p-3.5">
+              <p className="flex items-center gap-1.5 text-[12px] font-semibold text-ink">
                 <BookMarked className="h-3.5 w-3.5 text-ink-4" />
                 {item.risk}
               </p>

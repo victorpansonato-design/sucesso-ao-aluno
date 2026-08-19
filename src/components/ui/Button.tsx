@@ -6,13 +6,20 @@ import { press } from '../../lib/motion';
 /* ==========================================================================
    Button
    --------------------------------------------------------------------------
-   Five variants, and each one carries a meaning rather than a look:
+   Buttons are pills, surfaces are 12px rectangles. Two shapes for the whole
+   app, so the silhouette alone says whether a thing is a place or an action —
+   which is why a button needs no outline to read as a button.
+
+   Variants carry meaning rather than a look:
 
      primary   — the single most important action on the surface. One per view.
-     secondary — a real alternative to primary. Bordered, not filled.
+                 The one place institutional blue fills a shape.
+     secondary — a real alternative to primary. Filled with the inset surface,
+                 never outlined.
      ghost     — tertiary; lives inside dense rows and toolbars.
      danger    — destructive or irreversible (registering an evasion, resetting).
-     onBand    — the same grammar, but legible on the royal-blue contrast band.
+     onBand    — kept so existing call sites still compile. The royal-blue panel
+                 it was named for is gone, so it resolves to primary/secondary.
 
    Press feedback is uniform across the app: a 2.5% scale-down. Nothing else.
    ========================================================================== */
@@ -21,20 +28,37 @@ type Variant = 'primary' | 'secondary' | 'ghost' | 'danger' | 'onBand' | 'onBand
 type Size = 'xs' | 'sm' | 'md';
 
 const VARIANT: Record<Variant, string> = {
-  primary: 'bg-brand text-on-brand hover:bg-brand-hover shadow-raised',
-  secondary:
-    'bg-surface text-ink border border-hairline-strong hover:bg-surface-2 hover:border-ink-4',
+  primary: 'bg-brand text-on-brand hover:bg-brand-hover',
+  secondary: 'bg-surface-2 text-ink hover:bg-surface-3',
   ghost: 'text-ink-2 hover:bg-surface-2 hover:text-ink',
-  danger: 'bg-crit text-white hover:brightness-110 shadow-raised',
-  onBand: 'bg-white text-brand hover:bg-white/90 shadow-raised',
-  onBandGhost:
-    'text-band-ink border border-band-line bg-band-inset hover:bg-white/15 backdrop-blur-sm',
+  danger: 'bg-crit text-white hover:brightness-110',
+  onBand: 'bg-brand text-on-brand hover:bg-brand-hover',
+  onBandGhost: 'bg-surface-2 text-ink hover:bg-surface-3',
 };
 
+/**
+ * Geometry is split from padding on purpose. Emitting both `px-3.5` and `px-0`
+ * and hoping the second wins does not work: Tailwind decides the order in the
+ * stylesheet, not the class attribute, so `px-3.5` won and a 32px square button
+ * ended up with 28px of padding, squeezing its 14px icon down to 4px. A square
+ * button now simply never receives horizontal padding.
+ */
 const SIZE: Record<Size, string> = {
-  xs: 'h-7 px-2.5 text-[11.5px] gap-1.5 rounded-md',
-  sm: 'h-8 px-3 text-[12.5px] gap-1.5 rounded-md',
-  md: 'h-9.5 px-4 text-[13px] gap-2 rounded-lg',
+  xs: 'h-7 text-[12px] gap-1.5 rounded-full',
+  sm: 'h-8 text-[13px] gap-1.5 rounded-full',
+  md: 'h-9.5 text-[13px] gap-2 rounded-full',
+};
+
+const PAD: Record<Size, string> = {
+  xs: 'px-3',
+  sm: 'px-3.5',
+  md: 'px-4.5',
+};
+
+const SQUARE: Record<Size, string> = {
+  xs: 'w-7',
+  sm: 'w-8',
+  md: 'w-9.5',
 };
 
 /**
@@ -72,7 +96,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button
   },
   ref,
 ) {
-  const squarePad = square ? (size === 'xs' ? 'w-7 px-0' : size === 'sm' ? 'w-8 px-0' : 'w-9.5 px-0') : '';
+  const shape = square ? SQUARE[size] : PAD[size];
 
   return (
     <motion.button
@@ -80,12 +104,12 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button
       whileTap={disabled ? undefined : press}
       disabled={disabled}
       className={[
-        'inline-flex shrink-0 items-center justify-center font-semibold whitespace-nowrap',
+        'inline-flex shrink-0 items-center justify-center font-medium whitespace-nowrap',
         'transition-colors duration-150 select-none',
         'disabled:pointer-events-none disabled:opacity-45',
         SIZE[size],
+        shape,
         VARIANT[variant],
-        squarePad,
         full ? 'w-full' : '',
         className,
       ].join(' ')}
@@ -109,8 +133,8 @@ export function LinkButton({
   return (
     <button
       className={[
-        'inline-flex items-center gap-1.5 text-[12.5px] font-semibold text-brand-text',
-        'transition-colors hover:text-brand-2 disabled:opacity-45',
+        'inline-flex items-center gap-1.5 text-[12px] font-medium text-ink-2',
+        'transition-colors hover:text-ink disabled:opacity-45',
         className,
       ].join(' ')}
       {...rest}

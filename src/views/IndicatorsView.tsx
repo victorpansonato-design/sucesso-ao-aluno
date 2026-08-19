@@ -222,7 +222,6 @@ export function IndicatorsView({ actions }: { actions: ShellActions }) {
       <Card tone="band" padded={false}>
         <div className="relative p-5 sm:p-6">
           <CardHeader
-            tone="band"
             eyebrow="Resultado consolidado do ciclo"
             title="Impacto do Centro de Sucesso ao Aluno"
             subtitle="Cálculos explícitos, para que o número possa ser defendido em reunião."
@@ -251,7 +250,7 @@ export function IndicatorsView({ actions }: { actions: ShellActions }) {
                 <>
                   <span>{breached.length} casos estourados</span>
                   {avgFirstContactHours !== null && (
-                    <span className="font-mono font-bold">
+                    <span className="font-mono font-semibold">
                       {decimal(avgFirstContactHours, 1)} h até o 1º contato
                     </span>
                   )}
@@ -269,7 +268,7 @@ export function IndicatorsView({ actions }: { actions: ShellActions }) {
             <StatTile
               tone="band"
               label="Receita preservada"
-              value={money(preservedRevenue).replace(/\s/g, ' ')}
+              value={money(preservedRevenue).replace(/\s/g, '')}
               icon={<ShieldCheck className="h-4 w-4" />}
               footer={<span>mensalidade × 6 × períodos restantes dos retidos</span>}
             />
@@ -323,7 +322,7 @@ export function IndicatorsView({ actions }: { actions: ShellActions }) {
                   <div className="min-w-0 flex-1">
                     <MeterBar value={b.percent} color={b.hex(false)} height={4} />
                   </div>
-                  <span className="w-20 shrink-0 text-right font-mono text-[12px] font-bold text-ink">
+                  <span className="w-20 shrink-0 text-right font-mono text-[12px] font-semibold text-ink">
                     {int(b.count)}
                     <span className="ml-1 font-normal text-ink-4">{percent(b.percent, 1)}</span>
                   </span>
@@ -351,11 +350,11 @@ export function IndicatorsView({ actions }: { actions: ShellActions }) {
                     <span className="min-w-0 flex-1 truncate text-[11.5px] font-semibold text-ink">
                       {row.course}
                     </span>
-                    <span className="shrink-0 font-mono text-[11px] font-bold text-ink">
+                    <span className="shrink-0 font-mono text-[11px] font-semibold text-ink">
                       {row.risky}
                       <span className="font-normal opacity-60">/{row.total}</span>
                     </span>
-                    <span className="w-12 shrink-0 text-right font-mono text-[11.5px] font-bold text-ink">
+                    <span className="w-12 shrink-0 text-right font-mono text-[11.5px] font-semibold text-ink">
                       {percent(row.ratio * 100)}
                     </span>
                   </div>
@@ -441,7 +440,7 @@ export function IndicatorsView({ actions }: { actions: ShellActions }) {
                 <div key={row.label} className="space-y-1.5">
                   <div className="flex items-baseline justify-between gap-3">
                     <span className="truncate text-[12px] font-medium text-ink-2">{row.label}</span>
-                    <span className="shrink-0 font-mono text-[12px] font-bold text-ink">
+                    <span className="shrink-0 font-mono text-[12px] font-semibold text-ink">
                       {int(row.value)}
                       <span className="ml-1.5 font-normal text-ink-4">
                         {percent((row.value / Math.max(1, row.total)) * 100)}
@@ -472,7 +471,7 @@ export function IndicatorsView({ actions }: { actions: ShellActions }) {
                 <div key={row.label} className="space-y-1.5">
                   <div className="flex items-baseline justify-between gap-3">
                     <span className="truncate text-[12px] font-medium text-ink-2">{row.label}</span>
-                    <span className="shrink-0 font-mono text-[12px] font-bold text-ink">{row.value}</span>
+                    <span className="shrink-0 font-mono text-[12px] font-semibold text-ink">{row.value}</span>
                   </div>
                   <MeterBar value={row.value} max={Math.max(1, cases.length)} color={row.color} height={5} />
                 </div>
@@ -525,7 +524,7 @@ export function IndicatorsView({ actions }: { actions: ShellActions }) {
                       {['Curso', 'Campus', 'Modalidade', 'Motivo registrado', 'Casos'].map((h) => (
                         <th
                           key={h}
-                          className="px-4 py-2.5 font-mono text-[9.5px] font-bold tracking-[0.08em] text-ink-4 uppercase"
+                          className="px-4 py-2.5 text-[11px] font-medium text-ink-4"
                         >
                           {h}
                         </th>
@@ -543,7 +542,7 @@ export function IndicatorsView({ actions }: { actions: ShellActions }) {
                           </Pill>
                         </td>
                         <td className="px-4 py-2.5 text-[11.5px] text-ink-2">{row.reason}</td>
-                        <td className="px-4 py-2.5 font-mono text-[12px] font-bold text-crit-ink">
+                        <td className="px-4 py-2.5 font-mono text-[12px] font-semibold text-crit-ink">
                           {row.count}
                         </td>
                       </tr>
@@ -568,7 +567,7 @@ export function IndicatorsView({ actions }: { actions: ShellActions }) {
                     (h) => (
                       <th
                         key={h}
-                        className="px-4 py-2.5 font-mono text-[9.5px] font-bold tracking-[0.08em] text-ink-4 uppercase"
+                        className="px-4 py-2.5 text-[11px] font-medium text-ink-4"
                       >
                         {h}
                       </th>
@@ -590,9 +589,9 @@ export function IndicatorsView({ actions }: { actions: ShellActions }) {
                     <td className="px-4 py-3 font-mono text-[11.5px] text-ink-3">
                       {settings.slaHours[r.key]}h
                     </td>
-                    <td className="px-4 py-3 font-mono text-[12px] font-bold text-ink">{r.alerts}</td>
-                    <td className="px-4 py-3 font-mono text-[12px] font-bold text-ok-ink">{r.confirmed}</td>
-                    <td className="px-4 py-3 font-mono text-[12px] font-bold text-crit-ink">{r.rejected}</td>
+                    <td className="px-4 py-3 font-mono text-[12px] font-semibold text-ink">{r.alerts}</td>
+                    <td className="px-4 py-3 font-mono text-[12px] font-semibold text-ok-ink">{r.confirmed}</td>
+                    <td className="px-4 py-3 font-mono text-[12px] font-semibold text-crit-ink">{r.rejected}</td>
                     <td className="px-4 py-3 font-mono text-[12px] text-warn-ink">{r.pending}</td>
                     <td className="px-4 py-3">
                       {r.precision === null ? (
@@ -606,7 +605,7 @@ export function IndicatorsView({ actions }: { actions: ShellActions }) {
                               height={4}
                             />
                           </span>
-                          <span className="font-mono text-[11.5px] font-bold text-ink">
+                          <span className="font-mono text-[11.5px] font-semibold text-ink">
                             {Math.round(r.precision)}%
                           </span>
                         </span>
@@ -633,7 +632,7 @@ export function IndicatorsView({ actions }: { actions: ShellActions }) {
         <SectionLabel>Carga e desempenho da equipe</SectionLabel>
         <Card padded={false}>
           <div className="flex items-center justify-between border-b border-hairline bg-surface-2 px-4 py-2.5">
-            <span className="font-mono text-[10.5px] font-bold tracking-[0.08em] text-ink-3 uppercase">
+            <span className="text-[11px] font-medium text-ink-3">
               {specialists.length} especialistas
             </span>
             <Button
@@ -655,14 +654,14 @@ export function IndicatorsView({ actions }: { actions: ShellActions }) {
                 className="flex w-full items-center gap-4 p-4 text-left transition-colors hover:bg-surface-hover"
               >
                 <span className="min-w-0 flex-1">
-                  <span className="block truncate text-[12.5px] font-bold text-ink">{spec.name}</span>
+                  <span className="block truncate text-[12.5px] font-semibold text-ink">{spec.name}</span>
                   <span className="block truncate text-[11px] text-ink-3">{spec.role}</span>
                 </span>
 
                 <span className="w-32 shrink-0">
                   <span className="flex items-baseline justify-between">
-                    <span className="font-mono text-[9.5px] font-bold text-ink-4 uppercase">Carga</span>
-                    <span className="font-mono text-[11.5px] font-bold text-ink">
+                    <span className="text-[11px] font-medium text-ink-4">Carga</span>
+                    <span className="font-mono text-[11.5px] font-semibold text-ink">
                       {specOpen}/{spec.capacity}
                     </span>
                   </span>
@@ -676,22 +675,22 @@ export function IndicatorsView({ actions }: { actions: ShellActions }) {
                 </span>
 
                 <span className="hidden w-20 shrink-0 text-right sm:block">
-                  <span className="block font-mono text-[9.5px] font-bold text-ink-4 uppercase">SLA</span>
-                  <span className="font-mono text-[12px] font-bold text-ink">
+                  <span className="block text-[11px] font-medium text-ink-4">SLA</span>
+                  <span className="font-mono text-[12px] font-semibold text-ink">
                     {percent(spec.slaAdherence, 1)}
                   </span>
                 </span>
 
                 <span className="hidden w-16 shrink-0 text-right sm:block">
-                  <span className="block font-mono text-[9.5px] font-bold text-ink-4 uppercase">
+                  <span className="block text-[11px] font-medium text-ink-4">
                     Retidos
                   </span>
-                  <span className="font-mono text-[12px] font-bold text-ok-ink">{specRetained}</span>
+                  <span className="font-mono text-[12px] font-semibold text-ok-ink">{specRetained}</span>
                 </span>
 
                 <span className="w-14 shrink-0 text-right">
-                  <span className="block font-mono text-[9.5px] font-bold text-ink-4 uppercase">Total</span>
-                  <span className="font-mono text-[12px] font-bold text-ink">{total}</span>
+                  <span className="block text-[11px] font-medium text-ink-4">Total</span>
+                  <span className="font-mono text-[12px] font-semibold text-ink">{total}</span>
                 </span>
               </button>
             ))}
@@ -736,7 +735,7 @@ export function IndicatorsView({ actions }: { actions: ShellActions }) {
             <button
               key={item.label}
               onClick={item.run}
-              className="group flex flex-col gap-2 rounded-lg border border-hairline bg-surface-2 p-4 text-left transition-colors hover:border-brand"
+              className="group flex flex-col gap-2 rounded-lg bg-surface-2 p-4 text-left transition-colors"
             >
               <span className="flex items-center justify-between">
                 <span className="text-ink-3 transition-colors group-hover:text-brand-text">
@@ -744,7 +743,7 @@ export function IndicatorsView({ actions }: { actions: ShellActions }) {
                 </span>
                 <Download className="h-3.5 w-3.5 text-ink-4" />
               </span>
-              <span className="text-[12.5px] font-bold text-ink">{item.label}</span>
+              <span className="text-[12.5px] font-semibold text-ink">{item.label}</span>
               <span className="text-[11px] leading-relaxed text-ink-3">{item.detail}</span>
             </button>
           ))}

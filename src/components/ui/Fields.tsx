@@ -7,15 +7,20 @@ import { spring } from '../../lib/motion';
 /* ==========================================================================
    Form controls
    --------------------------------------------------------------------------
-   Every control shares one chrome: inset surface, hairline border, brand focus
-   ring. A required field is marked once, next to its label, and the hint sits
-   under the control where it is read after the value rather than before it.
+   Controls are filled, not outlined: the inset surface is what says "you can
+   type here". An outline would repeat what the fill already says, and would put
+   a rectangle back on a screen we just cleared of them.
+
+   The one line a control draws is the focus ring, because that is the only
+   moment a boundary carries information. A required field is marked once, next
+   to its label, and the hint sits under the control where it is read after the
+   value rather than before it.
    ========================================================================== */
 
 const CONTROL =
-  'w-full rounded-md border border-hairline-strong bg-surface-2 px-3 text-[13px] text-ink ' +
-  'transition-colors placeholder:text-ink-4 hover:border-ink-4 ' +
-  'focus:border-brand-2 focus:bg-surface focus:outline-none focus:ring-2 focus:ring-brand-2/25 ' +
+  'w-full rounded-md bg-surface-2 px-3 text-[13px] text-ink ' +
+  'transition-colors placeholder:text-ink-4 hover:bg-surface-3 ' +
+  'focus:bg-surface-2 focus:outline-none focus:ring-2 focus:ring-focus ' +
   'disabled:opacity-50';
 
 export function Label({
@@ -31,7 +36,7 @@ export function Label({
 }) {
   return (
     <div className="mb-1.5 flex items-baseline justify-between gap-3">
-      <label htmlFor={htmlFor} className="text-[12px] font-semibold text-ink">
+      <label htmlFor={htmlFor} className="text-[12px] font-medium text-ink">
         {children}
         {required && <span className="ml-1 text-crit">*</span>}
       </label>
@@ -166,8 +171,8 @@ export function Segmented<T extends string>({
     <div
       role="tablist"
       className={[
-        'inline-flex shrink-0 items-center gap-0.5 rounded-lg p-0.5',
-        tone === 'band' ? 'border border-band-line bg-band-inset' : 'border border-hairline bg-surface-2',
+        'inline-flex shrink-0 items-center gap-0.5 rounded-full p-0.5',
+        tone === 'band' ? 'bg-surface-3' : 'bg-surface-2',
         full ? 'w-full' : '',
       ].join(' ')}
     >
@@ -180,27 +185,18 @@ export function Segmented<T extends string>({
             aria-selected={active}
             onClick={() => onChange(opt.value)}
             className={[
-              'relative flex items-center justify-center gap-1.5 rounded-md font-semibold whitespace-nowrap transition-colors',
+              'relative flex items-center justify-center gap-1.5 rounded-full whitespace-nowrap transition-colors',
               height,
               pad,
               full ? 'flex-1' : '',
-              active
-                ? tone === 'band'
-                  ? 'text-brand'
-                  : 'text-ink'
-                : tone === 'band'
-                  ? 'text-band-ink-2 hover:text-band-ink'
-                  : 'text-ink-3 hover:text-ink',
+              active ? 'font-semibold text-ink' : 'font-medium text-ink-3 hover:text-ink',
             ].join(' ')}
           >
             {active && (
               <motion.span
                 layoutId={layoutId}
                 transition={spring}
-                className={[
-                  'absolute inset-0 rounded-md',
-                  tone === 'band' ? 'bg-white shadow-raised' : 'border border-hairline bg-surface shadow-raised',
-                ].join(' ')}
+                className="absolute inset-0 rounded-full bg-surface"
               />
             )}
             <span className="relative z-10 flex items-center gap-1.5">
@@ -209,8 +205,8 @@ export function Segmented<T extends string>({
               {opt.count !== undefined && (
                 <span
                   className={[
-                    'font-mono text-[10.5px] font-bold',
-                    active ? 'text-brand-text' : 'text-ink-4',
+                    'font-mono text-[10.5px] font-medium',
+                    active ? 'text-ink-3' : 'text-ink-4',
                   ].join(' ')}
                 >
                   {opt.count}
@@ -241,9 +237,9 @@ export function Switch({
 }) {
   const id = useId();
   return (
-    <div className="flex items-start justify-between gap-4 rounded-lg border border-hairline bg-surface-2 p-3.5">
+    <div className="flex items-start justify-between gap-4 rounded-lg bg-surface-2 p-3.5">
       <div className="min-w-0">
-        <label htmlFor={id} className="block text-[12.5px] font-semibold text-ink">
+        <label htmlFor={id} className="block text-[13px] font-medium text-ink">
           {label}
         </label>
         {description && (
@@ -294,12 +290,12 @@ export function Chip({
       onClick={onClick}
       aria-pressed={active}
       className={[
-        'inline-flex h-7 items-center gap-1.5 rounded-full border px-2.5 text-[11.5px] font-semibold transition-colors',
+        'inline-flex h-7 items-center gap-1.5 rounded-full px-3 text-[12px] transition-colors',
         active
           ? tone === 'crit'
-            ? 'border-crit-border bg-crit-soft text-crit-ink'
-            : 'border-brand-border bg-brand-soft text-brand-text'
-          : 'border-hairline bg-surface text-ink-3 hover:border-ink-4 hover:text-ink',
+            ? 'bg-crit font-semibold text-white'
+            : 'bg-ink font-semibold text-canvas'
+          : 'bg-surface-2 font-medium text-ink-3 hover:bg-surface-3 hover:text-ink',
       ].join(' ')}
     >
       {children}

@@ -114,7 +114,7 @@ export function TeamView({ actions }: { actions: ShellActions }) {
                   <button
                     key={kase.id}
                     onClick={() => actions.openCase(kase.id)}
-                    className="inline-flex items-center gap-2 rounded-md border border-crit-border bg-surface px-2.5 py-1.5 transition-colors hover:border-crit"
+                    className="inline-flex items-center gap-2 rounded-md bg-surface px-2.5 py-1.5 transition-colors"
                   >
                     <PriorityBadge priority={kase.priority} />
                     <span className="text-[11.5px] font-semibold text-ink">
@@ -127,7 +127,7 @@ export function TeamView({ actions }: { actions: ShellActions }) {
             {unassigned.length > 4 && (
               <button
                 onClick={() => actions.goto('fila')}
-                className="inline-flex items-center gap-1 px-2 text-[11.5px] font-bold text-brand-text hover:text-brand-2"
+                className="inline-flex items-center gap-1 px-2 text-[11.5px] font-semibold text-brand-text hover:text-brand-2"
               >
                 +{unassigned.length - 4} na fila
                 <ArrowRight className="h-3 w-3" />
@@ -147,17 +147,13 @@ export function TeamView({ actions }: { actions: ShellActions }) {
             const saturated = load >= 0.85;
 
             return (
-              <Card
-                key={spec.id}
-                className={isMe ? 'border-brand' : undefined}
-                padded={false}
-              >
+              <Card key={spec.id} tone={isMe ? 'band' : 'plain'} padded={false}>
                 <div className="p-5">
                   <div className="flex items-start gap-3">
                     <Avatar initials={spec.initials} size="md" tone={isMe ? 'brand' : 'neutral'} />
                     <div className="min-w-0 flex-1">
                       <div className="flex flex-wrap items-center gap-1.5">
-                        <span className="truncate text-[13px] font-bold text-ink">{spec.name}</span>
+                        <span className="truncate text-[13px] font-semibold text-ink">{spec.name}</span>
                         {isMe && (
                           <Pill tone="info" solid dot={false}>
                             você
@@ -199,12 +195,12 @@ export function TeamView({ actions }: { actions: ShellActions }) {
                   {/* Load */}
                   <div className="mt-4 space-y-1.5">
                     <div className="flex items-baseline justify-between">
-                      <span className="font-mono text-[9.5px] font-bold tracking-[0.08em] text-ink-4 uppercase">
+                      <span className="text-[11px] font-medium text-ink-4">
                         Carga operacional
                       </span>
                       <span
                         className={[
-                          'font-mono text-[12px] font-bold',
+                          'font-mono text-[12px] font-semibold',
                           saturated ? 'text-crit-ink' : 'text-ink',
                         ].join(' ')}
                       >
@@ -234,10 +230,10 @@ export function TeamView({ actions }: { actions: ShellActions }) {
                       { label: 'Saídas', value: lost, tone: lost > 0 ? 'text-risk-ink' : 'text-ink-3' },
                     ].map((m) => (
                       <div key={m.label}>
-                        <p className="font-mono text-[9px] font-bold tracking-[0.06em] text-ink-4 uppercase">
+                        <p className="text-[11px] font-medium text-ink-4">
                           {m.label}
                         </p>
-                        <p className={`mt-0.5 font-mono text-[15px] font-bold ${m.tone}`}>{m.value}</p>
+                        <p className={`mt-0.5 font-mono text-[15px] font-semibold ${m.tone}`}>{m.value}</p>
                       </div>
                     ))}
                   </div>
@@ -249,10 +245,10 @@ export function TeamView({ actions }: { actions: ShellActions }) {
                       { label: 'CSAT', value: decimal(spec.csat, 1) },
                     ].map((m) => (
                       <div key={m.label}>
-                        <p className="font-mono text-[9px] font-bold tracking-[0.06em] text-ink-4 uppercase">
+                        <p className="text-[11px] font-medium text-ink-4">
                           {m.label}
                         </p>
-                        <p className="mt-0.5 font-mono text-[12px] font-bold text-ink">{m.value}</p>
+                        <p className="mt-0.5 font-mono text-[12px] font-semibold text-ink">{m.value}</p>
                       </div>
                     ))}
                   </div>
@@ -322,12 +318,12 @@ export function TeamView({ actions }: { actions: ShellActions }) {
               detail: 'Entrada, primeiros acessos e adaptação nos primeiros 30/60/90 dias.',
             },
           ].map((q) => (
-            <div key={q.queue} className="rounded-lg border border-hairline bg-surface-2 p-3.5">
+            <div key={q.queue} className="rounded-lg bg-surface-2 p-3.5">
               <div className="flex items-start justify-between gap-2">
-                <p className="text-[12.5px] font-bold text-ink">{q.queue}</p>
+                <p className="text-[12.5px] font-semibold text-ink">{q.queue}</p>
                 <ShieldCheck className="h-3.5 w-3.5 shrink-0 text-ink-4" />
               </div>
-              <p className="mt-1 font-mono text-[10px] font-bold tracking-[0.06em] text-brand-text uppercase">
+              <p className="mt-1 text-[11px] font-medium text-brand-text">
                 {q.radar}
               </p>
               <p className="mt-1.5 text-[11.5px] leading-relaxed text-ink-3">{q.detail}</p>

@@ -9,156 +9,170 @@
    semantic token below, so a component never hardcodes a hex value and dark
    mode is a token swap rather than a second set of classes.
 
-   Principles (Apple HIG + Vercel Geist, adapted to the Anchieta identity):
-     · Institutional royal blue is the ONLY brand accent. No second hue.
-     · Pure black is never a surface or a text colour — neutrals are sculpted.
-     · Elevation is a hairline first; shadow only when a surface truly floats.
-     · Status colour is reserved for status. It never decorates.
+   The five rules this layer enforces:
+
+     1. SEPARATION IS CONTRAST, NOT A LINE. A card is a lighter surface on a
+        darker canvas. No outline around every box — a screen with forty
+        hairline rectangles reads as a wireframe, not as software.
+     2. A HAIRLINE IS A DIVIDER, NEVER A FRAME. `--hairline` exists to split a
+        list into rows and a card into sections. It never closes a shape.
+     3. ONE SURFACE RADIUS (12px) AND A PILL. Six radii were six decisions
+        nobody could remember; now the shape tells you if a thing is a surface
+        or a control.
+     4. COLOUR IS EARNED. Structure is monochrome. Institutional blue appears
+        in exactly three places — the primary button, the active nav item, the
+        main donut arc — so it still means something. Red is reserved for a
+        breached SLA and a critical case; amber for "atenção"; everything else
+        is ink.
+     5. NO SHADOW ON THINGS THAT DON'T FLOAT. Only overlays cast one.
    ========================================================================== */
 
 :root {
-  /* Surfaces */
-  --canvas: #f6f7f9;
-  --canvas-subtle: #f0f2f5;
+  /* -- Surfaces: the whole visual hierarchy, built from four greys --------- */
+  --canvas: #f3f4f6;
+  --canvas-subtle: #eef0f2;
   --surface: #ffffff;
-  --surface-2: #f5f6f8;
-  --surface-3: #eceef2;
-  --surface-hover: #f3f4f7;
+  --surface-2: #eef0f2;
+  --surface-3: #e6e8eb;
+  --surface-hover: #f3f4f6;
 
-  /* Hairlines */
-  --hairline: #e3e5ea;
-  --hairline-strong: #d3d7de;
+  /* -- Dividers (never frames) -------------------------------------------- */
+  --hairline: #e6e8eb;
+  --hairline-strong: #d8dbe0;
 
-  /* Text ladder */
-  --ink: #0d1117;
-  --ink-2: #3a424e;
-  --ink-3: #69727f;
-  --ink-4: #98a1af;
+  /* -- Text ladder -------------------------------------------------------- */
+  --ink: #101317;
+  --ink-2: #414852;
+  --ink-3: #6b7280;
+  --ink-4: #9aa1ac;
 
-  /* Brand — Azul Royal / Oceano / Ciano */
-  --brand: #003a70;
-  --brand-hover: #002d58;
+  /* -- Brand: surgical. Primary button, active nav, main donut arc. ------- */
+  --brand: #00509d;
+  --brand-hover: #003f7d;
   --brand-2: #00509d;
-  --brand-3: #00a3e0;
-  --brand-soft: #e9f1f8;
-  --brand-soft-2: #d7e6f4;
-  --brand-border: #c3d9ed;
-  --brand-text: #00437f;
+  --brand-3: #0f6fc4;
+  --brand-soft: #e8eef5;
+  --brand-soft-2: #dce7f1;
+  --brand-border: #e8eef5;
+  --brand-text: #00457f;
   --on-brand: #ffffff;
   /* The registered Grupo Anchieta wordmark blue — never re-tinted. */
   --brand-mark: #1567b8;
 
-  /* Contrast band — the surgical royal-blue panel */
-  --band: #003a70;
-  --band-2: #00325f;
-  --band-ink: #ffffff;
-  --band-ink-2: #a7c8e7;
-  --band-ink-3: #7ba9d1;
-  --band-line: rgb(255 255 255 / 0.16);
-  --band-inset: rgb(255 255 255 / 0.07);
+  /* -- Emphasis surface --------------------------------------------------
+     Was a royal-blue panel that took over whole sections. A hue that loud,
+     repeated on six screens, stopped reading as emphasis. It is now the inset
+     surface: one step of contrast, no hue, no grid, no shadow. */
+  --band: #eef0f2;
+  --band-2: #e6e8eb;
+  --band-ink: #101317;
+  --band-ink-2: #6b7280;
+  --band-ink-3: #9aa1ac;
+  --band-line: #e6e8eb;
+  --band-inset: #ffffff;
 
-  /* Status — Estável / Atenção / Risco / Crítico */
-  --ok: #15803d;
-  --ok-ink: #0f6330;
-  --ok-soft: #e7f5ec;
-  --ok-border: #bde0c9;
-  --warn: #b45309;
-  --warn-ink: #8f4308;
-  --warn-soft: #fdf4e5;
-  --warn-border: #f0dcb6;
-  --risk: #c2410c;
-  --risk-ink: #9c340a;
-  --risk-soft: #fdf0e9;
-  --risk-border: #f4d2c0;
-  --crit: #be123c;
-  --crit-ink: #9c0f31;
-  --crit-soft: #fdecf0;
-  --crit-border: #f5c9d4;
+  /* -- Status: gray → amber → amber → red. One red, at the end. ---------- */
+  --ok: #6b7280;
+  --ok-ink: #414852;
+  --ok-soft: #eef0f2;
+  --ok-border: #e6e8eb;
+  --warn: #9a7128;
+  --warn-ink: #7d5c1f;
+  --warn-soft: #f5f1e8;
+  --warn-border: #ece3d1;
+  --risk: #a15c07;
+  --risk-ink: #874d05;
+  --risk-soft: #f6f0e7;
+  --risk-border: #eddfc9;
+  --crit: #b42318;
+  --crit-ink: #971d14;
+  --crit-soft: #f8eceb;
+  --crit-border: #f0d5d2;
   --info: #00509d;
-  --info-soft: #e9f1f8;
-  --info-border: #c3d9ed;
+  --info-soft: #e8eef5;
+  --info-border: #dce7f1;
 
-  /* Chrome */
+  /* -- Chrome ------------------------------------------------------------- */
   --focus: #00509d;
-  --scrim: rgb(13 17 23 / 0.44);
-  --track: #e6e8ec;
+  --scrim: rgb(16 19 23 / 0.4);
+  --track: #e6e8eb;
   --skeleton: #eaecf0;
 
-  /* Elevation */
-  --shadow-raised: 0 1px 2px rgb(13 17 23 / 0.05);
+  /* -- Elevation: overlays only ------------------------------------------- */
+  --shadow-raised: none;
   --shadow-overlay:
-    0 1px 2px rgb(13 17 23 / 0.06), 0 8px 24px -6px rgb(13 17 23 / 0.12),
-    0 24px 56px -12px rgb(13 17 23 / 0.14);
-  --shadow-band: 0 1px 2px rgb(0 42 82 / 0.16), 0 12px 28px -14px rgb(0 42 82 / 0.4);
+    0 1px 2px rgb(16 19 23 / 0.06), 0 8px 24px -6px rgb(16 19 23 / 0.12),
+    0 24px 56px -12px rgb(16 19 23 / 0.14);
+  --shadow-band: none;
 
   color-scheme: light;
 }
 
 .dark {
-  --canvas: #0a0b0d;
-  --canvas-subtle: #0d0f12;
-  --surface: #111316;
-  --surface-2: #171a1e;
-  --surface-3: #1e2227;
-  --surface-hover: #191d22;
+  --canvas: #0c0d0f;
+  --canvas-subtle: #101215;
+  --surface: #16181b;
+  --surface-2: #1d1f23;
+  --surface-3: #24272c;
+  --surface-hover: #1f2226;
 
-  --hairline: #23272d;
-  --hairline-strong: #313740;
+  --hairline: #262a2f;
+  --hairline-strong: #343941;
 
-  --ink: #f1f3f6;
-  --ink-2: #c2c9d3;
-  --ink-3: #8b95a2;
-  --ink-4: #626c79;
+  --ink: #f2f4f6;
+  --ink-2: #c3c9d1;
+  --ink-3: #8b929c;
+  --ink-4: #626973;
 
   --brand: #2b7cc9;
-  --brand-hover: #3a8bd8;
+  --brand-hover: #3b8cd9;
   --brand-2: #4d9ae0;
   --brand-3: #35b6ec;
-  --brand-soft: #10233a;
-  --brand-soft-2: #142c48;
-  --brand-border: #1f3d5e;
+  --brand-soft: #16222f;
+  --brand-soft-2: #1a2c3d;
+  --brand-border: #16222f;
   --brand-text: #7fb6e6;
   --on-brand: #ffffff;
   --brand-mark: #2b83d4;
 
-  --band: #0b2c4f;
-  --band-2: #0e3559;
-  --band-ink: #f2f7fc;
-  --band-ink-2: #94bade;
-  --band-ink-3: #6d97bd;
-  --band-line: rgb(255 255 255 / 0.12);
-  --band-inset: rgb(255 255 255 / 0.05);
+  --band: #1d1f23;
+  --band-2: #24272c;
+  --band-ink: #f2f4f6;
+  --band-ink-2: #8b929c;
+  --band-ink-3: #626973;
+  --band-line: #262a2f;
+  --band-inset: #16181b;
 
-  --ok: #3fb96b;
-  --ok-ink: #7fd79f;
-  --ok-soft: #0f2418;
-  --ok-border: #1d3f28;
-  --warn: #d3a03c;
-  --warn-ink: #e6bf74;
-  --warn-soft: #241c0c;
-  --warn-border: #45351a;
-  --risk: #e07a45;
-  --risk-ink: #f0a179;
-  --risk-soft: #26170f;
-  --risk-border: #482a1b;
-  --crit: #e05561;
-  --crit-ink: #f08b93;
-  --crit-soft: #26121a;
-  --crit-border: #4a2028;
+  --ok: #8b929c;
+  --ok-ink: #c3c9d1;
+  --ok-soft: #1d1f23;
+  --ok-border: #262a2f;
+  --warn: #b99552;
+  --warn-ink: #d0b17a;
+  --warn-soft: #201c14;
+  --warn-border: #3a3222;
+  --risk: #cd8a45;
+  --risk-ink: #e0a970;
+  --risk-soft: #231a12;
+  --risk-border: #40301f;
+  --crit: #e0554b;
+  --crit-ink: #f08a82;
+  --crit-soft: #241614;
+  --crit-border: #452421;
   --info: #4d9ae0;
-  --info-soft: #10233a;
-  --info-border: #1f3d5e;
+  --info-soft: #16222f;
+  --info-border: #1a2c3d;
 
   --focus: #4d9ae0;
   --scrim: rgb(4 5 7 / 0.66);
-  --track: #23272d;
-  --skeleton: #1a1e23;
+  --track: #262a2f;
+  --skeleton: #1c1f23;
 
-  --shadow-raised: 0 1px 2px rgb(0 0 0 / 0.4);
+  --shadow-raised: none;
   --shadow-overlay:
     0 1px 2px rgb(0 0 0 / 0.5), 0 12px 32px -8px rgb(0 0 0 / 0.6),
     0 32px 64px -16px rgb(0 0 0 / 0.7);
-  --shadow-band: 0 1px 2px rgb(0 0 0 / 0.5), 0 12px 28px -14px rgb(0 0 0 / 0.7);
+  --shadow-band: none;
 
   color-scheme: dark;
 }
@@ -221,16 +235,19 @@
   --color-skeleton: var(--skeleton);
   --color-focus: var(--focus);
 
-  --font-sans:
-    'Inter', -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', Roboto, sans-serif;
-  --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  /* Geist is the face the shadcn/Vercel dashboards use, and it ships with a
+     matching mono. One family, one voice, two widths. */
+  --font-sans: 'Geist', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-mono: 'Geist Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 
-  --radius-xs: 5px;
-  --radius-sm: 7px;
-  --radius-md: 10px;
-  --radius-lg: 14px;
-  --radius-xl: 18px;
-  --radius-2xl: 22px;
+  /* Two radii. `xs` and `sm` exist only for inline chips and controls that
+     would look absurd at 12px; everything that is a surface uses 12px. */
+  --radius-xs: 6px;
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 12px;
+  --radius-xl: 12px;
+  --radius-2xl: 12px;
 
   --shadow-raised: var(--shadow-raised);
   --shadow-overlay: var(--shadow-overlay);
@@ -254,9 +271,8 @@
     background-color: var(--canvas);
     color: var(--ink);
     font-family: var(--font-sans);
-    font-feature-settings: 'cv02', 'cv03', 'cv04', 'ss01';
     font-optical-sizing: auto;
-    letter-spacing: -0.011em;
+    letter-spacing: -0.006em;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
   }
@@ -265,14 +281,15 @@
   h1,
   h2,
   h3 {
-    letter-spacing: -0.022em;
+    letter-spacing: -0.02em;
   }
 
-  /* Every metric in a data cockpit must align vertically across rows. */
+  /* Mono is for values that must align down a column — RA, protocol, money,
+     an SLA countdown. It is not a label style. */
   .font-mono,
   [class*='font-mono'] {
     font-variant-numeric: tabular-nums;
-    letter-spacing: -0.01em;
+    letter-spacing: 0;
   }
 
   button,
@@ -351,23 +368,16 @@
     -webkit-backdrop-filter: blur(14px) saturate(115%);
   }
 
-  /* -- Ambient depth for the royal-blue contrast band --------------------- */
+  /* -- Emphasis surface: flat. Kept as a class so the ~19 call sites that
+        ask for it keep working, but it no longer paints a blue panel. ----- */
   .band-surface {
-    background-image: linear-gradient(160deg, var(--band-2) 0%, var(--band) 58%, var(--band-2) 100%);
+    background-color: var(--band);
   }
 
-  /* -- Hairline grid used behind band panels (structure, not decoration) -- */
+  /* The decorative grid that used to sit on the blue panel is gone. The
+     selector stays so `band-grid` remains a valid, inert class. */
   .band-grid::before {
-    content: '';
-    position: absolute;
-    inset: 0;
-    pointer-events: none;
-    background-image:
-      linear-gradient(to right, var(--band-inset) 1px, transparent 1px),
-      linear-gradient(to bottom, var(--band-inset) 1px, transparent 1px);
-    background-size: 56px 56px;
-    mask-image: radial-gradient(120% 100% at 100% 0%, #000 0%, transparent 72%);
-    -webkit-mask-image: radial-gradient(120% 100% at 100% 0%, #000 0%, transparent 72%);
+    content: none;
   }
 
   /* -- Live indicator: a single calm pulse, never a party -----------------  */

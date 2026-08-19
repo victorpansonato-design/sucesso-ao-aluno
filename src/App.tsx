@@ -156,11 +156,12 @@ function Shell() {
 
         <footer className="border-t border-hairline px-4 py-4 sm:px-6 lg:px-8 print:hidden">
           <div className="mx-auto flex w-full max-w-[1440px] flex-wrap items-center justify-between gap-2">
-            <p className="font-mono text-[10.5px] text-ink-4">
+            <p className="text-[11px] text-ink-4">
               UniAnchieta · Centro de Sucesso ao Aluno · ambiente de demonstração com dados fictícios
             </p>
-            <p className="font-mono text-[10.5px] text-ink-4">
-              {cases.length} casos · {students.length} alunos na base
+            <p className="text-[11px] text-ink-4">
+              <span className="font-mono">{cases.length}</span> casos ·{' '}
+              <span className="font-mono">{students.length}</span> alunos na base
             </p>
           </div>
         </footer>

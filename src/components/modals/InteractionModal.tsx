@@ -208,10 +208,10 @@ export function InteractionModal({
                   type="button"
                   onClick={() => setChannel(c.value)}
                   className={[
-                    'flex flex-col items-center gap-1.5 rounded-lg border px-2 py-3 transition-colors',
+                    'flex flex-col items-center gap-1.5 rounded-lg px-2 py-3 transition-colors',
                     active
-                      ? 'border-brand bg-brand-soft text-brand-text'
-                      : 'border-hairline bg-surface-2 text-ink-3 hover:border-ink-4 hover:text-ink',
+                      ? 'bg-brand-soft text-brand-text'
+                      : 'bg-surface-2 text-ink-3 hover:text-ink',
                   ].join(' ')}
                 >
                   <c.Icon className="h-4 w-4" />
@@ -256,8 +256,8 @@ export function InteractionModal({
         </div>
 
         {/* The mandatory four */}
-        <div className="space-y-4 rounded-lg border border-hairline bg-surface-2 p-4">
-          <p className="font-mono text-[10px] font-bold tracking-[0.1em] text-ink-4 uppercase">
+        <div className="space-y-4 rounded-lg bg-surface-2 p-4">
+          <p className="text-[11px] font-medium text-ink-4">
             Registro mínimo obrigatório
           </p>
 

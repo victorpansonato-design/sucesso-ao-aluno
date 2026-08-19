@@ -6,11 +6,18 @@ import { emphasis, press } from '../../lib/motion';
 /* ==========================================================================
    Surfaces & layout primitives
    --------------------------------------------------------------------------
-   A card is a hairline and a radius. Elevation is reserved for things that
-   genuinely float. The `band` variant is the one place the institutional royal
-   blue takes over a whole surface, and it is used sparingly and deliberately:
-   the primary KPI row, a critical case header, a section hero. If it appeared
-   everywhere it would stop meaning "pay attention here".
+   A card is a lighter surface and a 12px radius. That is the whole recipe.
+
+   No border: a hairline around every box turns a dense screen into a stack of
+   picture frames, and the eye has to parse the frame before it can read the
+   content. Contrast alone separates a card from the canvas, with less ink.
+
+   No shadow either. Nothing on a page is floating — it is laid out. Only
+   overlays, which genuinely sit above the app, cast one.
+
+   Hairlines still exist, but only as dividers: between rows of a list, between
+   sections of a card, under a section label. A line that separates is useful.
+   A line that encloses is decoration.
    ========================================================================== */
 
 export function Card({
@@ -23,25 +30,14 @@ export function Card({
   children: ReactNode;
   className?: string;
   padded?: boolean;
+  /** `inset` and `band` are both "one step of contrast" — no hue, no frame. */
   tone?: 'plain' | 'inset' | 'band';
   as?: 'section' | 'div' | 'article' | 'aside';
 }) {
-  const toneClass =
-    tone === 'band'
-      ? 'band-surface band-grid relative border-band-line text-band-ink shadow-band'
-      : tone === 'inset'
-        ? 'border-hairline bg-surface-2'
-        : 'border-hairline bg-surface';
+  const toneClass = tone === 'plain' ? 'bg-surface' : 'bg-surface-2';
 
   return (
-    <Tag
-      className={[
-        'rounded-xl border',
-        toneClass,
-        padded ? 'p-5' : '',
-        className,
-      ].join(' ')}
-    >
+    <Tag className={['rounded-xl', toneClass, padded ? 'p-5' : '', className].join(' ')}>
       {children}
     </Tag>
   );
@@ -52,47 +48,26 @@ export function CardHeader({
   subtitle,
   eyebrow,
   action,
-  tone = 'plain',
   className = '',
 }: {
   title: ReactNode;
   subtitle?: ReactNode;
+  /** Use only when it names a real section. Not on every card. */
   eyebrow?: ReactNode;
   action?: ReactNode;
-  tone?: 'plain' | 'band';
   className?: string;
 }) {
-  const onBand = tone === 'band';
   return (
     <div className={`relative flex items-start justify-between gap-4 ${className}`}>
       <div className="min-w-0">
         {eyebrow && (
-          <div
-            className={[
-              'mb-1.5 font-mono text-[10px] font-bold tracking-[0.1em] uppercase',
-              onBand ? 'text-band-ink-2' : 'text-ink-4',
-            ].join(' ')}
-          >
+          <div className="mb-1 flex items-center gap-1.5 text-[12px] font-medium text-ink-3">
             {eyebrow}
           </div>
         )}
-        <h2
-          className={[
-            'text-[14.5px] leading-tight font-bold',
-            onBand ? 'text-band-ink' : 'text-ink',
-          ].join(' ')}
-        >
-          {title}
-        </h2>
+        <h2 className="text-[15px] leading-tight font-semibold text-ink">{title}</h2>
         {subtitle && (
-          <p
-            className={[
-              'mt-1 max-w-2xl text-[12px] leading-relaxed',
-              onBand ? 'text-band-ink-2' : 'text-ink-3',
-            ].join(' ')}
-          >
-            {subtitle}
-          </p>
+          <p className="mt-1 max-w-2xl text-[12px] leading-relaxed text-ink-3">{subtitle}</p>
         )}
       </div>
       {action && <div className="flex shrink-0 items-center gap-2">{action}</div>}
@@ -121,11 +96,13 @@ export function PageHeader({
       <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
         <div className="min-w-0">
           {eyebrow && (
-            <div className="mb-2 flex items-center gap-2 font-mono text-[10.5px] font-bold tracking-[0.1em] text-ink-4 uppercase">
+            <div className="mb-1.5 flex items-center gap-2 text-[12px] font-medium text-ink-3">
               {eyebrow}
             </div>
           )}
-          <h1 className="text-[26px] leading-[1.1] font-bold text-ink sm:text-[30px]">{title}</h1>
+          <h1 className="text-[24px] leading-[1.15] font-semibold text-ink sm:text-[30px]">
+            {title}
+          </h1>
           {description && (
             <p className="mt-2 max-w-3xl text-[13px] leading-relaxed text-ink-3">{description}</p>
           )}
@@ -137,14 +114,15 @@ export function PageHeader({
   );
 }
 
-/* -- Section divider with a label ---------------------------------------- */
+/* -- Section divider with a label ----------------------------------------
+   Sentence case, not a mono all-caps eyebrow. Uppercase mono repeated a dozen
+   times per screen reads as texture, and texture is what makes a dense tool
+   tiring to look at for eight hours. */
 
 export function SectionLabel({ children, action }: { children: ReactNode; action?: ReactNode }) {
   return (
     <div className="flex items-baseline justify-between gap-4 border-b border-hairline pb-2">
-      <h2 className="font-mono text-[10.5px] font-bold tracking-[0.1em] text-ink-3 uppercase">
-        {children}
-      </h2>
+      <h2 className="text-[12px] font-semibold text-ink-3">{children}</h2>
       {action}
     </div>
   );
@@ -172,84 +150,91 @@ export function StatTile({
   /** Status hue for the value, when the metric carries a verdict. */
   accent?: string;
 }) {
-  const onBand = tone === 'band';
   const interactive = Boolean(onClick);
 
   const body = (
     <>
       <div className="relative flex items-start justify-between gap-3">
-        <span
-          className={[
-            'font-mono text-[10px] font-bold tracking-[0.1em] uppercase',
-            onBand ? 'text-band-ink-2' : 'text-ink-4',
-          ].join(' ')}
-        >
-          {label}
-        </span>
-        {icon && (
-          <span className={onBand ? 'text-band-ink-2' : 'text-ink-4'}>{icon}</span>
-        )}
+        <span className="text-[12px] font-medium text-ink-3">{label}</span>
+        {icon && <span className="text-ink-4">{icon}</span>}
       </div>
 
-      <div className="relative mt-2.5 flex items-baseline gap-2">
+      <div className="relative mt-2 flex items-baseline gap-2">
         <span
-          className="font-mono text-[27px] leading-none font-bold tracking-tight"
+          className="font-mono text-[24px] leading-none font-medium tracking-tight"
           style={accent ? { color: accent } : undefined}
         >
-          <span className={accent ? '' : onBand ? 'text-band-ink' : 'text-ink'}>{value}</span>
+          <span className={accent ? '' : 'text-ink'}>{value}</span>
         </span>
-        {detail && (
-          <span
-            className={[
-              'text-[12px] font-semibold',
-              onBand ? 'text-band-ink-2' : 'text-ink-3',
-            ].join(' ')}
-          >
-            {detail}
-          </span>
-        )}
+        {detail && <span className="text-[12px] text-ink-3">{detail}</span>}
       </div>
 
       {footer && (
-        <div
-          className={[
-            'relative mt-3 flex items-center justify-between gap-2 border-t pt-2.5 text-[11.5px]',
-            onBand ? 'border-band-line text-band-ink-2' : 'border-hairline text-ink-3',
-          ].join(' ')}
-        >
+        <div className="relative mt-3 flex items-center justify-between gap-2 border-t border-hairline pt-2.5 text-[11px] text-ink-3">
           {footer}
         </div>
       )}
     </>
   );
 
+  const surface = tone === 'band' ? 'bg-surface-2' : 'bg-surface';
+
   if (interactive) {
     return (
       <motion.button
         whileTap={press}
         onClick={onClick}
-        className={[
-          'flex flex-col rounded-xl border p-4 text-left transition-colors',
-          onBand
-            ? 'border-band-line bg-band-inset hover:bg-white/10'
-            : 'border-hairline bg-surface hover:border-ink-4',
-        ].join(' ')}
+        className={`flex flex-col rounded-xl p-4 text-left transition-colors hover:bg-surface-hover ${surface}`}
       >
         {body}
       </motion.button>
     );
   }
 
-  return (
-    <div
-      className={[
-        'flex flex-col rounded-xl border p-4',
-        onBand ? 'border-band-line bg-band-inset' : 'border-hairline bg-surface',
-      ].join(' ')}
-    >
-      {body}
-    </div>
+  return <div className={`flex flex-col rounded-xl p-4 ${surface}`}>{body}</div>;
+}
+
+/* -- Metric: a number with no box around it -------------------------------
+   For the handful of figures that open a screen. They are separated by
+   whitespace, not by five little cards in a row. */
+
+export function Metric({
+  label,
+  value,
+  onClick,
+  tone = 'plain',
+}: {
+  label: ReactNode;
+  value: ReactNode;
+  onClick?: () => void;
+  tone?: 'plain' | 'crit';
+}) {
+  const inner = (
+    <>
+      <span
+        className={[
+          'block font-mono text-[30px] leading-none font-medium tracking-tight',
+          tone === 'crit' ? 'text-crit-ink' : 'text-ink',
+        ].join(' ')}
+      >
+        {value}
+      </span>
+      <span className="mt-2 block text-[12px] font-medium text-ink-3">{label}</span>
+    </>
   );
+
+  if (onClick) {
+    return (
+      <motion.button
+        whileTap={press}
+        onClick={onClick}
+        className="min-w-0 text-left transition-opacity hover:opacity-60"
+      >
+        {inner}
+      </motion.button>
+    );
+  }
+  return <div className="min-w-0">{inner}</div>;
 }
 
 /* -- Row: the clickable list item used across queues and directories ------ */
@@ -274,21 +259,14 @@ export function Row({
       className={[
         'relative block w-full text-left transition-colors',
         onClick ? 'cursor-pointer' : '',
-        active
-          ? 'bg-brand-soft'
-          : onClick
-            ? 'hover:bg-surface-hover'
-            : '',
+        active ? 'bg-surface-2' : onClick ? 'hover:bg-surface-hover' : '',
         className,
       ].join(' ')}
     >
       {/* Left rail marks the active row and, in red, a breached one. */}
       {(active || tone === 'crit') && (
         <span
-          className={[
-            'absolute inset-y-0 left-0 w-[3px]',
-            active ? 'bg-brand' : 'bg-crit',
-          ].join(' ')}
+          className={['absolute inset-y-0 left-0 w-0.5', active ? 'bg-brand' : 'bg-crit'].join(' ')}
         />
       )}
       {children}
@@ -318,12 +296,14 @@ export function EmptyState({
         compact ? 'gap-2 px-6 py-10' : 'gap-3 px-6 py-16',
       ].join(' ')}
     >
-      <div className="flex h-11 w-11 items-center justify-center rounded-xl border border-hairline bg-surface-2 text-ink-4">
+      <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-surface-2 text-ink-4">
         {icon ?? <Inbox className="h-5 w-5" />}
       </div>
       <div>
-        <p className="text-[13px] font-bold text-ink">{title}</p>
-        {message && <p className="mx-auto mt-1 max-w-sm text-[12px] leading-relaxed text-ink-3">{message}</p>}
+        <p className="text-[13px] font-semibold text-ink">{title}</p>
+        {message && (
+          <p className="mx-auto mt-1 max-w-sm text-[12px] leading-relaxed text-ink-3">{message}</p>
+        )}
       </div>
       {action}
     </div>
@@ -347,20 +327,21 @@ export function DataList({
   columns?: 1 | 2 | 3 | 4;
   className?: string;
 }) {
-  const grid = { 1: 'grid-cols-1', 2: 'grid-cols-2', 3: 'grid-cols-3', 4: 'grid-cols-2 sm:grid-cols-4' }[
-    columns
-  ];
+  const grid = {
+    1: 'grid-cols-1',
+    2: 'grid-cols-2',
+    3: 'grid-cols-3',
+    4: 'grid-cols-2 sm:grid-cols-4',
+  }[columns];
   return (
     <dl className={`grid gap-x-5 gap-y-3 ${grid} ${className}`}>
       {items.map((item) => (
         <div key={item.label} className="min-w-0">
-          <dt className="font-mono text-[9.5px] font-bold tracking-[0.08em] text-ink-4 uppercase">
-            {item.label}
-          </dt>
+          <dt className="text-[11px] font-medium text-ink-4">{item.label}</dt>
           <dd
             className={[
-              'mt-1 text-[13px] font-semibold',
-              item.tone === 'crit' ? 'text-crit-ink' : item.tone === 'ok' ? 'text-ok-ink' : 'text-ink',
+              'mt-0.5 text-[13px] font-medium',
+              item.tone === 'crit' ? 'text-crit-ink' : 'text-ink',
             ].join(' ')}
           >
             {item.value}
@@ -371,7 +352,10 @@ export function DataList({
   );
 }
 
-/* -- Callout -------------------------------------------------------------- */
+/* -- Callout --------------------------------------------------------------
+   A tinted box with a matching border was the loudest thing on the page. The
+   tone now lives in a 2px rail on the left edge; the box itself is just the
+   inset surface. Same hierarchy, a fraction of the ink. */
 
 export function Callout({
   children,
@@ -384,25 +368,26 @@ export function Callout({
   icon?: ReactNode;
   title?: ReactNode;
 }) {
-  const toneClass = {
-    info: 'border-info-border bg-info-soft',
-    warn: 'border-warn-border bg-warn-soft',
-    crit: 'border-crit-border bg-crit-soft',
-    ok: 'border-ok-border bg-ok-soft',
+  const rail = {
+    info: 'bg-brand',
+    warn: 'bg-warn',
+    crit: 'bg-crit',
+    ok: 'bg-ink-4',
   }[tone];
 
   const textClass = {
-    info: 'text-brand-text',
+    info: 'text-ink',
     warn: 'text-warn-ink',
     crit: 'text-crit-ink',
-    ok: 'text-ok-ink',
+    ok: 'text-ink',
   }[tone];
 
   return (
-    <div className={`flex gap-2.5 rounded-lg border p-3.5 ${toneClass}`}>
+    <div className="relative flex gap-2.5 overflow-hidden rounded-lg bg-surface-2 p-3.5 pl-4">
+      <span className={`absolute inset-y-0 left-0 w-0.5 ${rail}`} />
       {icon && <span className={`mt-px shrink-0 ${textClass}`}>{icon}</span>}
       <div className="min-w-0 text-[12px] leading-relaxed">
-        {title && <p className={`font-bold ${textClass}`}>{title}</p>}
+        {title && <p className={`font-semibold ${textClass}`}>{title}</p>}
         {children && <div className={`${title ? 'mt-1' : ''} text-ink-2`}>{children}</div>}
       </div>
     </div>
@@ -423,7 +408,10 @@ export function Tabs<T extends string>({
   layoutId: string;
 }) {
   return (
-    <div role="tablist" className="scroll-slim -mb-px flex gap-1 overflow-x-auto border-b border-hairline">
+    <div
+      role="tablist"
+      className="scroll-slim -mb-px flex gap-1 overflow-x-auto border-b border-hairline"
+    >
       {tabs.map((tab) => {
         const active = tab.value === value;
         return (
@@ -433,8 +421,8 @@ export function Tabs<T extends string>({
             aria-selected={active}
             onClick={() => onChange(tab.value)}
             className={[
-              'relative shrink-0 px-3.5 py-2.5 text-[12.5px] font-semibold transition-colors',
-              active ? 'text-ink' : 'text-ink-3 hover:text-ink',
+              'relative shrink-0 px-3.5 py-2.5 text-[13px] transition-colors',
+              active ? 'font-semibold text-ink' : 'font-medium text-ink-3 hover:text-ink',
             ].join(' ')}
           >
             <span className="flex items-center gap-1.5">
@@ -442,8 +430,8 @@ export function Tabs<T extends string>({
               {tab.count !== undefined && (
                 <span
                   className={[
-                    'rounded px-1.5 py-px font-mono text-[10px] font-bold',
-                    active ? 'bg-brand-soft text-brand-text' : 'bg-surface-3 text-ink-4',
+                    'rounded-sm px-1.5 py-px font-mono text-[10px] font-medium',
+                    active ? 'bg-surface-3 text-ink-2' : 'bg-surface-2 text-ink-4',
                   ].join(' ')}
                 >
                   {tab.count}
@@ -454,7 +442,7 @@ export function Tabs<T extends string>({
               <motion.span
                 layoutId={layoutId}
                 transition={{ duration: 0.22, ease: emphasis }}
-                className="absolute inset-x-2 -bottom-px h-[2px] rounded-full bg-brand"
+                className="absolute inset-x-2 -bottom-px h-0.5 rounded-full bg-brand"
               />
             )}
           </button>

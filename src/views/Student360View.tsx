@@ -162,7 +162,7 @@ export function Student360View({
               <Avatar initials={student.initials} size="lg" tone={student.status} />
               <div className="min-w-0 flex-1">
                 <div className="flex flex-wrap items-center gap-2">
-                  <h1 className="text-[24px] leading-tight font-bold text-ink">{student.name}</h1>
+                  <h1 className="text-[24px] leading-tight font-semibold text-ink">{student.name}</h1>
                   <HealthBadge status={student.status} solid />
                   <CohortBadge cohort={student.cohort} days={student.journey.daysSinceEnrollment} />
                 </div>
@@ -221,7 +221,7 @@ export function Student360View({
                   <>
                     <span>Mínimo: 75%</span>
                     {student.academic.attendancePrevPercent !== student.academic.attendancePercent && (
-                      <span className="font-mono font-bold">
+                      <span className="font-mono font-semibold">
                         antes {percent(student.academic.attendancePrevPercent)}
                       </span>
                     )}
@@ -241,7 +241,7 @@ export function Student360View({
                         ? 'acesso hoje'
                         : `há ${student.engagement.lastAccessDaysAgo} d`}
                     </span>
-                    {drop > 0 && <span className="font-mono font-bold">−{drop}%</span>}
+                    {drop > 0 && <span className="font-mono font-semibold">−{drop}%</span>}
                   </>
                 }
               />
@@ -255,7 +255,7 @@ export function Student360View({
                   <>
                     <span className="truncate">{student.financial.situation}</span>
                     {student.financial.outstanding > 0 && (
-                      <span className="font-mono font-bold">{money(student.financial.outstanding)}</span>
+                      <span className="font-mono font-semibold">{money(student.financial.outstanding)}</span>
                     )}
                   </>
                 }
@@ -321,10 +321,10 @@ export function Student360View({
               key={alert.id}
               className={
                 alert.severity === 'Crítico'
-                  ? 'border-crit-border'
+                  ? ''
                   : alert.severity === 'Risco'
-                    ? 'border-risk-border'
-                    : 'border-warn-border'
+                    ? ''
+                    : ''
               }
             >
               <div className="flex flex-wrap items-start justify-between gap-4">
@@ -342,14 +342,14 @@ export function Student360View({
                     </span>
                   </div>
 
-                  <h3 className="mt-2 text-[14px] font-bold text-ink">{alert.title}</h3>
+                  <h3 className="mt-2 text-[14px] font-semibold text-ink">{alert.title}</h3>
                   <p className="mt-1.5 max-w-3xl text-[12.5px] leading-relaxed text-ink-2">
                     {alert.detail}
                   </p>
 
                   <div className="mt-3 grid gap-3 sm:grid-cols-2">
-                    <div className="rounded-lg border border-hairline bg-surface-2 p-3">
-                      <p className="font-mono text-[9.5px] font-bold tracking-[0.08em] text-ink-4 uppercase">
+                    <div className="rounded-lg bg-surface-2 p-3">
+                      <p className="text-[11px] font-medium text-ink-4">
                         Dados que geraram o alerta
                       </p>
                       <ul className="mt-2 space-y-1.5">
@@ -361,8 +361,8 @@ export function Student360View({
                         ))}
                       </ul>
                     </div>
-                    <div className="rounded-lg border border-brand-border bg-brand-soft p-3">
-                      <p className="font-mono text-[9.5px] font-bold tracking-[0.08em] text-brand-text uppercase">
+                    <div className="rounded-lg bg-brand-soft p-3">
+                      <p className="text-[11px] font-medium text-brand-text">
                         Ação sugerida
                       </p>
                       <p className="mt-2 text-[11.5px] leading-relaxed text-ink-2">
@@ -407,7 +407,7 @@ export function Student360View({
 
       {radars.length > 0 && pendingAlerts.length === 0 && (
         <Callout tone="warn" icon={<RadarIcon className="h-3.5 w-3.5" />} title="Radares ativos sem alerta aberto">
-          {radars.map((r) => RADARS[r].label).join(' · ')} — os gatilhos estão acionados mas nenhum alerta
+          {radars.map((r) => RADARS[r].label).join('·')} — os gatilhos estão acionados mas nenhum alerta
           aguarda verdicto. Considere abrir um caso de acompanhamento.
         </Callout>
       )}
@@ -462,7 +462,7 @@ export function Student360View({
                     {followUps.map((f) => (
                       <li
                         key={f.id}
-                        className="rounded-lg border border-hairline bg-surface-2 p-3"
+                        className="rounded-lg bg-surface-2 p-3"
                       >
                         <div className="flex items-start justify-between gap-2">
                           <p className="text-[12px] leading-snug font-semibold text-ink">{f.title}</p>
@@ -522,18 +522,18 @@ export function Student360View({
                         <div
                           key={d.id}
                           className={[
-                            'rounded-lg border p-4',
+                            'rounded-lg p-4',
                             d.status === 'Em risco' || d.status === 'Dependência'
-                              ? 'border-crit-border bg-crit-soft/40'
-                              : 'border-hairline bg-surface-2',
+                              ? 'bg-crit-soft/40'
+                              : 'bg-surface-2',
                           ].join(' ')}
                         >
                           <div className="flex items-start justify-between gap-3">
                             <div className="min-w-0">
-                              <p className="font-mono text-[10px] font-bold tracking-[0.08em] text-ink-4 uppercase">
+                              <p className="text-[11px] font-medium text-ink-4">
                                 {d.code} · {d.format}
                               </p>
-                              <h4 className="mt-0.5 text-[13px] leading-snug font-bold text-ink">
+                              <h4 className="mt-0.5 text-[13px] leading-snug font-semibold text-ink">
                                 {d.name}
                               </h4>
                               <p className="mt-0.5 text-[11.5px] text-ink-3">
@@ -559,12 +559,12 @@ export function Student360View({
 
                           <div className="mt-3 grid grid-cols-3 gap-3 border-t border-hairline pt-3">
                             <div>
-                              <p className="font-mono text-[9.5px] font-bold tracking-[0.08em] text-ink-4 uppercase">
+                              <p className="text-[11px] font-medium text-ink-4">
                                 Nota
                               </p>
                               <p
                                 className={[
-                                  'mt-0.5 font-mono text-[15px] font-bold',
+                                  'mt-0.5 font-mono text-[15px] font-semibold',
                                   d.grade > 0 && d.grade < 6 ? 'text-crit-ink' : 'text-ink',
                                 ].join(' ')}
                               >
@@ -572,12 +572,12 @@ export function Student360View({
                               </p>
                             </div>
                             <div>
-                              <p className="font-mono text-[9.5px] font-bold tracking-[0.08em] text-ink-4 uppercase">
+                              <p className="text-[11px] font-medium text-ink-4">
                                 Frequência
                               </p>
                               <p
                                 className={[
-                                  'mt-0.5 font-mono text-[15px] font-bold',
+                                  'mt-0.5 font-mono text-[15px] font-semibold',
                                   d.attendancePercent < 75 ? 'text-crit-ink' : 'text-ink',
                                 ].join(' ')}
                               >
@@ -585,12 +585,12 @@ export function Student360View({
                               </p>
                             </div>
                             <div>
-                              <p className="font-mono text-[9.5px] font-bold tracking-[0.08em] text-ink-4 uppercase">
+                              <p className="text-[11px] font-medium text-ink-4">
                                 Faltas
                               </p>
                               <p
                                 className={[
-                                  'mt-0.5 font-mono text-[15px] font-bold',
+                                  'mt-0.5 font-mono text-[15px] font-semibold',
                                   atLimit ? 'text-crit-ink' : 'text-ink',
                                 ].join(' ')}
                               >
@@ -745,11 +745,11 @@ export function Student360View({
                 <div className="mt-5 space-y-5">
                   <div>
                     <div className="flex items-baseline justify-between">
-                      <p className="font-mono text-[10px] font-bold tracking-[0.08em] text-ink-4 uppercase">
+                      <p className="text-[11px] font-medium text-ink-4">
                         Acessos por semana · últimas 8 semanas
                       </p>
                       {drop > 0 && (
-                        <span className="font-mono text-[11.5px] font-bold text-crit-ink">
+                        <span className="font-mono text-[11.5px] font-semibold text-crit-ink">
                           −{drop}% vs. ciclo anterior
                         </span>
                       )}
@@ -759,7 +759,7 @@ export function Student360View({
                         const max = Math.max(...student.engagement.accessTrend, 1);
                         return (
                           <div key={i} className="flex flex-1 flex-col items-center gap-1.5">
-                            <span className="font-mono text-[10px] font-bold text-ink-4">{v}</span>
+                            <span className="font-mono text-[10px] font-semibold text-ink-4">{v}</span>
                             <div
                               className="w-full rounded-t-[3px] transition-all"
                               style={{
@@ -891,7 +891,7 @@ export function Student360View({
                     <div key={i.id} className="p-5">
                       <div className="flex flex-wrap items-center justify-between gap-2">
                         <div className="flex flex-wrap items-center gap-2">
-                          <span className="text-[12.5px] font-bold text-ink">
+                          <span className="text-[12.5px] font-semibold text-ink">
                             {i.kind} via {i.channel}
                           </span>
                           <Pill
@@ -908,7 +908,7 @@ export function Student360View({
                             {i.outcome}
                           </Pill>
                           {i.scoreDelta !== 0 && (
-                            <span className="font-mono text-[11px] font-bold text-ok-ink">
+                            <span className="font-mono text-[11px] font-semibold text-ok-ink">
                               +{i.scoreDelta} pts
                             </span>
                           )}
@@ -918,7 +918,7 @@ export function Student360View({
                         </span>
                       </div>
 
-                      <div className="mt-3 grid gap-3 rounded-lg border border-hairline bg-surface-2 p-3.5 sm:grid-cols-2">
+                      <div className="mt-3 grid gap-3 rounded-lg bg-surface-2 p-3.5 sm:grid-cols-2">
                         {[
                           ['Causa identificada', i.cause],
                           ['Intervenção realizada', i.intervention],
@@ -926,7 +926,7 @@ export function Student360View({
                           ['Próximo passo', i.nextStep],
                         ].map(([label, value]) => (
                           <div key={label} className="min-w-0">
-                            <p className="font-mono text-[9.5px] font-bold tracking-[0.08em] text-ink-4 uppercase">
+                            <p className="text-[11px] font-medium text-ink-4">
                               {label}
                             </p>
                             <p className="mt-1 text-[12px] leading-relaxed text-ink-2">{value}</p>
@@ -979,7 +979,7 @@ export function Student360View({
                       <div className="flex flex-wrap items-center gap-3 p-4">
                         <div className="min-w-0 flex-1">
                           <div className="flex flex-wrap items-center gap-1.5">
-                            <span className="font-mono text-[10.5px] font-bold text-ink-4">
+                            <span className="font-mono text-[10.5px] font-semibold text-ink-4">
                               {c.protocol}
                             </span>
                             <PriorityBadge priority={c.priority} />

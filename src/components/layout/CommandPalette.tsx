@@ -176,7 +176,7 @@ export function CommandPalette({
             animate="animate"
             exit="exit"
             onKeyDown={onKeyDown}
-            className="flex w-full max-w-2xl flex-col overflow-hidden rounded-2xl border border-hairline bg-surface shadow-overlay"
+            className="flex w-full max-w-2xl flex-col overflow-hidden rounded-2xl bg-surface shadow-overlay"
           >
             <div className="flex shrink-0 items-center gap-3 border-b border-hairline bg-surface-2 px-4 py-3.5">
               <Search className="h-4 w-4 shrink-0 text-brand-2" />
@@ -187,7 +187,7 @@ export function CommandPalette({
                 placeholder="Nome, RA (ex.: 2607454), CPF, curso, campus, protocolo ou radar…"
                 className="min-w-0 flex-1 bg-transparent text-[14px] text-ink placeholder:text-ink-4 focus:outline-none"
               />
-              <kbd className="shrink-0 rounded border border-hairline bg-surface px-1.5 py-0.5 font-mono text-[10px] font-bold text-ink-4">
+              <kbd className="shrink-0 rounded bg-surface px-1.5 py-0.5 font-mono text-[10px] font-semibold text-ink-4">
                 ESC
               </kbd>
             </div>
@@ -217,7 +217,7 @@ export function CommandPalette({
                       {student ? (
                         <Avatar initials={student.initials} size="sm" tone={student.status} />
                       ) : (
-                        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-hairline bg-surface-2 text-ink-4">
+                        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-surface-2 text-ink-4">
                           {r.type === 'case' ? (
                             <FileText className="h-3.5 w-3.5" />
                           ) : r.type === 'route' && r.param ? (
@@ -231,7 +231,7 @@ export function CommandPalette({
                       <span className="min-w-0 flex-1">
                         <span className="flex flex-wrap items-center gap-1.5">
                           <span
-                            className={`truncate text-[12.5px] font-bold ${active ? 'text-brand-text' : 'text-ink'}`}
+                            className={`truncate text-[12.5px] font-semibold ${active ? 'text-brand-text' : 'text-ink'}`}
                           >
                             {r.label}
                           </span>
@@ -260,7 +260,7 @@ export function CommandPalette({
                 ['esc', 'fechar'],
               ].map(([key, label]) => (
                 <span key={key} className="flex items-center gap-1.5 text-[10.5px] text-ink-4">
-                  <kbd className="rounded border border-hairline bg-surface px-1 py-px font-mono text-[9.5px] font-bold">
+                  <kbd className="rounded bg-surface px-1 py-px font-mono text-[9.5px] font-semibold">
                     {key}
                   </kbd>
                   {label}

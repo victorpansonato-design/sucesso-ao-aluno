@@ -34,12 +34,12 @@ export function Toaster() {
               initial="initial"
               animate="animate"
               exit="exit"
-              className="pointer-events-auto relative flex gap-3 overflow-hidden rounded-xl border border-hairline bg-surface p-3.5 pl-4 shadow-overlay"
+              className="pointer-events-auto relative flex gap-3 overflow-hidden rounded-xl bg-surface p-3.5 pl-4 shadow-overlay"
             >
               <span className={`absolute inset-y-0 left-0 w-[3px] ${meta.bar}`} />
               <meta.Icon className={`mt-px h-4 w-4 shrink-0 ${meta.tone}`} />
               <div className="min-w-0 flex-1">
-                <p className="text-[12.5px] leading-snug font-bold text-ink">{toast.title}</p>
+                <p className="text-[12.5px] leading-snug font-semibold text-ink">{toast.title}</p>
                 <p className="mt-0.5 text-[11.5px] leading-relaxed text-ink-3">{toast.detail}</p>
                 {toast.action && (
                   <button
@@ -47,7 +47,7 @@ export function Toaster() {
                       toast.action?.run();
                       dismissToast(toast.id);
                     }}
-                    className="mt-2 text-[11.5px] font-bold text-brand-text hover:text-brand-2"
+                    className="mt-2 text-[11.5px] font-semibold text-brand-text hover:text-brand-2"
                   >
                     {toast.action.label} →
                   </button>

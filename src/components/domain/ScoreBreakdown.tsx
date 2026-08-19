@@ -17,9 +17,9 @@ import { HEALTH_TONE } from '../ui/Badges';
 export function statusColor(status: HealthStatus, dark: boolean): string {
   const map: Record<HealthStatus, [string, string]> = {
     Estável: ['#15803d', '#3fb96b'],
-    Atenção: ['#b45309', '#d3a03c'],
-    Risco: ['#c2410c', '#e07a45'],
-    Crítico: ['#be123c', '#e05561'],
+    Atenção: ['#ca8a04', '#e0b341'],
+    Risco: ['#ea580c', '#f0844a'],
+    Crítico: ['#b42318', '#e0554b'],
   };
   return map[status][dark ? 1 : 0];
 }
@@ -39,18 +39,20 @@ export function ScoreBreakdown({
     <div className="space-y-3">
       {score.factors.map((factor, index) => {
         const ratio = factor.weight > 0 ? factor.earned / factor.weight : 0;
+        // Only a negative factor is red. A healthy one is ink, because there
+        // is nothing to act on and a green bar would compete for the eye.
         const color =
           factor.impact === 'negative'
             ? 'var(--crit)'
             : factor.impact === 'neutral'
               ? 'var(--warn)'
-              : 'var(--ok)';
+              : 'var(--ink-4)';
 
         return (
           <div key={factor.dimension} className="space-y-1.5">
             <div className="flex items-baseline justify-between gap-3">
               <span className="truncate text-[12px] font-semibold text-ink">{factor.label}</span>
-              <span className="shrink-0 font-mono text-[11.5px] font-bold text-ink">
+              <span className="shrink-0 font-mono text-[11.5px] font-semibold text-ink">
                 {factor.earned}
                 <span className="font-normal text-ink-4"> / {factor.weight}</span>
               </span>
@@ -84,15 +86,14 @@ export function ScoreChips({ score }: { score: ScoreResult }) {
           key={f.dimension}
           title={`${f.label}: ${f.rationale}`}
           className={[
-            'inline-flex items-center gap-1 rounded border px-1.5 py-[2px] font-mono text-[10px] font-bold',
-            f.impact === 'negative'
-              ? 'border-crit-border bg-crit-soft text-crit-ink'
-              : f.impact === 'neutral'
-                ? 'border-warn-border bg-warn-soft text-warn-ink'
-                : 'border-ok-border bg-ok-soft text-ok-ink',
+            'inline-flex items-center gap-1.5 rounded-sm bg-surface-2 px-1.5 py-0.5 text-[11px] font-medium',
+            f.impact === 'negative' ? 'text-crit-ink' : 'text-ink-3',
           ].join(' ')}
         >
-          {f.label.split(' ')[0]} {f.earned}/{f.weight}
+          {f.label.split(' ')[0]}
+          <span className="font-mono">
+            {f.earned}/{f.weight}
+          </span>
         </span>
       ))}
     </div>

@@ -22,11 +22,10 @@ import {
   Avatar,
   CohortBadge,
   HealthBadge,
-  ModalityBadge,
   RadarBadge,
   TrendIndicator,
 } from '../components/ui/Badges';
-import { MeterBar, Sparkline } from '../components/ui/Charts';
+import { Sparkline } from '../components/ui/Charts';
 import { COURSE_NAMES } from '../data/catalog';
 import { scoreDistribution } from '../lib/healthScore';
 import { accessDropPercent } from '../lib/radars';
@@ -44,7 +43,7 @@ import { decimal, int, percent, searchKey } from '../lib/format';
    ========================================================================== */
 
 type SortKey = 'score' | 'nome' | 'frequencia' | 'ava' | 'media' | 'periodo';
-const PAGE_SIZE = 14;
+const PAGE_SIZE = 12;
 
 export function StudentsView({ actions }: { actions: ShellActions }) {
   const { scopedStudents, radarsOf, resetFilters, filtersActive, students } = useApp();
@@ -125,7 +124,7 @@ export function StudentsView({ actions }: { actions: ShellActions }) {
   const SortHeader = ({ label, k, className = '' }: { label: string; k: SortKey; className?: string }) => (
     <button
       onClick={() => toggleSort(k)}
-      className={`inline-flex items-center gap-1 font-mono text-[9.5px] font-bold tracking-[0.08em] uppercase transition-colors ${
+      className={`inline-flex items-center gap-1 text-[11px] font-medium  transition-colors ${
         sort === k ? 'text-ink' : 'text-ink-4 hover:text-ink-2'
       } ${className}`}
     >
@@ -186,7 +185,7 @@ export function StudentsView({ actions }: { actions: ShellActions }) {
                   {band.range[0]}–{band.range[1]} pts
                 </span>
                 {status === band.status && (
-                  <span className="font-mono font-bold text-brand-text">filtrado</span>
+                  <span className="font-mono font-semibold text-brand-text">filtrado</span>
                 )}
               </>
             }
@@ -261,7 +260,7 @@ export function StudentsView({ actions }: { actions: ShellActions }) {
 
         {status !== 'todos' && (
           <div className="mt-3 flex flex-wrap items-center gap-1.5 border-t border-hairline pt-3">
-            <span className="font-mono text-[10px] font-bold tracking-[0.08em] text-ink-4 uppercase">
+            <span className="text-[11px] font-medium text-ink-4">
               Classificação
             </span>
             {(['Estável', 'Atenção', 'Risco', 'Crítico'] as HealthStatus[]).map((s) => (
@@ -285,7 +284,7 @@ export function StudentsView({ actions }: { actions: ShellActions }) {
       {/* Table */}
       <Card padded={false} className="overflow-hidden">
         <div className="flex items-center justify-between border-b border-hairline bg-surface-2 px-4 py-2.5">
-          <span className="font-mono text-[10.5px] font-bold tracking-[0.08em] text-ink-3 uppercase">
+          <span className="text-[11px] font-medium text-ink-3">
             {filtered.length} {filtered.length === 1 ? 'aluno' : 'alunos'}
           </span>
           <div className="flex items-center gap-4">
@@ -328,118 +327,98 @@ export function StudentsView({ actions }: { actions: ShellActions }) {
                   tone={s.status === 'Crítico' ? 'crit' : 'plain'}
                   className="group"
                 >
-                  <div className="flex flex-col gap-3 p-4 pl-5 xl:flex-row xl:items-center">
-                    {/* Identity */}
+                  <div className="flex flex-col gap-2.5 px-5 py-3 xl:flex-row xl:items-center xl:gap-5">
+                    {/* Identity — two lines. The RA and the radars live on the
+                        second line rather than earning a third. */}
                     <button
                       onClick={() => actions.openStudent(s.id)}
                       className="flex min-w-0 flex-1 items-center gap-3 text-left"
                     >
-                      <Avatar initials={s.initials} size="md" tone={s.status} />
+                      <Avatar initials={s.initials} size="sm" tone={s.status} />
                       <span className="min-w-0">
-                        <span className="flex flex-wrap items-center gap-1.5">
-                          <span className="truncate text-[13px] font-bold text-ink group-hover:underline">
+                        <span className="flex flex-wrap items-center gap-x-2.5 gap-y-1">
+                          <span className="truncate text-[13.5px] font-semibold text-ink group-hover:underline">
                             {s.name}
                           </span>
                           <HealthBadge status={s.status} />
-                          <ModalityBadge modality={s.modality} />
                           {s.cohort === 'Calouro' && (
                             <CohortBadge cohort="Calouro" days={s.journey.daysSinceEnrollment} />
                           )}
-                        </span>
-                        <span className="mt-0.5 block truncate text-[11.5px] text-ink-3">
-                          {s.course} · {s.period}º período · {s.shift}
-                        </span>
-                        <span className="mt-1 flex flex-wrap items-center gap-1.5">
-                          <span className="font-mono text-[10px] text-ink-4">RA {s.ra}</span>
-                          {radars.map((r) => (
+                          {radars.slice(0, 2).map((r) => (
                             <RadarBadge key={r} radar={r} />
                           ))}
+                          {radars.length > 2 && (
+                            <span
+                              className="text-[11px] text-ink-4"
+                              title={radars.join(' · ')}
+                            >
+                              +{radars.length - 2}
+                            </span>
+                          )}
+                        </span>
+                        <span className="mt-0.5 block truncate text-[12px] text-ink-3">
+                          <span className="font-mono">{s.ra}</span> · {s.course} · {s.period}º ·{' '}
+                          {s.modality === 'EaD' ? 'EaD 100%' : s.modality}
                         </span>
                       </span>
                     </button>
 
-                    {/* Metrics */}
-                    <div className="flex shrink-0 items-center gap-5 border-t border-hairline pt-3 xl:border-t-0 xl:pt-0">
-                      <div className="w-14">
-                        <p className="font-mono text-[9.5px] font-bold tracking-[0.08em] text-ink-4 uppercase">
-                          Média
-                        </p>
-                        <p
+                    {/* Metrics — values only. The column header names them. */}
+                    <div className="flex shrink-0 items-center gap-5">
+                      <span
+                        className={[
+                          'w-10 text-right font-mono text-[13px]',
+                          s.academic.gpa < 6 ? 'font-semibold text-crit-ink' : 'text-ink-2',
+                        ].join(' ')}
+                        title="Média do período"
+                      >
+                        {s.academic.gpa > 0 ? decimal(s.academic.gpa, 1) : '—'}
+                      </span>
+
+                      <span
+                        className={[
+                          'w-12 text-right font-mono text-[13px]',
+                          s.academic.attendancePercent < 75
+                            ? 'font-semibold text-crit-ink'
+                            : 'text-ink-2',
+                        ].join(' ')}
+                        title="Frequência"
+                      >
+                        {percent(s.academic.attendancePercent)}
+                      </span>
+
+                      <span
+                        className="hidden w-[86px] items-center justify-end gap-1.5 sm:flex"
+                        title="Acessos ao AVA nas últimas 8 semanas"
+                      >
+                        <Sparkline
+                          data={s.engagement.accessTrend}
+                          width={48}
+                          height={16}
+                          color={drop >= 40 ? 'var(--crit)' : 'var(--ink-4)'}
+                        />
+                        <span
                           className={[
-                            'font-mono text-[13px] font-bold',
-                            s.academic.gpa < 6 ? 'text-crit-ink' : 'text-ink',
+                            'font-mono text-[11px]',
+                            s.engagement.lastAccessDaysAgo >= 7
+                              ? 'font-semibold text-crit-ink'
+                              : 'text-ink-3',
                           ].join(' ')}
                         >
-                          {s.academic.gpa > 0 ? decimal(s.academic.gpa, 1) : '—'}
-                        </p>
-                      </div>
+                          {s.engagement.lastAccessDaysAgo === 0
+                            ? 'hoje'
+                            : `${s.engagement.lastAccessDaysAgo}d`}
+                        </span>
+                      </span>
 
-                      <div className="w-16">
-                        <p className="font-mono text-[9.5px] font-bold tracking-[0.08em] text-ink-4 uppercase">
-                          Freq.
-                        </p>
-                        <p
-                          className={[
-                            'font-mono text-[13px] font-bold',
-                            s.academic.attendancePercent < 75 ? 'text-crit-ink' : 'text-ink',
-                          ].join(' ')}
-                        >
-                          {percent(s.academic.attendancePercent)}
-                        </p>
-                      </div>
-
-                      <div className="hidden w-24 sm:block">
-                        <p className="font-mono text-[9.5px] font-bold tracking-[0.08em] text-ink-4 uppercase">
-                          AVA 8 sem.
-                        </p>
-                        <div className="flex items-center gap-1.5">
-                          <Sparkline
-                            data={s.engagement.accessTrend}
-                            width={54}
-                            height={20}
-                            color={drop >= 40 ? 'var(--crit)' : 'var(--brand-2)'}
-                          />
-                          <span
-                            className={[
-                              'font-mono text-[10.5px] font-bold',
-                              s.engagement.lastAccessDaysAgo >= 7 ? 'text-crit-ink' : 'text-ink-3',
-                            ].join(' ')}
-                          >
-                            {s.engagement.lastAccessDaysAgo === 0
-                              ? 'hoje'
-                              : `${s.engagement.lastAccessDaysAgo}d`}
-                          </span>
-                        </div>
-                      </div>
-
-                      <div className="w-24">
-                        <div className="flex items-baseline justify-between">
-                          <p className="font-mono text-[9.5px] font-bold tracking-[0.08em] text-ink-4 uppercase">
-                            Score
-                          </p>
-                          <TrendIndicator trend={s.trend} />
-                        </div>
-                        <p className="font-mono text-[15px] leading-none font-bold text-ink">
+                      <span className="flex w-20 items-center justify-end gap-1.5" title="Health Score">
+                        <TrendIndicator trend={s.trend} />
+                        <span className="font-mono text-[15px] font-medium text-ink">
                           {s.healthScore}
-                        </p>
-                        <div className="mt-1.5">
-                          <MeterBar
-                            value={s.healthScore}
-                            color={
-                              s.status === 'Crítico'
-                                ? 'var(--crit)'
-                                : s.status === 'Risco'
-                                  ? 'var(--risk)'
-                                  : s.status === 'Atenção'
-                                    ? 'var(--warn)'
-                                    : 'var(--ok)'
-                            }
-                            height={4}
-                          />
-                        </div>
-                      </div>
+                        </span>
+                      </span>
 
-                      <div className="flex items-center gap-1.5">
+                      <span className="flex items-center gap-1">
                         <Button
                           size="sm"
                           variant="ghost"
@@ -466,7 +445,7 @@ export function StudentsView({ actions }: { actions: ShellActions }) {
                         >
                           Dossiê
                         </Button>
-                      </div>
+                      </span>
                     </div>
                   </div>
                 </Row>
@@ -503,10 +482,10 @@ export function StudentsView({ actions }: { actions: ShellActions }) {
                     <button
                       onClick={() => setPage(i)}
                       className={[
-                        'h-7 min-w-7 rounded-md px-2 font-mono text-[11px] font-bold transition-colors',
+                        'h-7 min-w-7 rounded-md px-2 font-mono text-[11px] font-semibold transition-colors',
                         i === safePage
                           ? 'bg-brand text-on-brand'
-                          : 'border border-hairline bg-surface text-ink-3 hover:text-ink',
+                          : 'bg-surface text-ink-3 hover:text-ink',
                       ].join(' ')}
                     >
                       {i + 1}

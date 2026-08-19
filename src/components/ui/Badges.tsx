@@ -16,10 +16,19 @@ import { signed } from '../../lib/format';
 /* ==========================================================================
    Status vocabulary
    --------------------------------------------------------------------------
-   Colour is load-bearing here, so it is spent carefully: a dot carries the
-   status hue, the label stays in ink. That keeps a dense table readable — ten
-   rows of saturated pills would be unreadable, ten rows of dotted labels scan
-   instantly and still let a critical row jump out.
+   There are two kinds of small label in this app and they must not look alike:
+
+     STATUS  — a verdict you may have to act on. Rendered as a coloured dot
+               plus a word. No fill, no outline. Ten rows of tinted balloons
+               with borders is a bag of sweets; ten rows of dotted words scan
+               in one pass and still let a critical row jump out.
+
+     TAG     — a fact about the record (modality, campus, radar). Rendered as a
+               quiet filled chip in ink-3. It carries no urgency, so it gets no
+               colour and no dot.
+
+   `solid` used to mean "tinted background + border". It now means "this
+   verdict is the point of the row", and spends ink weight instead of fill.
    ========================================================================== */
 
 type Tone = 'ok' | 'warn' | 'risk' | 'crit' | 'info' | 'neutral' | 'muted';
@@ -34,14 +43,15 @@ const DOT: Record<Tone, string> = {
   muted: 'bg-ink-4',
 };
 
-const SOLID: Record<Tone, string> = {
-  ok: 'border-ok-border bg-ok-soft text-ok-ink',
-  warn: 'border-warn-border bg-warn-soft text-warn-ink',
-  risk: 'border-risk-border bg-risk-soft text-risk-ink',
-  crit: 'border-crit-border bg-crit-soft text-crit-ink',
-  info: 'border-info-border bg-info-soft text-brand-text',
-  neutral: 'border-hairline bg-surface-2 text-ink-2',
-  muted: 'border-hairline bg-surface-2 text-ink-3',
+/** Ink for an emphasised verdict. Only `crit` gets red. */
+const EMPHASIS_INK: Record<Tone, string> = {
+  ok: 'text-ink-2',
+  warn: 'text-warn-ink',
+  risk: 'text-risk-ink',
+  crit: 'text-crit-ink',
+  info: 'text-brand-text',
+  neutral: 'text-ink-2',
+  muted: 'text-ink-3',
 };
 
 export function Pill({
@@ -55,29 +65,52 @@ export function Pill({
 }: {
   tone?: Tone;
   children: ReactNode;
+  /** A dot makes this a status. Without it, it is a tag. */
   dot?: boolean;
+  /** Emphasise the verdict: status ink instead of neutral ink. */
   solid?: boolean;
   mono?: boolean;
   className?: string;
   title?: string;
 }) {
+  // Status: bare dot + word, sitting directly on the surface.
+  if (dot) {
+    return (
+      <span
+        title={title}
+        className={[
+          'inline-flex shrink-0 items-center gap-1.5 text-[12px] whitespace-nowrap',
+          solid ? `font-semibold ${EMPHASIS_INK[tone]}` : 'font-medium text-ink-2',
+          mono ? 'font-mono' : '',
+          className,
+        ].join(' ')}
+      >
+        <span className={`h-1.25 w-1.25 shrink-0 rounded-full ${DOT[tone]}`} />
+        {children}
+      </span>
+    );
+  }
+
+  // Tag: a quiet chip. Filled, never outlined.
   return (
     <span
       title={title}
       className={[
-        'inline-flex shrink-0 items-center gap-1.5 rounded-full border px-2 py-[3px] text-[11px] font-semibold whitespace-nowrap',
-        solid ? SOLID[tone] : 'border-hairline bg-surface text-ink-2',
+        'inline-flex shrink-0 items-center rounded-sm bg-surface-2 px-1.5 py-0.5 text-[11px] whitespace-nowrap',
+        solid ? `font-semibold ${EMPHASIS_INK[tone]}` : 'font-medium text-ink-3',
         mono ? 'font-mono' : '',
         className,
       ].join(' ')}
     >
-      {dot && <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${DOT[tone]}`} />}
       {children}
     </span>
   );
 }
 
-/* -- Health status -------------------------------------------------------- */
+/* -- Health status --------------------------------------------------------
+   "Estável" gets no dot at all. There is nothing to do about a healthy
+   student, so the row stays silent — which is exactly what makes the amber and
+   red dots visible three rows further down. */
 
 export const HEALTH_TONE: Record<HealthStatus, Tone> = {
   Estável: 'ok',
@@ -95,8 +128,17 @@ export function HealthBadge({
   solid?: boolean;
   className?: string;
 }) {
+  if (status === 'Estável') {
+    return (
+      <span
+        className={`inline-flex shrink-0 items-center text-[12px] font-medium whitespace-nowrap text-ink-3 ${className}`}
+      >
+        Estável
+      </span>
+    );
+  }
   return (
-    <Pill tone={HEALTH_TONE[status]} solid={solid} className={className}>
+    <Pill tone={HEALTH_TONE[status]} solid={solid || status === 'Crítico'} className={className}>
       {status}
     </Pill>
   );
@@ -113,7 +155,7 @@ export const PRIORITY_TONE: Record<Priority, Tone> = {
 
 export function PriorityBadge({ priority, solid = false }: { priority: Priority; solid?: boolean }) {
   return (
-    <Pill tone={PRIORITY_TONE[priority]} solid={solid}>
+    <Pill tone={PRIORITY_TONE[priority]} solid={solid || priority === 'Crítico'}>
       {priority}
     </Pill>
   );
@@ -146,7 +188,7 @@ export function RadarBadge({ radar, full = false }: { radar: RadarKey; full?: bo
   return (
     <span
       title={def.label}
-      className="inline-flex shrink-0 items-center gap-1.5 rounded border border-hairline bg-surface-2 px-1.5 py-[2px] font-mono text-[10px] font-bold tracking-[0.06em] whitespace-nowrap text-ink-3 uppercase"
+      className="inline-flex shrink-0 items-center rounded-sm bg-surface-2 px-1.5 py-0.5 text-[11px] font-medium whitespace-nowrap text-ink-3"
     >
       {full ? def.label : def.shortLabel}
     </span>
@@ -179,7 +221,7 @@ export function CohortBadge({ cohort, days }: { cohort: Cohort; days?: number })
 
 export function ModalityBadge({ modality }: { modality: Modality }) {
   return (
-    <span className="inline-flex shrink-0 items-center rounded border border-hairline bg-surface-2 px-1.5 py-[2px] font-mono text-[10px] font-bold tracking-[0.06em] text-ink-3 uppercase">
+    <span className="inline-flex shrink-0 items-center rounded-sm bg-surface-2 px-1.5 py-0.5 text-[11px] font-medium text-ink-3">
       {modality === 'EaD' ? 'EaD 100%' : modality}
     </span>
   );
@@ -197,14 +239,14 @@ export function TrendIndicator({
   className?: string;
 }) {
   const config = {
-    up: { Icon: ArrowUpRight, color: 'text-ok' },
-    down: { Icon: ArrowDownRight, color: 'text-crit' },
+    up: { Icon: ArrowUpRight, color: 'text-ink-2' },
+    down: { Icon: ArrowDownRight, color: 'text-crit-ink' },
     flat: { Icon: Minus, color: 'text-ink-4' },
   }[trend];
 
   return (
     <span
-      className={`inline-flex items-center gap-0.5 font-mono text-[11.5px] font-bold ${config.color} ${className}`}
+      className={`inline-flex items-center gap-0.5 font-mono text-[11.5px] font-medium ${config.color} ${className}`}
     >
       <config.Icon className="h-3 w-3" />
       {delta !== undefined && delta !== 0 ? signed(delta) : null}
@@ -214,13 +256,16 @@ export function TrendIndicator({
 
 /* -- Avatar: initials, not stock photography ------------------------------
    Real internal tools show initials. Stock portraits of strangers standing in
-   for actual students read as a mockup and, with real data, as a privacy leak. */
+   for actual students read as a mockup and, with real data, as a privacy leak.
+
+   The tone is a step of fill, not a hue: a critical student's avatar is a
+   shade darker, not red. The red dot beside the name already says it once. */
 
 const AVATAR_SIZE = {
-  xs: 'h-6 w-6 text-[9.5px]',
+  xs: 'h-6 w-6 text-[10px]',
   sm: 'h-8 w-8 text-[11px]',
-  md: 'h-10 w-10 text-[12.5px]',
-  lg: 'h-14 w-14 text-[16px]',
+  md: 'h-9 w-9 text-[12px]',
+  lg: 'h-12 w-12 text-[15px]',
 } as const;
 
 export function Avatar({
@@ -236,22 +281,16 @@ export function Avatar({
 }) {
   const toneClass =
     tone === 'brand'
-      ? 'border-brand-border bg-brand-soft text-brand-text'
+      ? 'bg-brand text-on-brand'
       : tone === 'Crítico'
-        ? 'border-crit-border bg-crit-soft text-crit-ink'
-        : tone === 'Risco'
-          ? 'border-risk-border bg-risk-soft text-risk-ink'
-          : tone === 'Atenção'
-            ? 'border-warn-border bg-warn-soft text-warn-ink'
-            : tone === 'Estável'
-              ? 'border-ok-border bg-ok-soft text-ok-ink'
-              : 'border-hairline bg-surface-3 text-ink-2';
+        ? 'bg-surface-3 text-ink'
+        : 'bg-surface-2 text-ink-2';
 
   return (
     <span
       aria-hidden="true"
       className={[
-        'inline-flex shrink-0 items-center justify-center rounded-full border font-mono font-bold select-none',
+        'inline-flex shrink-0 items-center justify-center rounded-full font-medium select-none',
         AVATAR_SIZE[size],
         toneClass,
         className,

@@ -155,14 +155,14 @@ export function RadarsView({
           <div className="flex flex-wrap items-start justify-between gap-5">
             <div className="min-w-0 max-w-2xl">
               <div className="flex items-center gap-2.5">
-                <span className="flex h-9 w-9 items-center justify-center rounded-lg border border-band-line bg-band-inset text-band-ink">
+                <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-band-inset text-band-ink">
                   <RadarIcon className="h-4.5 w-4.5" />
                 </span>
                 <div>
-                  <p className="font-mono text-[10px] font-bold tracking-[0.1em] text-band-ink-2 uppercase">
+                  <p className="text-[11px] font-medium text-band-ink-2">
                     SLA {settings.slaHours[active]} horas úteis · especialidade {radar.specialty}
                   </p>
-                  <h2 className="text-[19px] leading-tight font-bold text-band-ink">{radar.label}</h2>
+                  <h2 className="text-[19px] leading-tight font-semibold text-band-ink">{radar.label}</h2>
                 </div>
               </div>
 
@@ -171,26 +171,26 @@ export function RadarsView({
 
             <div className="flex shrink-0 gap-6">
               <div className="text-right">
-                <p className="font-mono text-[10px] font-bold tracking-[0.1em] text-band-ink-2 uppercase">
+                <p className="text-[11px] font-medium text-band-ink-2">
                   Alunos com sinal
                 </p>
-                <p className="font-mono text-[30px] leading-none font-bold text-band-ink">
+                <p className="font-mono text-[30px] leading-none font-semibold text-band-ink">
                   {flagged.length}
                 </p>
               </div>
               <div className="text-right">
-                <p className="font-mono text-[10px] font-bold tracking-[0.1em] text-band-ink-2 uppercase">
+                <p className="text-[11px] font-medium text-band-ink-2">
                   Casos abertos
                 </p>
-                <p className="font-mono text-[30px] leading-none font-bold text-band-ink">
+                <p className="font-mono text-[30px] leading-none font-semibold text-band-ink">
                   {radarCases.filter((c) => isOpen(c.status)).length}
                 </p>
               </div>
               <div className="text-right">
-                <p className="font-mono text-[10px] font-bold tracking-[0.1em] text-band-ink-2 uppercase">
+                <p className="text-[11px] font-medium text-band-ink-2">
                   Precisão
                 </p>
-                <p className="font-mono text-[30px] leading-none font-bold text-band-ink">
+                <p className="font-mono text-[30px] leading-none font-semibold text-band-ink">
                   {precision.rate === null ? '—' : `${Math.round(precision.rate)}%`}
                 </p>
               </div>
@@ -224,7 +224,7 @@ export function RadarsView({
                 { label: 'Especialidade', value: radar.specialty },
                 {
                   label: 'Modalidades',
-                  value: radar.appliesTo.map((m) => (m === 'EaD' ? 'EaD' : m)).join(', '),
+                  value: radar.appliesTo.map((m) => (m === 'EaD' ? 'EaD' : m)).join(','),
                 },
               ]}
             />
@@ -256,7 +256,7 @@ export function RadarsView({
                         <row.Icon className="h-3.5 w-3.5" style={{ color: row.color }} />
                         {row.label}
                       </span>
-                      <span className="font-mono text-[12px] font-bold text-ink">{row.value}</span>
+                      <span className="font-mono text-[12px] font-semibold text-ink">{row.value}</span>
                     </div>
                     <MeterBar value={row.value} max={precision.total} color={row.color} height={4} />
                   </div>
@@ -282,7 +282,7 @@ export function RadarsView({
           Eles são acompanhados pela régua de{' '}
           <button
             onClick={() => actions.goto('onboarding')}
-            className="font-bold text-brand-text underline hover:text-brand-2"
+            className="font-semibold text-brand-text underline hover:text-brand-2"
           >
             Onboarding 90 dias
           </button>
@@ -321,11 +321,11 @@ export function RadarsView({
               if (!student) return null;
               return (
                 <Row key={kase.id} onClick={() => actions.openCase(kase.id)}>
-                  <div className="flex flex-wrap items-center gap-3 p-4">
+                  <div className="flex flex-wrap items-center gap-3 px-5 py-3">
                     <Avatar initials={student.initials} size="sm" tone={student.status} />
                     <div className="min-w-0 flex-1">
                       <div className="flex flex-wrap items-center gap-1.5">
-                        <span className="truncate text-[12.5px] font-bold text-ink">{student.name}</span>
+                        <span className="truncate text-[12.5px] font-semibold text-ink">{student.name}</span>
                         <PriorityBadge priority={kase.priority} solid={kase.priority === 'Crítico'} />
                         <CaseStatusBadge status={kase.status} />
                         <ModalityBadge modality={student.modality} />
@@ -333,7 +333,7 @@ export function RadarsView({
                       <p className="mt-0.5 truncate text-[11.5px] text-ink-3">{kase.title}</p>
                     </div>
                     <div className="flex shrink-0 items-center gap-4">
-                      <span className="font-mono text-[11.5px] font-bold text-ink-3">
+                      <span className="font-mono text-[11.5px] font-semibold text-ink-3">
                         score {student.healthScore}
                       </span>
                       <SlaPill kase={kase} />
@@ -381,7 +381,7 @@ export function RadarsView({
                         <Avatar initials={student.initials} size="sm" tone={student.status} />
                         <span className="min-w-0">
                           <span className="flex flex-wrap items-center gap-1.5">
-                            <span className="truncate text-[12.5px] font-bold text-ink group-hover:underline">
+                            <span className="truncate text-[12.5px] font-semibold text-ink group-hover:underline">
                               {student.name}
                             </span>
                             <HealthBadge status={student.status} />

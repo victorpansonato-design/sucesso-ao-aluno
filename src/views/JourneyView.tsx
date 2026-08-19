@@ -274,7 +274,6 @@ export function JourneyView({ actions }: { actions: ShellActions }) {
         <div className="relative grid gap-6 p-5 sm:p-6 lg:grid-cols-[minmax(0,1fr)_400px]">
           <div className="min-w-0">
             <CardHeader
-              tone="band"
               eyebrow={`Perfil de peso · ${modality === 'EaD' ? 'EaD 100%' : modality}`}
               title={profile.headline}
               subtitle={profile.attendanceNote}
@@ -321,8 +320,8 @@ export function JourneyView({ actions }: { actions: ShellActions }) {
             </div>
           </div>
 
-          <aside className="rounded-xl border border-band-line bg-band-inset p-4">
-            <p className="font-mono text-[10px] font-bold tracking-[0.1em] text-band-ink-2 uppercase">
+          <aside className="rounded-xl bg-band-inset p-4">
+            <p className="text-[11px] font-medium text-band-ink-2">
               Composição do Health Score nesta modalidade
             </p>
 
@@ -333,7 +332,7 @@ export function JourneyView({ actions }: { actions: ShellActions }) {
                     <span className="truncate text-[11.5px] font-medium text-band-ink-2">
                       {DIMENSION_LABEL[dim]}
                     </span>
-                    <span className="shrink-0 font-mono text-[12px] font-bold text-band-ink">
+                    <span className="shrink-0 font-mono text-[12px] font-semibold text-band-ink">
                       {weights[dim]}%
                     </span>
                   </div>
@@ -351,7 +350,7 @@ export function JourneyView({ actions }: { actions: ShellActions }) {
               Total {totalWeight} pontos ·{' '}
               <button
                 onClick={() => actions.goto('governanca')}
-                className="font-bold text-band-ink underline"
+                className="font-semibold text-band-ink underline"
               >
                 revisar em Governança
               </button>
@@ -374,7 +373,7 @@ export function JourneyView({ actions }: { actions: ShellActions }) {
 
           {modality === 'Híbrido' && (
             <div className="mt-5 border-t border-hairline pt-4">
-              <p className="flex items-center gap-1.5 text-[12.5px] font-bold text-ink">
+              <p className="flex items-center gap-1.5 text-[12.5px] font-semibold text-ink">
                 <CalendarDays className="h-3.5 w-3.5 text-brand-2" />
                 “Como funciona meu módulo?”
               </p>
@@ -424,27 +423,27 @@ export function JourneyView({ actions }: { actions: ShellActions }) {
                 key={stage.id}
                 onClick={() => setSelectedStage(selected ? null : stage.id)}
                 className={[
-                  'flex flex-col justify-between gap-3 rounded-xl border p-4 text-left transition-colors',
+                  'flex flex-col justify-between gap-3 rounded-xl p-4 text-left transition-colors',
                   selected
-                    ? 'border-brand bg-brand-soft'
-                    : 'border-hairline bg-surface hover:border-ink-4',
+                    ? 'bg-brand-soft'
+                    : 'bg-surface',
                 ].join(' ')}
               >
                 <div>
                   <div className="flex items-center justify-between gap-2">
                     <span
                       className={[
-                        'flex h-6 w-6 items-center justify-center rounded-full font-mono text-[11px] font-bold',
-                        selected ? 'bg-brand text-on-brand' : 'border border-hairline bg-surface-2 text-ink-4',
+                        'flex h-6 w-6 items-center justify-center rounded-full font-mono text-[11px] font-semibold',
+                        selected ? 'bg-brand text-on-brand' : 'bg-surface-2 text-ink-4',
                       ].join(' ')}
                     >
                       {i + 1}
                     </span>
-                    <span className="font-mono text-[16px] font-bold text-ink">
+                    <span className="font-mono text-[16px] font-semibold text-ink">
                       {stage.members.length}
                     </span>
                   </div>
-                  <p className="mt-2.5 text-[12.5px] leading-snug font-bold text-ink">{stage.title}</p>
+                  <p className="mt-2.5 text-[12.5px] leading-snug font-semibold text-ink">{stage.title}</p>
                   <p className="mt-1 line-clamp-2 text-[11px] leading-relaxed text-ink-3">
                     {stage.description}
                   </p>
@@ -452,10 +451,10 @@ export function JourneyView({ actions }: { actions: ShellActions }) {
 
                 <div className="space-y-2 border-t border-hairline pt-2.5">
                   <div className="flex items-baseline justify-between">
-                    <span className="font-mono text-[9.5px] font-bold tracking-[0.08em] text-ink-4 uppercase">
+                    <span className="text-[11px] font-medium text-ink-4">
                       Score médio
                     </span>
-                    <span className="font-mono text-[12px] font-bold text-ink">{stage.avgScore}</span>
+                    <span className="font-mono text-[12px] font-semibold text-ink">{stage.avgScore}</span>
                   </div>
                   <MeterBar
                     value={stage.avgScore}
@@ -472,7 +471,7 @@ export function JourneyView({ actions }: { actions: ShellActions }) {
                     Risco: {stage.risk}
                   </p>
                   {stage.atRisk > 0 && (
-                    <p className="font-mono text-[10.5px] font-bold text-crit-ink">
+                    <p className="font-mono text-[10.5px] font-semibold text-crit-ink">
                       {stage.atRisk} em risco ou crítico
                     </p>
                   )}
@@ -504,7 +503,7 @@ export function JourneyView({ actions }: { actions: ShellActions }) {
           {(['Estável', 'Atenção', 'Risco', 'Crítico'] as const).map((status) => (
             <span key={status} className="flex items-center gap-1.5 text-[11.5px] text-ink-3">
               <HealthBadge status={status} />
-              <span className="font-mono font-bold text-ink">
+              <span className="font-mono font-semibold text-ink">
                 {cohort.filter((s) => s.status === status).length}
               </span>
             </span>
@@ -547,7 +546,7 @@ export function JourneyView({ actions }: { actions: ShellActions }) {
                   <Avatar initials={s.initials} size="sm" tone={s.status} />
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-1.5">
-                      <span className="truncate text-[12.5px] font-bold text-ink">{s.name}</span>
+                      <span className="truncate text-[12.5px] font-semibold text-ink">{s.name}</span>
                       <HealthBadge status={s.status} />
                       <ModalityBadge modality={s.modality} />
                     </div>
@@ -557,10 +556,10 @@ export function JourneyView({ actions }: { actions: ShellActions }) {
                   </div>
                   <div className="hidden w-32 sm:block">
                     <div className="flex items-baseline justify-between">
-                      <span className="font-mono text-[9.5px] font-bold text-ink-4 uppercase">
+                      <span className="text-[11px] font-medium text-ink-4">
                         Progresso
                       </span>
-                      <span className="font-mono text-[11px] font-bold text-ink">
+                      <span className="font-mono text-[11px] font-semibold text-ink">
                         {percent(s.journey.progressPercent)}
                       </span>
                     </div>
@@ -569,12 +568,12 @@ export function JourneyView({ actions }: { actions: ShellActions }) {
                     </div>
                   </div>
                   <div className="w-14 text-right">
-                    <span className="font-mono text-[9.5px] font-bold text-ink-4 uppercase">Score</span>
-                    <p className="font-mono text-[14px] font-bold text-ink">{s.healthScore}</p>
+                    <span className="text-[11px] font-medium text-ink-4">Score</span>
+                    <p className="font-mono text-[14px] font-semibold text-ink">{s.healthScore}</p>
                   </div>
                   <div className="hidden w-16 text-right sm:block">
-                    <span className="font-mono text-[9.5px] font-bold text-ink-4 uppercase">Média</span>
-                    <p className="font-mono text-[14px] font-bold text-ink">
+                    <span className="text-[11px] font-medium text-ink-4">Média</span>
+                    <p className="font-mono text-[14px] font-semibold text-ink">
                       {s.academic.gpa > 0 ? decimal(s.academic.gpa, 1) : '—'}
                     </p>
                   </div>

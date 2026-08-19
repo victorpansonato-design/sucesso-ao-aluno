@@ -165,7 +165,7 @@ export function OnboardingView({ actions }: { actions: ShellActions }) {
             de retenção da base de veteranos.{' '}
             <button
               onClick={() => updateSettings({ segregateOnboarding: false })}
-              className="font-bold text-brand-text underline hover:text-brand-2"
+              className="font-semibold text-brand-text underline hover:text-brand-2"
             >
               Desligar segregação
             </button>
@@ -176,7 +176,7 @@ export function OnboardingView({ actions }: { actions: ShellActions }) {
             positivos de evasão e polui a taxa de retenção.{' '}
             <button
               onClick={() => updateSettings({ segregateOnboarding: true })}
-              className="font-bold text-brand-text underline hover:text-brand-2"
+              className="font-semibold text-brand-text underline hover:text-brand-2"
             >
               Reativar segregação
             </button>
@@ -239,17 +239,17 @@ export function OnboardingView({ actions }: { actions: ShellActions }) {
                 <div key={m.label} className="space-y-1.5">
                   <div className="flex items-baseline justify-between gap-3">
                     <span className="flex items-center gap-2 text-[12.5px] font-medium text-ink-2">
-                      <span className="flex h-5 w-5 items-center justify-center rounded-full border border-hairline bg-surface-2 font-mono text-[10px] font-bold text-ink-4">
+                      <span className="flex h-5 w-5 items-center justify-center rounded-full bg-surface-2 font-mono text-[10px] font-semibold text-ink-4">
                         {i + 1}
                       </span>
                       {m.label}
                     </span>
-                    <span className="shrink-0 font-mono text-[12px] font-bold text-ink">
+                    <span className="shrink-0 font-mono text-[12px] font-semibold text-ink">
                       {m.done}
                       <span className="font-normal text-ink-4">/{m.total}</span>
                       <span className="ml-2 text-ink-3">{percent(m.rate)}</span>
                       {drop > 20 && (
-                        <span className="ml-2 font-bold text-crit-ink">−{Math.round(drop)} p.p.</span>
+                        <span className="ml-2 font-semibold text-crit-ink">−{Math.round(drop)} p.p.</span>
                       )}
                     </span>
                   </div>
@@ -284,7 +284,7 @@ export function OnboardingView({ actions }: { actions: ShellActions }) {
 
                 return (
                   <Row key={s.id} tone={s.engagement.lastAccessDaysAgo >= 7 ? 'crit' : 'plain'}>
-                    <div className="flex flex-col gap-3 p-4 pl-5 lg:flex-row lg:items-center">
+                    <div className="flex flex-col gap-2.5 px-5 py-3 lg:flex-row lg:items-center lg:gap-5">
                       <button
                         onClick={() => actions.openStudent(s.id)}
                         className="group flex min-w-0 flex-1 items-start gap-3 text-left"
@@ -292,7 +292,7 @@ export function OnboardingView({ actions }: { actions: ShellActions }) {
                         <Avatar initials={s.initials} size="md" tone={s.status} />
                         <span className="min-w-0">
                           <span className="flex flex-wrap items-center gap-1.5">
-                            <span className="truncate text-[13px] font-bold text-ink group-hover:underline">
+                            <span className="truncate text-[13px] font-semibold text-ink group-hover:underline">
                               {s.name}
                             </span>
                             <HealthBadge status={s.status} />
@@ -312,10 +312,8 @@ export function OnboardingView({ actions }: { actions: ShellActions }) {
                                 key={step.label}
                                 title={step.label}
                                 className={[
-                                  'inline-flex items-center gap-1 rounded border px-1.5 py-px font-mono text-[9.5px] font-bold',
-                                  step.done
-                                    ? 'border-ok-border bg-ok-soft text-ok-ink'
-                                    : 'border-hairline bg-surface-2 text-ink-4',
+                                  'inline-flex items-center gap-1 rounded-sm bg-surface-2 px-1.5 py-0.5 text-[11px]',
+                                  step.done ? 'font-medium text-ink-2' : 'text-ink-4',
                                 ].join(' ')}
                               >
                                 {step.done ? (
@@ -332,12 +330,12 @@ export function OnboardingView({ actions }: { actions: ShellActions }) {
 
                       <div className="flex shrink-0 items-center gap-5 border-t border-hairline pt-3 lg:border-t-0 lg:pt-0">
                         <div className="w-20">
-                          <p className="font-mono text-[9.5px] font-bold tracking-[0.08em] text-ink-4 uppercase">
+                          <p className="text-[11px] font-medium text-ink-4">
                             Último AVA
                           </p>
                           <p
                             className={[
-                              'font-mono text-[14px] font-bold',
+                              'font-mono text-[14px] font-semibold',
                               s.engagement.lastAccessDaysAgo >= 7 ? 'text-crit-ink' : 'text-ink',
                             ].join(' ')}
                           >
@@ -348,10 +346,10 @@ export function OnboardingView({ actions }: { actions: ShellActions }) {
                         </div>
 
                         <div className="w-24">
-                          <p className="font-mono text-[9.5px] font-bold tracking-[0.08em] text-ink-4 uppercase">
+                          <p className="text-[11px] font-medium text-ink-4">
                             Marcos
                           </p>
-                          <p className="font-mono text-[14px] font-bold text-ink">
+                          <p className="font-mono text-[14px] font-semibold text-ink">
                             {doneSteps}
                             <span className="text-[11px] font-normal text-ink-4">/{totalSteps}</span>
                           </p>
@@ -434,8 +432,8 @@ export function OnboardingView({ actions }: { actions: ShellActions }) {
               body: 'A primeira atividade entregue é o preditor mais forte de permanência. Feche o contato com ela combinada.',
             },
           ].map((tip) => (
-            <div key={tip.title} className="rounded-lg border border-hairline bg-surface-2 p-3.5">
-              <p className="text-[12px] font-bold text-ink">{tip.title}</p>
+            <div key={tip.title} className="rounded-lg bg-surface-2 p-3.5">
+              <p className="text-[12px] font-semibold text-ink">{tip.title}</p>
               <p className="mt-1.5 text-[11.5px] leading-relaxed text-ink-3">{tip.body}</p>
             </div>
           ))}

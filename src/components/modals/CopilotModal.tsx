@@ -152,7 +152,7 @@ export function CopilotModal({
           {/* ---- Left: the approaches -------------------------------------- */}
           <div className="min-w-0 space-y-4 p-5">
             <div>
-              <p className="mb-2 font-mono text-[10px] font-bold tracking-[0.1em] text-ink-4 uppercase">
+              <p className="mb-2 text-[11px] font-medium text-ink-4">
                 Três ângulos possíveis · ordenados por aderência aos dados
               </p>
               <div className="grid gap-2 sm:grid-cols-3">
@@ -164,10 +164,10 @@ export function CopilotModal({
                       key={a.angle}
                       onClick={() => setAngle(a.angle)}
                       className={[
-                        'flex flex-col gap-2 rounded-lg border p-3 text-left transition-colors',
+                        'flex flex-col gap-2 rounded-lg p-3 text-left transition-colors',
                         active
-                          ? 'border-brand bg-brand-soft'
-                          : 'border-hairline bg-surface-2 hover:border-ink-4',
+                          ? 'bg-brand-soft'
+                          : 'bg-surface-2',
                       ].join(' ')}
                     >
                       <div className="flex items-start justify-between gap-2">
@@ -176,7 +176,7 @@ export function CopilotModal({
                         />
                         <span
                           className={[
-                            'font-mono text-[10.5px] font-bold',
+                            'font-mono text-[10.5px] font-semibold',
                             a.fit >= 70 ? 'text-ok-ink' : a.fit >= 45 ? 'text-warn-ink' : 'text-ink-4',
                           ].join(' ')}
                         >
@@ -184,7 +184,7 @@ export function CopilotModal({
                         </span>
                       </div>
                       <span
-                        className={`text-[12px] leading-snug font-bold ${active ? 'text-brand-text' : 'text-ink'}`}
+                        className={`text-[12px] leading-snug font-semibold ${active ? 'text-brand-text' : 'text-ink'}`}
                       >
                         {a.label}
                       </span>
@@ -194,15 +194,15 @@ export function CopilotModal({
               </div>
             </div>
 
-            <div className="space-y-3 rounded-lg border border-hairline bg-surface-2 p-4">
+            <div className="space-y-3 rounded-lg bg-surface-2 p-4">
               <div>
-                <p className="font-mono text-[10px] font-bold tracking-[0.1em] text-ink-4 uppercase">
+                <p className="text-[11px] font-medium text-ink-4">
                   Quando usar
                 </p>
                 <p className="mt-1 text-[12px] leading-relaxed text-ink-2">{selected.whenToUse}</p>
               </div>
               <div className="border-t border-hairline pt-3">
-                <p className="font-mono text-[10px] font-bold tracking-[0.1em] text-ink-4 uppercase">
+                <p className="text-[11px] font-medium text-ink-4">
                   Objetivo do contato
                 </p>
                 <p className="mt-1 text-[12px] leading-relaxed font-semibold text-ink">
@@ -214,7 +214,7 @@ export function CopilotModal({
             {/* Script */}
             <div className="space-y-2">
               <div className="flex flex-wrap items-center justify-between gap-3">
-                <p className="font-mono text-[10px] font-bold tracking-[0.1em] text-ink-4 uppercase">
+                <p className="text-[11px] font-medium text-ink-4">
                   Roteiro sugerido
                 </p>
                 <Segmented
@@ -230,7 +230,7 @@ export function CopilotModal({
                 />
               </div>
 
-              <div className="rounded-lg border border-hairline bg-surface-2 p-4">
+              <div className="rounded-lg bg-surface-2 p-4">
                 <pre className="scroll-slim max-h-72 overflow-y-auto font-sans text-[12.5px] leading-relaxed whitespace-pre-wrap text-ink-2">
                   {script}
                 </pre>
@@ -266,7 +266,7 @@ export function CopilotModal({
             </div>
 
             <div>
-              <p className="font-mono text-[10px] font-bold tracking-[0.1em] text-ink-4 uppercase">
+              <p className="text-[11px] font-medium text-ink-4">
                 Fatos na mesa
               </p>
               <ul className="mt-2 space-y-1.5">
@@ -280,7 +280,7 @@ export function CopilotModal({
             </div>
 
             <div className="border-t border-hairline pt-4">
-              <p className="font-mono text-[10px] font-bold tracking-[0.1em] text-ink-4 uppercase">
+              <p className="text-[11px] font-medium text-ink-4">
                 Hipóteses de causa-raiz
               </p>
               <ul className="mt-2 space-y-1.5">

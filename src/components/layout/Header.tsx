@@ -97,13 +97,13 @@ export function Header({
         {/* Search trigger — the command palette */}
         <button
           onClick={onOpenPalette}
-          className="group flex h-9 min-w-0 flex-1 items-center gap-2.5 rounded-lg border border-hairline bg-surface-2 px-3 text-left transition-colors hover:border-ink-4 sm:max-w-md"
+          className="group flex h-9 min-w-0 flex-1 items-center gap-2.5 rounded-lg bg-surface-2 px-3 text-left transition-colors sm:max-w-md"
         >
           <Search className="h-3.5 w-3.5 shrink-0 text-ink-4 transition-colors group-hover:text-brand-2" />
           <span className="min-w-0 flex-1 truncate text-[12.5px] text-ink-4">
             Buscar aluno, RA, curso, caso…
           </span>
-          <kbd className="hidden shrink-0 rounded border border-hairline bg-surface px-1.5 py-0.5 font-mono text-[10px] font-bold text-ink-4 sm:block">
+          <kbd className="hidden shrink-0 rounded bg-surface px-1.5 py-0.5 font-mono text-[10px] font-semibold text-ink-4 sm:block">
             ⌘K
           </kbd>
         </button>
@@ -140,7 +140,7 @@ export function Header({
 
           {/* Campus + cycle */}
           <div className="hidden 2xl:flex items-center gap-2">
-            <label className="flex h-8 items-center gap-1.5 rounded-lg border border-hairline bg-surface-2 px-2.5">
+            <label className="flex h-8 items-center gap-1.5 rounded-lg bg-surface-2 px-2.5">
               <Building2 className="h-3.5 w-3.5 shrink-0 text-ink-4" />
               <select
                 value={campusFilter}
@@ -157,15 +157,15 @@ export function Header({
               </select>
             </label>
 
-            <label className="flex h-8 items-center gap-1.5 rounded-lg border border-hairline bg-surface-2 px-2.5">
-              <span className="font-mono text-[9.5px] font-bold tracking-[0.08em] text-ink-4 uppercase">
+            <label className="flex h-8 items-center gap-1.5 rounded-lg bg-surface-2 px-2.5">
+              <span className="text-[11px] font-medium text-ink-4">
                 Ciclo
               </span>
               <select
                 value={semester}
                 onChange={(e) => setSemester(e.target.value)}
                 aria-label="Ciclo letivo"
-                className="cursor-pointer bg-transparent font-mono text-[11.5px] font-bold text-ink focus:outline-none"
+                className="cursor-pointer bg-transparent font-mono text-[11.5px] font-semibold text-ink focus:outline-none"
               >
                 <option value="2026/2">2026/2</option>
                 <option value="2026/1">2026/1</option>
@@ -200,7 +200,7 @@ export function Header({
             >
               <Bell className="h-3.5 w-3.5" />
               {unreadCount > 0 && (
-                <span className="absolute -top-1 -right-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-crit px-1 font-mono text-[9.5px] font-bold text-white">
+                <span className="absolute -top-1 -right-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-crit px-1 font-mono text-[9.5px] font-semibold text-white">
                   {unreadCount}
                 </span>
               )}
@@ -213,13 +213,13 @@ export function Header({
                   initial="initial"
                   animate="animate"
                   exit="exit"
-                  className="absolute right-0 z-50 mt-2 w-[368px] origin-top-right overflow-hidden rounded-xl border border-hairline bg-surface shadow-overlay"
+                  className="absolute right-0 z-50 mt-2 w-[368px] origin-top-right overflow-hidden rounded-xl bg-surface shadow-overlay"
                 >
                   <div className="flex items-center justify-between border-b border-hairline bg-surface-2 px-4 py-2.5">
-                    <p className="text-[12.5px] font-bold text-ink">
+                    <p className="text-[12.5px] font-semibold text-ink">
                       Notificações
                       {unreadCount > 0 && (
-                        <span className="ml-1.5 font-mono text-[11px] font-bold text-crit">
+                        <span className="ml-1.5 font-mono text-[11px] font-semibold text-crit">
                           {unreadCount} novas
                         </span>
                       )}
@@ -260,7 +260,7 @@ export function Header({
                             <span className="min-w-0 flex-1">
                               <span className="flex items-baseline justify-between gap-2">
                                 <span
-                                  className={`truncate text-[12px] ${n.read ? 'font-semibold text-ink-2' : 'font-bold text-ink'}`}
+                                  className={`truncate text-[12px] ${n.read ? 'font-semibold text-ink-2' : 'font-semibold text-ink'}`}
                                 >
                                   {n.title}
                                 </span>
@@ -300,7 +300,7 @@ export function Header({
           out of context after a filter change. */}
       {filtersActive && (
         <div className="flex items-center gap-2 border-t border-hairline bg-brand-soft px-4 py-1.5 sm:px-6">
-          <span className="font-mono text-[10px] font-bold tracking-[0.08em] text-brand-text uppercase">
+          <span className="text-[11px] font-medium text-brand-text">
             Escopo ativo
           </span>
           <span className="truncate text-[11.5px] font-semibold text-ink-2">
@@ -310,7 +310,7 @@ export function Header({
               campusFilter !== 'Todos' ? campusFilter : null,
             ]
               .filter(Boolean)
-              .join(' · ')}
+              .join('·')}
           </span>
           <button
             onClick={resetFilters}

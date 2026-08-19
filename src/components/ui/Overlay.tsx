@@ -113,7 +113,8 @@ export interface ModalProps {
   /** Sticky footer — action row. */
   footer?: ReactNode;
   children: ReactNode;
-  /** Renders the header on the royal-blue band for high-stakes dialogs. */
+  /** Accepted for compatibility. The blue-band header variant was retired;
+      a dialog earns attention from its content, not from a coloured strip. */
   tone?: 'plain' | 'band';
 }
 
@@ -127,7 +128,6 @@ export function Modal({
   size = 'md',
   footer,
   children,
-  tone = 'plain',
 }: ModalProps) {
   const sheetRef = useOverlayBehaviour(open, onClose);
   const titleId = useId();
@@ -157,61 +157,27 @@ export function Modal({
             exit="exit"
             className={[
               'relative flex w-full flex-col overflow-hidden outline-none',
-              'rounded-2xl border border-hairline bg-surface shadow-overlay',
+              'rounded-2xl bg-surface shadow-overlay',
               'max-h-[86vh]',
               MODAL_WIDTH[size],
             ].join(' ')}
           >
-            <header
-              className={[
-                'flex shrink-0 items-start justify-between gap-4 px-5 py-4',
-                tone === 'band'
-                  ? 'band-surface band-grid relative border-b border-band-line'
-                  : 'border-b border-hairline bg-surface-2/60',
-              ].join(' ')}
-            >
+            <header className="flex shrink-0 items-start justify-between gap-4 border-b border-hairline px-5 py-4">
               <div className="relative flex min-w-0 items-start gap-3">
                 {icon && (
-                  <div
-                    className={[
-                      'mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg',
-                      tone === 'band'
-                        ? 'border border-band-line bg-band-inset text-band-ink'
-                        : 'border border-brand-border bg-brand-soft text-brand-text',
-                    ].join(' ')}
-                  >
+                  <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-surface-2 text-ink-2">
                     {icon}
                   </div>
                 )}
                 <div className="min-w-0">
                   {eyebrow && (
-                    <div
-                      className={[
-                        'mb-1 font-mono text-[10px] font-bold tracking-[0.1em] uppercase',
-                        tone === 'band' ? 'text-band-ink-2' : 'text-ink-4',
-                      ].join(' ')}
-                    >
-                      {eyebrow}
-                    </div>
+                    <div className="mb-1 text-[12px] font-medium text-ink-3">{eyebrow}</div>
                   )}
-                  <h2
-                    id={titleId}
-                    className={[
-                      'text-[15px] leading-tight font-bold',
-                      tone === 'band' ? 'text-band-ink' : 'text-ink',
-                    ].join(' ')}
-                  >
+                  <h2 id={titleId} className="text-[15px] leading-tight font-semibold text-ink">
                     {title}
                   </h2>
                   {subtitle && (
-                    <p
-                      className={[
-                        'mt-1 text-[12px] leading-relaxed',
-                        tone === 'band' ? 'text-band-ink-2' : 'text-ink-3',
-                      ].join(' ')}
-                    >
-                      {subtitle}
-                    </p>
+                    <p className="mt-1 text-[12px] leading-relaxed text-ink-3">{subtitle}</p>
                   )}
                 </div>
               </div>
@@ -220,12 +186,7 @@ export function Modal({
                 type="button"
                 onClick={onClose}
                 aria-label="Fechar"
-                className={[
-                  'relative -mt-0.5 -mr-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-md transition-colors',
-                  tone === 'band'
-                    ? 'text-band-ink-2 hover:bg-white/15 hover:text-band-ink'
-                    : 'text-ink-4 hover:bg-surface-3 hover:text-ink',
-                ].join(' ')}
+                className="relative -mt-0.5 -mr-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-ink-4 transition-colors hover:bg-surface-2 hover:text-ink"
               >
                 <X className="h-4 w-4" />
               </button>

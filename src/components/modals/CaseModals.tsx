@@ -265,18 +265,18 @@ export function ForwardCaseModal({
                   key={spec.id}
                   onClick={() => setTargetId(spec.id)}
                   className={[
-                    'flex w-full items-center gap-3 rounded-lg border p-3 text-left transition-colors',
+                    'flex w-full items-center gap-3 rounded-lg p-3 text-left transition-colors',
                     active
-                      ? 'border-brand bg-brand-soft'
-                      : 'border-hairline bg-surface-2 hover:border-ink-4',
+                      ? 'bg-brand-soft'
+                      : 'bg-surface-2',
                   ].join(' ')}
                 >
                   <Avatar initials={spec.initials} size="sm" tone={active ? 'brand' : 'neutral'} />
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-1.5">
-                      <span className="truncate text-[12.5px] font-bold text-ink">{spec.name}</span>
+                      <span className="truncate text-[12.5px] font-semibold text-ink">{spec.name}</span>
                       {matches && (
-                        <span className="rounded border border-ok-border bg-ok-soft px-1.5 py-px font-mono text-[9.5px] font-bold text-ok-ink uppercase">
+                        <span className="rounded-sm bg-surface-3 px-1.5 py-0.5 text-[11px] font-medium text-ink-2">
                           especialidade compatível
                         </span>
                       )}
@@ -289,7 +289,7 @@ export function ForwardCaseModal({
                         color={saturated ? 'var(--warn)' : 'var(--ok)'}
                         height={4}
                       />
-                      <span className="shrink-0 font-mono text-[10.5px] font-bold text-ink-3">
+                      <span className="shrink-0 font-mono text-[10.5px] font-semibold text-ink-3">
                         {load}/{spec.capacity}
                       </span>
                     </div>
@@ -500,7 +500,7 @@ export function CreateCaseModal({
                 placeholder="Buscar por nome ou RA…"
               />
               {!student && (
-                <div className="scroll-slim max-h-44 divide-y divide-hairline overflow-y-auto rounded-lg border border-hairline">
+                <div className="scroll-slim max-h-44 divide-y divide-hairline overflow-y-auto rounded-lg">
                   {matches.length === 0 ? (
                     <p className="p-3 text-[12px] text-ink-4">Nenhum aluno encontrado.</p>
                   ) : (
@@ -522,7 +522,7 @@ export function CreateCaseModal({
                             RA {s.ra} · {s.course} · {s.modality}
                           </span>
                         </span>
-                        <span className="shrink-0 font-mono text-[11px] font-bold text-ink-3">
+                        <span className="shrink-0 font-mono text-[11px] font-semibold text-ink-3">
                           {s.healthScore}
                         </span>
                       </button>
@@ -601,14 +601,14 @@ export function CreateCaseModal({
 
         {/* Evidence pulled from the radar itself */}
         {student && (
-          <div className="rounded-lg border border-hairline bg-surface-2 p-4">
+          <div className="rounded-lg bg-surface-2 p-4">
             <div className="mb-2 flex items-center gap-2">
               <RadarBadge radar={radar} full />
               <PriorityBadge priority={priority} />
             </div>
             {detected.length > 0 ? (
               <>
-                <p className="font-mono text-[10px] font-bold tracking-[0.1em] text-ink-4 uppercase">
+                <p className="text-[11px] font-medium text-ink-4">
                   Sinais que o radar já detecta para este aluno
                 </p>
                 <ul className="mt-2 space-y-1.5">
@@ -633,7 +633,7 @@ export function CreateCaseModal({
           </div>
         )}
 
-        <label className="flex cursor-pointer items-center gap-2.5 rounded-lg border border-hairline bg-surface-2 p-3">
+        <label className="flex cursor-pointer items-center gap-2.5 rounded-lg bg-surface-2 p-3">
           <input
             type="checkbox"
             checked={assignToMe}
