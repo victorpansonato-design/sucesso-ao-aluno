@@ -222,10 +222,7 @@ export function RadarsView({
                 { label: 'SLA inicial', value: `${settings.slaHours[active]} h úteis` },
                 { label: 'Prioridade padrão', value: radar.defaultPriority },
                 { label: 'Especialidade', value: radar.specialty },
-                {
-                  label: 'Modalidades',
-                  value: radar.appliesTo.map((m) => (m === 'EaD' ? 'EaD' : m)).join(','),
-                },
+                { label: 'Modalidades', value: radar.appliesTo.join(' · ') },
               ]}
             />
           </div>

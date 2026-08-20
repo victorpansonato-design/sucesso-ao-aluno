@@ -92,7 +92,7 @@ const PROTOCOLS: Protocol[] = [
   },
   {
     radar: 'engajamento',
-    title: 'Desengajamento no AVA (híbrido e EaD)',
+    title: 'Desengajamento no AVA',
     when: 'Sete dias ou mais sem login, queda superior a 40% nos acessos ou duas entregas consecutivas perdidas.',
     objective:
       'Reduzir o atrito que está impedindo o acesso e recolocar o aluno no ritmo do módulo.',

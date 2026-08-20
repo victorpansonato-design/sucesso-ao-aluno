@@ -27,7 +27,9 @@ import {
 } from '../components/ui/Badges';
 import { Sparkline } from '../components/ui/Charts';
 import { COURSE_NAMES } from '../data/catalog';
-import { scoreDistribution } from '../lib/healthScore';
+import { populationDistribution, populationOf } from '../data/population';
+import type { PopulationScope } from '../data/population';
+import { scoreDistribution, statusFromSlug } from '../lib/healthScore';
 import { accessDropPercent } from '../lib/radars';
 import { exportStudents } from '../lib/exporters';
 import { decimal, int, percent, searchKey } from '../lib/format';
@@ -45,11 +47,21 @@ import { decimal, int, percent, searchKey } from '../lib/format';
 type SortKey = 'score' | 'nome' | 'frequencia' | 'ava' | 'media' | 'periodo';
 const PAGE_SIZE = 12;
 
-export function StudentsView({ actions }: { actions: ShellActions }) {
-  const { scopedStudents, radarsOf, resetFilters, filtersActive, students } = useApp();
+export function StudentsView({
+  actions,
+  bandParam,
+}: {
+  actions: ShellActions;
+  /** Health Score band slug from the route, sent by the cockpit donut. */
+  bandParam?: string | null;
+}) {
+  const { scopedStudents, radarsOf, resetFilters, filtersActive, students, modalityFilter, cohortFilter, settings } =
+    useApp();
 
   const [query, setQuery] = useState('');
-  const [status, setStatus] = useState<HealthStatus | 'todos'>('todos');
+  const [status, setStatus] = useState<HealthStatus | 'todos'>(
+    () => statusFromSlug(bandParam ?? null) ?? 'todos',
+  );
   const [course, setCourse] = useState('todos');
   const [scoreBand, setScoreBand] = useState<'todos' | '0-40' | '41-60' | '61-80' | '81-100'>('todos');
   const [sort, setSort] = useState<SortKey>('score');
@@ -57,6 +69,23 @@ export function StudentsView({ actions }: { actions: ShellActions }) {
   const [page, setPage] = useState(0);
 
   const distribution = useMemo(() => scoreDistribution(scopedStudents), [scopedStudents]);
+
+  /**
+   * The same band, counted across the whole institution. The cockpit donut
+   * describes 8.600 students; this table lists the ones with an open dossier in
+   * the Centro. Those are different numbers on purpose, and a filtered list
+   * that does not explain the gap just looks broken.
+   */
+  const census = useMemo(() => {
+    if (status === 'todos') return null;
+    const scope: PopulationScope = {
+      modality: modalityFilter,
+      cohort:
+        cohortFilter !== 'Todos' ? cohortFilter : settings.segregateOnboarding ? 'Veterano' : 'Todos',
+    };
+    const band = populationDistribution(scope).find((b) => b.status === status);
+    return band ? { band, evaluated: populationOf(scope) } : null;
+  }, [status, modalityFilter, cohortFilter, settings.segregateOnboarding]);
 
   const filtered = useMemo(() => {
     const list = scopedStudents.filter((s) => {
@@ -143,9 +172,9 @@ export function StudentsView({ actions }: { actions: ShellActions }) {
       className="space-y-5"
     >
       <PageHeader
-        eyebrow="Cadastro único · visão 360°"
+        eyebrow="Acompanhamento ativo · visão 360°"
         title="Base de Alunos"
-        description="Todos os alunos do escopo com Health Score recalculado pelo perfil de peso da sua modalidade. Clique em qualquer linha para abrir o dossiê completo."
+        description="Alunos com dossiê aberto no Centro de Sucesso, com Health Score recalculado pelo perfil de peso da sua modalidade. Clique em qualquer linha para abrir o dossiê completo."
         actions={
           <Button
             variant="secondary"
@@ -158,14 +187,28 @@ export function StudentsView({ actions }: { actions: ShellActions }) {
         }
       />
 
+      {census && (
+        <div className="rounded-lg bg-surface-2 px-4 py-3 text-[12.5px] leading-relaxed text-ink-2">
+          <span className="font-mono font-medium text-ink">{int(census.band.count)}</span> alunos em{' '}
+          <span className="font-semibold">{census.band.label}</span> na base avaliada de{' '}
+          <span className="font-mono">{int(census.evaluated)}</span>. Abaixo, os{' '}
+          <span className="font-mono font-medium text-ink">
+            {int(scopedStudents.filter((x) => x.status === census.band.status).length)}
+          </span>{' '}
+          que já têm dossiê aberto no Centro de Sucesso.
+        </div>
+      )}
+
       {/* Distribution strip — clickable score bands */}
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
         <StatTile
-          label="No escopo"
+          label="Dossiês abertos"
           value={int(scopedStudents.length)}
           detail={`de ${int(students.length)}`}
           icon={<Users className="h-3.5 w-3.5" />}
-          footer={<span>{filtersActive ? 'filtros globais ativos' : 'base completa'}</span>}
+          footer={
+            <span>{filtersActive ? 'filtros globais ativos' : 'acompanhamento do Centro'}</span>
+          }
         />
         {distribution.map((band) => (
           <StatTile
@@ -358,7 +401,7 @@ export function StudentsView({ actions }: { actions: ShellActions }) {
                         </span>
                         <span className="mt-0.5 block truncate text-[12px] text-ink-3">
                           <span className="font-mono">{s.ra}</span> · {s.course} · {s.period}º ·{' '}
-                          {s.modality === 'EaD' ? 'EaD 100%' : s.modality}
+                          {s.modality}
                         </span>
                       </span>
                     </button>

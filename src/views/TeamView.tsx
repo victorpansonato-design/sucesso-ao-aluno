@@ -300,7 +300,7 @@ export function TeamView({ actions }: { actions: ShellActions }) {
             {
               queue: 'Engajamento',
               radar: 'Radar de Engajamento AVA',
-              detail: 'Ritmo de estudo digital no híbrido e no EaD.',
+              detail: 'Ritmo de estudo digital entre encontros presenciais.',
             },
             {
               queue: 'Financeiro',

@@ -55,7 +55,7 @@ export const RADARS: Record<RadarKey, RadarDefinition> = {
     defaultSlaHours: 4,
     defaultPriority: 'Crítico',
     specialty: 'Retenção',
-    appliesTo: ['Presencial', 'Híbrido', 'EaD'],
+    appliesTo: ['Presencial', 'Híbrido'],
     evaluate: (s) => {
       const hits: string[] = [];
       const attendanceDrop = s.academic.attendancePrevPercent - s.academic.attendancePercent;
@@ -97,7 +97,7 @@ export const RADARS: Record<RadarKey, RadarDefinition> = {
     defaultSlaHours: 24,
     defaultPriority: 'Alto',
     specialty: 'Acadêmico',
-    appliesTo: ['Presencial', 'Híbrido', 'EaD'],
+    appliesTo: ['Presencial', 'Híbrido'],
     evaluate: (s) => {
       const hits: string[] = [];
       const failing = s.academic.disciplines.filter((d) => d.grade > 0 && d.grade < 5);
@@ -137,7 +137,7 @@ export const RADARS: Record<RadarKey, RadarDefinition> = {
     label: 'Radar de Engajamento AVA',
     shortLabel: 'Engajamento',
     purpose:
-      'Manter o ritmo de estudo digital. No híbrido e no EaD o login é o equivalente funcional da presença em sala.',
+      'Manter o ritmo de estudo digital. No híbrido, entre um encontro e o próximo, o login é o equivalente funcional da presença em sala.',
     triggers: [
       'Mais de 7 dias sem login na plataforma virtual',
       'Queda superior a 40% nos acessos em relação ao ciclo anterior',
@@ -149,7 +149,7 @@ export const RADARS: Record<RadarKey, RadarDefinition> = {
     defaultSlaHours: 48,
     defaultPriority: 'Médio',
     specialty: 'Engajamento',
-    appliesTo: ['Presencial', 'Híbrido', 'EaD'],
+    appliesTo: ['Presencial', 'Híbrido'],
     evaluate: (s) => {
       const hits: string[] = [];
       if (s.engagement.lastAccessDaysAgo >= 7) {
@@ -188,7 +188,7 @@ export const RADARS: Record<RadarKey, RadarDefinition> = {
     defaultSlaHours: 24,
     defaultPriority: 'Alto',
     specialty: 'Financeiro',
-    appliesTo: ['Presencial', 'Híbrido', 'EaD'],
+    appliesTo: ['Presencial', 'Híbrido'],
     evaluate: (s) => {
       const hits: string[] = [];
       if (s.financial.daysOverdue >= 5 && s.financial.insidePreventiveWindow) {
@@ -228,7 +228,7 @@ export const RADARS: Record<RadarKey, RadarDefinition> = {
     defaultSlaHours: 12,
     defaultPriority: 'Alto',
     specialty: 'Experiência',
-    appliesTo: ['Presencial', 'Híbrido', 'EaD'],
+    appliesTo: ['Presencial', 'Híbrido'],
     evaluate: (s) => {
       const hits: string[] = [];
       const open = s.alerts.filter((a) => a.radar === 'atendimento' && a.review !== 'descartado');

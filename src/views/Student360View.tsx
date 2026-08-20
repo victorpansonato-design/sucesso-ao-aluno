@@ -736,9 +736,7 @@ export function Student360View({
                   subtitle={
                     student.modality === 'Presencial'
                       ? 'No presencial o AVA complementa a sala de aula — peso de 15% no Health Score.'
-                      : student.modality === 'Híbrido'
-                        ? 'No híbrido o AVA carrega o peso que a presença quinzenal não pode carregar — 27% do Health Score.'
-                        : 'Em EaD 100% o AVA é a sala de aula — 37% do Health Score.'
+                      : 'No híbrido o AVA carrega o peso que a presença quinzenal não pode carregar — 27% do Health Score.'
                   }
                 />
 

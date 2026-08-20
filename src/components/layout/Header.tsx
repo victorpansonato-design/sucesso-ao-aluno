@@ -2,11 +2,9 @@ import { useEffect, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
 import {
   Bell,
-  Building2,
   CheckCheck,
   FilterX,
   HeartHandshake,
-  Laptop,
   Layers,
   Plus,
   School,
@@ -23,7 +21,6 @@ import { Button } from '../ui/Button';
 import { Segmented } from '../ui/Fields';
 import { popoverVariants } from '../../lib/motion';
 import { relative } from '../../lib/format';
-import { CAMPUSES } from '../../data/catalog';
 
 /* ==========================================================================
    Header
@@ -60,8 +57,6 @@ export function Header({
     setModalityFilter,
     cohortFilter,
     setCohortFilter,
-    campusFilter,
-    setCampusFilter,
     semester,
     setSemester,
     filtersActive,
@@ -119,7 +114,6 @@ export function Header({
                 { value: 'Todas', label: 'Todas' },
                 { value: 'Presencial', label: 'Presencial', icon: <School className="h-3 w-3" /> },
                 { value: 'Híbrido', label: 'Híbrido', icon: <Layers className="h-3 w-3" /> },
-                { value: 'EaD', label: 'EaD', icon: <Laptop className="h-3 w-3" /> },
               ]}
             />
           </div>
@@ -138,25 +132,9 @@ export function Header({
             />
           </div>
 
-          {/* Campus + cycle */}
-          <div className="hidden 2xl:flex items-center gap-2">
-            <label className="flex h-8 items-center gap-1.5 rounded-lg bg-surface-2 px-2.5">
-              <Building2 className="h-3.5 w-3.5 shrink-0 text-ink-4" />
-              <select
-                value={campusFilter}
-                onChange={(e) => setCampusFilter(e.target.value)}
-                aria-label="Campus"
-                className="max-w-[130px] cursor-pointer truncate bg-transparent text-[11.5px] font-semibold text-ink focus:outline-none"
-              >
-                <option value="Todos">Todos os campi</option>
-                {CAMPUSES.map((c) => (
-                  <option key={c} value={c}>
-                    {c}
-                  </option>
-                ))}
-              </select>
-            </label>
-
+          {/* Cycle. Campus is not here on purpose: the institution has one, so
+              offering the choice was a question with a single possible answer. */}
+          <div className="hidden items-center gap-2 xl:flex">
             <label className="flex h-8 items-center gap-1.5 rounded-lg bg-surface-2 px-2.5">
               <span className="text-[11px] font-medium text-ink-4">
                 Ciclo
@@ -307,7 +285,6 @@ export function Header({
             {[
               modalityFilter !== 'Todas' ? modalityFilter : null,
               cohortFilter !== 'Todos' ? `${cohortFilter}s` : null,
-              campusFilter !== 'Todos' ? campusFilter : null,
             ]
               .filter(Boolean)
               .join('·')}

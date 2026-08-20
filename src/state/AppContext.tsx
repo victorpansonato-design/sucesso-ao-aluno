@@ -87,8 +87,6 @@ interface AppState {
   setModalityFilter: (v: 'Todas' | Modality) => void;
   cohortFilter: 'Todos' | Cohort;
   setCohortFilter: (v: 'Todos' | Cohort) => void;
-  campusFilter: string;
-  setCampusFilter: (v: string) => void;
   semester: string;
   setSemester: (v: string) => void;
   resetFilters: () => void;
@@ -309,27 +307,23 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const [modalityFilter, setModalityFilter] = useState<'Todas' | Modality>('Todas');
   const [cohortFilter, setCohortFilter] = useState<'Todos' | Cohort>('Todos');
-  const [campusFilter, setCampusFilter] = useState<string>('Todos');
   const [semester, setSemester] = useState<string>('2026/2');
 
   const resetFilters = useCallback(() => {
     setModalityFilter('Todas');
     setCohortFilter('Todos');
-    setCampusFilter('Todos');
   }, []);
 
-  const filtersActive =
-    modalityFilter !== 'Todas' || cohortFilter !== 'Todos' || campusFilter !== 'Todos';
+  const filtersActive = modalityFilter !== 'Todas' || cohortFilter !== 'Todos';
 
   const scopedStudents = useMemo(
     () =>
       students.filter((s) => {
         if (modalityFilter !== 'Todas' && s.modality !== modalityFilter) return false;
         if (cohortFilter !== 'Todos' && s.cohort !== cohortFilter) return false;
-        if (campusFilter !== 'Todos' && s.campus !== campusFilter) return false;
         return true;
       }),
-    [students, modalityFilter, cohortFilter, campusFilter],
+    [students, modalityFilter, cohortFilter],
   );
 
   const scopedIds = useMemo(() => new Set(scopedStudents.map((s) => s.id)), [scopedStudents]);
@@ -1059,8 +1053,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setModalityFilter,
     cohortFilter,
     setCohortFilter,
-    campusFilter,
-    setCampusFilter,
     semester,
     setSemester,
     resetFilters,
@@ -1124,11 +1116,19 @@ export function useQueueStats() {
   return useMemo(() => {
     const open = scopedCases.filter((c) => isOpen(c.status));
     const mine = open.filter((c) => c.assigneeId === currentUser.id);
+    /* Unowned cases split two ways. The whole pool is a management number; the
+       slice matching the attendant's specialty is the only one they can act on,
+       so it is the one the cockpit shows. */
+    const unowned = open.filter((c) => c.assigneeId === null);
+    const unownedMine = unowned.filter((c) => c.specialty === currentUser.specialty);
     return {
       open,
       openCount: open.length,
       critical: open.filter((c) => c.priority === 'Crítico').length,
-      unassigned: open.filter((c) => c.assigneeId === null).length,
+      unowned,
+      unassigned: unowned.length,
+      unownedMine,
+      unownedMineCount: unownedMine.length,
       mine,
       mineCount: mine.length,
       minePending: mine.filter((c) => c.status === 'Pendente').length,
@@ -1138,5 +1138,5 @@ export function useQueueStats() {
       onboarding: scopedStudents.filter((s) => s.cohort === 'Calouro').length,
       segregated: settings.segregateOnboarding,
     };
-  }, [scopedCases, cases, currentUser.id, settings.segregateOnboarding, scopedStudents]);
+  }, [scopedCases, cases, currentUser.id, currentUser.specialty, settings.segregateOnboarding, scopedStudents]);
 }

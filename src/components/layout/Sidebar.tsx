@@ -64,7 +64,7 @@ export function Sidebar({
   route: RouteName;
   onNavigate: (name: RouteName) => void;
 }) {
-  const { currentUser, theme, toggleTheme, scopedStudents } = useApp();
+  const { currentUser, theme, toggleTheme } = useApp();
   const stats = useQueueStats();
   const [collapsed, setCollapsed] = useState(false);
   const inManagement = MANAGEMENT_ROUTES.includes(route);
@@ -240,12 +240,6 @@ export function Sidebar({
             )}
           </button>
         </div>
-
-        {!collapsed && (
-          <p className="px-1 text-[11px] leading-relaxed text-ink-4">
-            {scopedStudents.length} alunos no escopo · dados fictícios de demonstração
-          </p>
-        )}
       </div>
     </motion.aside>
   );

@@ -10,7 +10,7 @@ import { useCallback, useEffect, useState } from 'react';
 
    Routes
      #/cockpit
-     #/fila                       #/fila/:caseId
+     #/fila                       #/fila/:caseId | #/fila/:preset
      #/alunos                     #/alunos/:studentId
      #/radares                    #/radares/:radarKey
      #/onboarding
@@ -35,8 +35,28 @@ export type RouteName =
 
 export interface Route {
   name: RouteName;
-  /** Second path segment: a case id, student id or radar key. */
+  /** Second path segment: a case id, student id, radar key or working-set preset. */
   param: string | null;
+}
+
+/**
+ * Working sets the queue can be opened *into*, as opposed to a single case.
+ * They exist because the cockpit's numbers have to be honest: clicking a tile
+ * that says "3 vencendo o SLA" must land on those three cases and nothing else.
+ * Case ids are always `case-…`, so the two never collide.
+ */
+export const QUEUE_PRESETS = [
+  'minha-fila',
+  'vencendo-sla',
+  'sem-dono',
+  'equipe',
+  'resolvidos-hoje',
+] as const;
+
+export type QueuePreset = (typeof QUEUE_PRESETS)[number];
+
+export function asQueuePreset(param: string | null): QueuePreset | null {
+  return QUEUE_PRESETS.find((p) => p === param) ?? null;
 }
 
 const VALID: RouteName[] = [

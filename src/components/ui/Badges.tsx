@@ -222,7 +222,7 @@ export function CohortBadge({ cohort, days }: { cohort: Cohort; days?: number })
 export function ModalityBadge({ modality }: { modality: Modality }) {
   return (
     <span className="inline-flex shrink-0 items-center rounded-sm bg-surface-2 px-1.5 py-0.5 text-[11px] font-medium text-ink-3">
-      {modality === 'EaD' ? 'EaD 100%' : modality}
+      {modality}
     </span>
   );
 }

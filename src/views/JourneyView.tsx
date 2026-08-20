@@ -4,7 +4,6 @@ import {
   ArrowRight,
   CalendarDays,
   ChevronRight,
-  Laptop,
   Layers,
   School,
   Scale,
@@ -29,7 +28,12 @@ import { MeterBar, StackedBar } from '../components/ui/Charts';
 import { Avatar, HealthBadge, ModalityBadge, Pill } from '../components/ui/Badges';
 import { DIMENSION_LABEL } from '../lib/healthScore';
 import { decimal, int, percent } from '../lib/format';
-import { BASE_POPULATION } from '../data/catalog';
+import { populationOf } from '../data/population';
+
+/** The modalities the institution delivers this cycle. EaD keeps its weight
+    profile in the score engine, but there is no journey to describe until it
+    is offered again. */
+type ActiveModality = Extract<Modality, 'Presencial' | 'Híbrido'>;
 
 /* ==========================================================================
    Jornada por Modalidade
@@ -49,7 +53,7 @@ interface StageDef {
   matches: (progress: number, days: number) => boolean;
 }
 
-const STAGES: Record<Modality, StageDef[]> = {
+const STAGES: Record<ActiveModality, StageDef[]> = {
   Presencial: [
     {
       id: 'ambientacao',
@@ -125,40 +129,10 @@ const STAGES: Record<Modality, StageDef[]> = {
       matches: (p) => p > 88,
     },
   ],
-  EaD: [
-    {
-      id: 'ativacao',
-      title: 'Ativação da plataforma',
-      description: 'Login, reconhecimento da trilha e primeira interação no fórum.',
-      risk: 'Não ativar a plataforma nos primeiros 15 dias.',
-      matches: (_, days) => days <= 90,
-    },
-    {
-      id: 'ritmo',
-      title: 'Construção de ritmo',
-      description: 'Estabelecer cadência semanal de estudo sem a âncora de um horário fixo.',
-      risk: 'Sem rotina externa, o estudo simplesmente não acontece.',
-      matches: (p) => p > 0 && p <= 35,
-    },
-    {
-      id: 'sprints',
-      title: 'Sprints e entregas',
-      description: 'Entregas quinzenais avaliadas, tutoria assíncrona e projetos aplicados.',
-      risk: 'Duas sprints consecutivas sem entrega.',
-      matches: (p) => p > 35 && p <= 70,
-    },
-    {
-      id: 'conclusao-ead',
-      title: 'Conclusão e certificação',
-      description: 'Últimos módulos, avaliação integradora e emissão do certificado.',
-      risk: 'Abandono na última etapa por perda de vínculo institucional.',
-      matches: (p) => p > 70,
-    },
-  ],
 };
 
 const MODALITY_PROFILE: Record<
-  Modality,
+  ActiveModality,
   { headline: string; focus: string[]; risks: string[]; attendanceNote: string }
 > = {
   Presencial: {
@@ -183,22 +157,11 @@ const MODALITY_PROFILE: Record<
     attendanceNote:
       'Presença cai para 15% e o engajamento no AVA sobe para 27%: no híbrido, o login carrega o peso que a frequência não pode carregar.',
   },
-  EaD: {
-    headline: 'O AVA é a sala de aula. Sem login, não há aula.',
-    focus: ['Trilha assíncrona', 'Sprints de entrega', 'Tutoria por fórum', 'Autonomia de rotina'],
-    risks: [
-      'Ausência de rotina externa que ancore o estudo',
-      'Sprints acumuladas sem entrega',
-      'Perda de vínculo institucional por falta de contato humano',
-    ],
-    attendanceNote:
-      'Presença vale apenas 5% e o engajamento no AVA responde por 37% do Health Score — é o eixo central da avaliação.',
-  },
 };
 
 export function JourneyView({ actions }: { actions: ShellActions }) {
   const { students, settings, scopedStudents } = useApp();
-  const [modality, setModality] = useState<Modality>('Híbrido');
+  const [modality, setModality] = useState<ActiveModality>('Híbrido');
 
   const cohort = useMemo(() => students.filter((s) => s.modality === modality), [students, modality]);
   const stages = STAGES[modality];
@@ -243,7 +206,7 @@ export function JourneyView({ actions }: { actions: ShellActions }) {
       <PageHeader
         eyebrow="Jornadas diferentes, réguas diferentes"
         title="Jornada por Modalidade"
-        description="Presencial, híbrido e EaD não são o mesmo curso com menos aulas. Cada modelo tem calendário, riscos e — decisivo para o Health Score — perfil de pesos próprio."
+        description="Presencial e híbrido não são o mesmo curso com menos aulas. Cada modelo tem calendário, riscos e — decisivo para o Health Score — perfil de pesos próprio."
         actions={
           <Button
             variant="secondary"
@@ -254,7 +217,7 @@ export function JourneyView({ actions }: { actions: ShellActions }) {
           </Button>
         }
       >
-        <Segmented<Modality>
+        <Segmented<ActiveModality>
           layoutId="journey-modality"
           value={modality}
           onChange={(v) => {
@@ -264,7 +227,6 @@ export function JourneyView({ actions }: { actions: ShellActions }) {
           options={[
             { value: 'Presencial', label: 'Presencial', icon: <School className="h-3 w-3" />, count: students.filter((s) => s.modality === 'Presencial').length },
             { value: 'Híbrido', label: 'Híbrido', icon: <Layers className="h-3 w-3" />, count: students.filter((s) => s.modality === 'Híbrido').length },
-            { value: 'EaD', label: 'EaD 100%', icon: <Laptop className="h-3 w-3" />, count: students.filter((s) => s.modality === 'EaD').length },
           ]}
         />
       </PageHeader>
@@ -274,7 +236,7 @@ export function JourneyView({ actions }: { actions: ShellActions }) {
         <div className="relative grid gap-6 p-5 sm:p-6 lg:grid-cols-[minmax(0,1fr)_400px]">
           <div className="min-w-0">
             <CardHeader
-              eyebrow={`Perfil de peso · ${modality === 'EaD' ? 'EaD 100%' : modality}`}
+              eyebrow={`Perfil de peso · ${modality}`}
               title={profile.headline}
               subtitle={profile.attendanceNote}
             />
@@ -283,7 +245,7 @@ export function JourneyView({ actions }: { actions: ShellActions }) {
               <StatTile
                 tone="band"
                 label="Alunos na base"
-                value={int(BASE_POPULATION[modality])}
+                value={int(populationOf({ modality, cohort: 'Todos' }))}
                 footer={<span>{cohort.length} na amostra</span>}
               />
               <StatTile
@@ -486,7 +448,7 @@ export function JourneyView({ actions }: { actions: ShellActions }) {
       <Card>
         <CardHeader
           eyebrow="Composição"
-          title={`Distribuição de classificação · ${modality === 'EaD' ? 'EaD 100%' : modality}`}
+          title={`Distribuição de classificação · ${modality}`}
         />
         <div className="mt-4">
           <StackedBar
@@ -519,7 +481,7 @@ export function JourneyView({ actions }: { actions: ShellActions }) {
             title={
               selectedStage
                 ? `Etapa: ${stageRows.find((s) => s.id === selectedStage)?.title}`
-                : `Todos os alunos ${modality === 'EaD' ? 'EaD' : modality.toLowerCase()}`
+                : `Todos os alunos ${modality.toLowerCase()}`
             }
             action={
               <LinkButton

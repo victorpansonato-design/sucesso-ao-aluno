@@ -1,6 +1,14 @@
 import { useMemo } from 'react';
 import { motion } from 'motion/react';
-import { ArrowRight, CheckCircle2, Hand, ListChecks, Plus, Sparkles } from 'lucide-react';
+import {
+  ArrowRight,
+  CheckCircle2,
+  Hand,
+  ListChecks,
+  Plus,
+  Sparkles,
+  Sprout,
+} from 'lucide-react';
 import type { ShellActions } from '../App';
 import { useApp, useQueueStats } from '../state/AppContext';
 import { pageVariants } from '../lib/motion';
@@ -9,64 +17,101 @@ import { Button, LinkButton } from '../components/ui/Button';
 import { Donut } from '../components/ui/Charts';
 import { Avatar, PriorityBadge } from '../components/ui/Badges';
 import { SlaPill } from '../components/domain/SlaPill';
-import { scoreDistribution } from '../lib/healthScore';
+import { STATUS_SLUG } from '../lib/healthScore';
 import { compareBySla, slaStatus, useClock } from '../lib/sla';
+import { populationDistribution, populationOf } from '../data/population';
 import { int, percent } from '../lib/format';
 
 /* ==========================================================================
    Cockpit
    --------------------------------------------------------------------------
-   One question, three blocks: "quem precisa de mim agora?"
+   Two questions, in this order:
 
-   The previous version answered that in the first screenful and then answered
-   five questions nobody had asked — a radar matrix, a bar chart of causes, a
-   follow-up agenda, a second copy of the same queue. Everything removed here
-   still exists on its own screen, reachable in one click. Repeating it on the
-   home screen only pushed the answer further down the page.
+     1. "Como estamos?" — the whole institution, every student the score engine
+        judges. Not the few dozen with an open dossier: the 8.600.
+     2. "Quem precisa de mim agora?" — and here *me* is literal. The four
+        numbers under the title are the attendant's own shift: their queue,
+        their SLA, the unowned cases in their specialty, their closures today.
+        A number nobody on this screen can act on does not belong on the screen
+        they open first.
 
-   What survives:
-     1. Four numbers that decide whether the shift is calm or on fire.
-     2. The shape of the base, so a coordinator can see the trend behind them.
-     3. The queue itself — the actual answer to the question.
+   Every number is a link, and every link lands on exactly the set it counted.
+   A tile reading "3 vencendo o SLA" that opens a list of forty is worse than no
+   tile at all, so the queue grew real working sets (`lib/router.ts`) instead of
+   four buttons pointing at the same default tab.
    ========================================================================== */
 
 export function CockpitView({ actions }: { actions: ShellActions }) {
-  const {
-    scopedStudents,
-    theme,
-    currentUser,
-    getStudent,
-    modalityFilter,
-    cohortFilter,
-  } = useApp();
+  const { theme, currentUser, getStudent, modalityFilter, cohortFilter, settings } = useApp();
   const stats = useQueueStats();
   const now = useClock();
   const dark = theme === 'dark';
 
-  const distribution = useMemo(() => scoreDistribution(scopedStudents), [scopedStudents]);
+  /* -- Block 1: the whole base ------------------------------------------- */
 
-  /* -- The four numbers -------------------------------------------------- */
-  const dueSoon = useMemo(
+  /**
+   * Which population the donut describes. The 90-day rule decides it: while
+   * onboarding is segregated, freshmen are on the welcome track and are not
+   * being judged by the Health Score, so counting them here would inflate the
+   * denominator of every percentage on screen. An explicit cohort filter in the
+   * header always wins.
+   */
+  const scope = useMemo(
+    () => ({
+      modality: modalityFilter,
+      cohort:
+        cohortFilter !== 'Todos'
+          ? cohortFilter
+          : settings.segregateOnboarding
+            ? ('Veterano' as const)
+            : ('Todos' as const),
+    }),
+    [modalityFilter, cohortFilter, settings.segregateOnboarding],
+  );
+
+  const distribution = useMemo(() => populationDistribution(scope), [scope]);
+  const evaluated = useMemo(() => populationOf(scope), [scope]);
+  const onboarding = useMemo(
+    () => populationOf({ modality: modalityFilter, cohort: 'Calouro' }),
+    [modalityFilter],
+  );
+
+  const needAttention = distribution
+    .filter((band) => band.status === 'Risco' || band.status === 'Crítico')
+    .reduce((sum, band) => sum + band.count, 0);
+
+  /* -- Block 2: my shift -------------------------------------------------- */
+
+  /** My cases already inside the SLA warning band, or past it. */
+  const myDueSoon = useMemo(
     () =>
-      stats.open.filter((c) => {
+      stats.mine.filter((c) => {
         const state = slaStatus(c, now).state;
         return state === 'warning' || state === 'breach';
       }).length,
-    [stats.open, now],
+    [stats.mine, now],
   );
 
   const solvedToday = useMemo(() => {
     const start = new Date();
     start.setHours(0, 0, 0, 0);
-    return stats.closed.filter((c) => c.closedAt && new Date(c.closedAt).getTime() >= start.getTime())
-      .length;
-  }, [stats.closed]);
+    return stats.closed.filter(
+      (c) =>
+        c.assigneeId === currentUser.id &&
+        c.closedAt &&
+        new Date(c.closedAt).getTime() >= start.getTime(),
+    ).length;
+  }, [stats.closed, currentUser.id]);
 
-  /* -- The queue: SLA first, then priority ------------------------------- */
-  const priorityQueue = useMemo(
-    () => [...stats.open].sort((a, b) => compareBySla(a, b, now)).slice(0, 6),
-    [stats.open, now],
+  /* -- Block 3: the work I can actually pick up ---------------------------
+     My open cases plus the unowned ones in my specialty — the two piles an
+     attendant can act on right now. The rest of the team's load is one click
+     away and does not belong in a list titled "precisam de mim". */
+  const actionable = useMemo(
+    () => [...stats.mine, ...stats.unownedMine].sort((a, b) => compareBySla(a, b, now)),
+    [stats.mine, stats.unownedMine, now],
   );
+  const priorityQueue = useMemo(() => actionable.slice(0, 6), [actionable]);
 
   const firstName = currentUser.name.split(' ')[0];
   const scopeLabel =
@@ -91,7 +136,7 @@ export function CockpitView({ actions }: { actions: ShellActions }) {
         eyebrow={
           <>
             <span className="pulse-dot h-1.5 w-1.5 rounded-full bg-ink-4 text-ink-4" />
-            {scopeLabel} · {int(scopedStudents.length)} alunos no escopo
+            {currentUser.specialty} · {scopeLabel}
           </>
         }
         title={`Bom dia, ${firstName}`}
@@ -108,42 +153,43 @@ export function CockpitView({ actions }: { actions: ShellActions }) {
               variant="primary"
               icon={<ListChecks className="h-3.5 w-3.5" />}
               iconRight={<ArrowRight className="h-3.5 w-3.5" />}
-              onClick={() => actions.goto('fila')}
+              onClick={() => actions.goto('fila', 'minha-fila')}
             >
-              Abrir fila ({stats.openCount})
+              Abrir fila ({stats.mineCount})
             </Button>
           </>
         }
       />
 
-      {/* ---- Four numbers. No boxes: whitespace separates them. ---------- */}
+      {/* ---- My shift. No boxes: whitespace separates them. -------------- */}
       <div className="grid grid-cols-2 gap-x-6 gap-y-7 sm:grid-cols-4 lg:gap-x-12">
         <Metric
           label="na minha fila"
           value={int(stats.mineCount)}
-          onClick={() => actions.goto('fila')}
+          onClick={() => actions.goto('fila', 'minha-fila')}
         />
         <Metric
-          label="vencendo o SLA"
-          value={int(dueSoon)}
-          tone={dueSoon > 0 ? 'crit' : 'plain'}
-          onClick={() => actions.goto('fila')}
+          label="vencendo o meu SLA"
+          value={int(myDueSoon)}
+          tone={myDueSoon > 0 ? 'crit' : 'plain'}
+          onClick={() => actions.goto('fila', 'vencendo-sla')}
         />
         <Metric
-          label="sem dono"
-          value={int(stats.unassigned)}
-          onClick={() => actions.goto('fila')}
+          label={`sem dono · ${currentUser.specialty}`}
+          value={int(stats.unownedMineCount)}
+          onClick={() => actions.goto('fila', 'sem-dono')}
         />
-        <Metric label="resolvidos hoje" value={int(solvedToday)} />
+        <Metric
+          label="resolvidos hoje"
+          value={int(solvedToday)}
+          onClick={() => actions.goto('fila', 'resolvidos-hoje')}
+        />
       </div>
 
-      {/* ---- Base health + the queue ------------------------------------- */}
-      <div className="grid gap-6 lg:grid-cols-[320px_minmax(0,1fr)]">
+      {/* ---- The base + the queue ---------------------------------------- */}
+      <div className="grid gap-6 lg:grid-cols-[340px_minmax(0,1fr)]">
         <Card>
-          <CardHeader
-            title="Saúde da base"
-            subtitle="Clique numa faixa para abrir a base filtrada."
-          />
+          <CardHeader title="Como está a base" />
 
           <div className="mt-5 flex flex-col items-center gap-5">
             <Donut
@@ -153,16 +199,19 @@ export function CockpitView({ actions }: { actions: ShellActions }) {
                 value: band.count,
                 color: band.hex(dark),
               }))}
-              centerValue={scopedStudents.length}
-              centerLabel="alunos"
-              onSegmentClick={() => actions.goto('alunos')}
+              centerValue={evaluated}
+              centerLabel="avaliados"
+              onSegmentClick={(key) => {
+                const band = distribution.find((b) => b.status === key);
+                if (band) actions.goto('alunos', STATUS_SLUG[band.status]);
+              }}
             />
 
             <div className="w-full min-w-0 space-y-1">
               {distribution.map((band) => (
                 <button
                   key={band.status}
-                  onClick={() => actions.goto('alunos')}
+                  onClick={() => actions.goto('alunos', STATUS_SLUG[band.status])}
                   className="flex w-full items-center gap-2.5 rounded-md px-1.5 py-1.5 text-left transition-colors hover:bg-surface-2"
                 >
                   <span
@@ -181,6 +230,30 @@ export function CockpitView({ actions }: { actions: ShellActions }) {
                 </button>
               ))}
             </div>
+
+            {/* The verdict in one line, plus the track deliberately kept out
+                of the chart above. */}
+            <div className="w-full space-y-2 border-t border-hairline pt-4">
+              <p className="px-1.5 text-[12.5px] leading-relaxed text-ink-2">
+                <span className="font-mono font-medium text-ink">{int(needAttention)}</span> em risco
+                ou crítico —{' '}
+                <span className="font-mono">
+                  {percent(evaluated > 0 ? (needAttention / evaluated) * 100 : 0, 1)}
+                </span>{' '}
+                da base avaliada.
+              </p>
+              <button
+                onClick={() => actions.goto('onboarding')}
+                className="flex w-full items-center gap-2 rounded-md px-1.5 py-1.5 text-left transition-colors hover:bg-surface-2"
+              >
+                <Sprout className="h-3.5 w-3.5 shrink-0 text-ink-4" />
+                <span className="min-w-0 flex-1 text-[12px] text-ink-3">
+                  <span className="font-mono font-medium text-ink-2">{int(onboarding)}</span>{' '}
+                  calouros na trilha de 90 dias
+                </span>
+                <ArrowRight className="h-3.5 w-3.5 shrink-0 text-ink-4" />
+              </button>
+            </div>
           </div>
         </Card>
 
@@ -188,13 +261,13 @@ export function CockpitView({ actions }: { actions: ShellActions }) {
           <div className="p-5 pb-4">
             <CardHeader
               title="Precisam de mim agora"
-              subtitle="SLA estourado primeiro, depois prioridade. Assuma ou abra o dossiê daqui."
+              subtitle={`Seus casos e os sem dono em ${currentUser.specialty}. SLA estourado primeiro, depois prioridade.`}
               action={
                 <LinkButton
-                  onClick={() => actions.goto('fila')}
+                  onClick={() => actions.goto('fila', 'minha-fila')}
                   iconRight={<ArrowRight className="h-3.5 w-3.5" />}
                 >
-                  Ver fila ({stats.openCount})
+                  Ver minha fila ({stats.mineCount})
                 </LinkButton>
               }
             />
@@ -203,8 +276,19 @@ export function CockpitView({ actions }: { actions: ShellActions }) {
           {priorityQueue.length === 0 ? (
             <EmptyState
               icon={<CheckCircle2 className="h-5 w-5" />}
-              title="Nenhum caso aberto no escopo"
-              message="Todos os protocolos deste recorte estão encerrados. Ajuste os filtros no topo para ver outro segmento da base."
+              title="Nada esperando por você"
+              message={`Sem casos seus em aberto e sem casos sem dono em ${currentUser.specialty}. A equipe tem ${int(stats.openCount)} protocolos abertos no escopo.`}
+              action={
+                stats.openCount > 0 ? (
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    onClick={() => actions.goto('fila', 'equipe')}
+                  >
+                    Ver a fila da equipe ({int(stats.openCount)})
+                  </Button>
+                ) : undefined
+              }
             />
           ) : (
             <ul className="divide-y divide-hairline border-t border-hairline">
@@ -281,6 +365,17 @@ export function CockpitView({ actions }: { actions: ShellActions }) {
                 );
               })}
             </ul>
+          )}
+
+          {actionable.length > priorityQueue.length && (
+            <div className="border-t border-hairline px-5 py-3">
+              <LinkButton
+                onClick={() => actions.goto('fila', 'minha-fila')}
+                iconRight={<ArrowRight className="h-3.5 w-3.5" />}
+              >
+                Mais {int(actionable.length - priorityQueue.length)} na fila
+              </LinkButton>
+            </div>
           )}
         </Card>
       </div>

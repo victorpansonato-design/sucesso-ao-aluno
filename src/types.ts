@@ -7,7 +7,13 @@
 
 /* -- Enrolment ------------------------------------------------------------ */
 
-/** The three delivery models, each with its own risk physics and score weights. */
+/**
+ * The three delivery models, each with its own risk physics and score weights.
+ * Only the ones in `MODALITIES` (data/catalog.ts) are offered in a given cycle —
+ * EaD is not being delivered right now, so it appears in no filter, tab or form,
+ * but its weight profile stays in the engine rather than being deleted and
+ * re-derived when the offer returns.
+ */
 export type Modality = 'Presencial' | 'Híbrido' | 'EaD';
 
 export type Shift = 'Matutino' | 'Vespertino' | 'Noturno' | 'Integral';

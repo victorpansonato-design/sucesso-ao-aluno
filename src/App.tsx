@@ -54,7 +54,7 @@ export interface ShellActions {
 
 function Shell() {
   const { route, navigate } = useRoute();
-  const { cases, students } = useApp();
+  const { students } = useApp();
 
   /* -- Overlay state ---------------------------------------------------- */
   const [paletteOpen, setPaletteOpen] = useState(false);
@@ -115,7 +115,9 @@ function Shell() {
         return route.param && students.some((s) => s.id === route.param) ? (
           <Student360View key={`aluno-${route.param}`} studentId={route.param} actions={actions} />
         ) : (
-          <StudentsView key="alunos" actions={actions} />
+          // Anything else in the slot is a Health Score band slug, sent by the
+          // cockpit donut so the base opens already filtered to that faixa.
+          <StudentsView key="alunos" actions={actions} bandParam={route.param} />
         );
       case 'radares':
         return <RadarsView key="radares" actions={actions} radarParam={route.param} />;
@@ -153,18 +155,6 @@ function Shell() {
             <AnimatePresence mode="wait">{renderView()}</AnimatePresence>
           </div>
         </main>
-
-        <footer className="border-t border-hairline px-4 py-4 sm:px-6 lg:px-8 print:hidden">
-          <div className="mx-auto flex w-full max-w-[1440px] flex-wrap items-center justify-between gap-2">
-            <p className="text-[11px] text-ink-4">
-              UniAnchieta · Centro de Sucesso ao Aluno · ambiente de demonstração com dados fictícios
-            </p>
-            <p className="text-[11px] text-ink-4">
-              <span className="font-mono">{cases.length}</span> casos ·{' '}
-              <span className="font-mono">{students.length}</span> alunos na base
-            </p>
-          </div>
-        </footer>
       </div>
 
       {/* ---- Overlays ---------------------------------------------------- */}

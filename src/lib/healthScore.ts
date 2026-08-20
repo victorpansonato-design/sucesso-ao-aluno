@@ -242,6 +242,23 @@ export const SCORE_BANDS: {
   },
 ];
 
+/**
+ * URL-safe band names, so the cockpit donut can deep-link into the base with a
+ * band already selected. Accents and capitals do not belong in a hash route.
+ */
+export const STATUS_SLUG: Record<HealthStatus, string> = {
+  'Estável': 'estavel',
+  'Atenção': 'atencao',
+  Risco: 'risco',
+  'Crítico': 'critico',
+};
+
+export function statusFromSlug(slug: string | null): HealthStatus | null {
+  if (!slug) return null;
+  const hit = SCORE_BANDS.find((band) => STATUS_SLUG[band.status] === slug);
+  return hit ? hit.status : null;
+}
+
 /* -- Public API ----------------------------------------------------------- */
 
 export interface ScoreContext {

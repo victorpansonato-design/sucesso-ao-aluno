@@ -28,6 +28,7 @@ import { Segmented } from '../components/ui/Fields';
 import { MeterBar } from '../components/ui/Charts';
 import { Avatar, HealthBadge, ModalityBadge, Pill } from '../components/ui/Badges';
 import { int, percent } from '../lib/format';
+import { TOTAL_ONBOARDING } from '../data/population';
 
 /* ==========================================================================
    Onboarding 90 dias
@@ -186,11 +187,15 @@ export function OnboardingView({ actions }: { actions: ShellActions }) {
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <StatTile
-          label="Calouros na janela"
-          value={int(inWindow.length)}
-          detail={`de ${int(freshmen.length)}`}
+          label="Calouros na instituição"
+          value={int(TOTAL_ONBOARDING)}
           icon={<Sprout className="h-3.5 w-3.5" />}
-          footer={<span>janela de {settings.onboardingWindowDays} dias</span>}
+          footer={
+            <span>
+              {int(inWindow.length)} em acompanhamento · janela de{' '}
+              {settings.onboardingWindowDays} dias
+            </span>
+          }
         />
         <StatTile
           label="Ambientação em curso"

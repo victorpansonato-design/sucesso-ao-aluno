@@ -23,11 +23,16 @@ export function AnimatedNumber({
   duration = 620,
   format = true,
   decimals = 0,
+  resetOnChange = false,
 }: {
   value: number;
   duration?: number;
   format?: boolean;
   decimals?: number;
+  /** Recount from zero on every change instead of tweening from the last
+   *  shown value — for counters where each update should read as a fresh
+   *  count-up (e.g. the donut re-scoping to a new filter), not a drift. */
+  resetOnChange?: boolean;
 }) {
   const [shown, setShown] = useState(value);
   const fromRef = useRef(value);
@@ -36,7 +41,7 @@ export function AnimatedNumber({
   useEffect(() => {
     // Count up from zero on mount, then tween between values on updates so a
     // score changing 78 → 86 reads as movement rather than a jump cut.
-    const from = firstRun.current ? 0 : fromRef.current;
+    const from = firstRun.current || resetOnChange ? 0 : fromRef.current;
     firstRun.current = false;
     fromRef.current = value;
 
@@ -217,8 +222,8 @@ export function Donut({
         })}
       </svg>
       <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
-        <span className="font-mono text-[30px] leading-none font-medium text-ink">
-          <AnimatedNumber value={centerValue} />
+        <span className="font-mono text-[30px] leading-none font-medium tracking-tight text-ink">
+          <AnimatedNumber value={centerValue} duration={520} resetOnChange />
         </span>
         <span className="mt-1 text-[11px] font-medium text-ink-4">
           {centerLabel}

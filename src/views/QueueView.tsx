@@ -27,6 +27,8 @@ import { CaseWorkflow } from '../components/domain/CaseWorkflow';
 import { RADARS, RADAR_ORDER } from '../lib/radars';
 import { PRIORITY_ORDER, compareBySla, slaStatus, useClock } from '../lib/sla';
 import { isOpen, isTerminal } from '../lib/caseFlow';
+import { asQueuePreset } from '../lib/router';
+import type { QueuePreset } from '../lib/router';
 import { exportCases } from '../lib/exporters';
 import { searchKey } from '../lib/format';
 
@@ -34,25 +36,88 @@ import { searchKey } from '../lib/format';
    Fila de Atendimento
    --------------------------------------------------------------------------
    The attendant's workspace: a master list on the left, the full case workflow
-   on the right. Two things make it usable at real volume:
+   on the right. Three decisions make it usable at real volume:
 
-     · The default tab is "Meus pendentes", and it is guaranteed to contain the
-       cases the state machine calls pending — the previous build filtered on
-       statuses that no longer existed, so the landing tab was always empty.
+     · One tab for my work, not two. "Meus pendentes" and "Em tratativa" split
+       the only pile an attendant actually owns, so a cockpit tile reading
+       "12 na minha fila" had nowhere honest to land. The distinction survives as
+       a filter inside the tab, which is what it always was.
+     · "Sem dono" is scoped to the attendant's specialty by default. The pool of
+       unowned cases across every specialty is a coordinator's number; the slice
+       matching your niche is the one you can actually claim.
      · Sorting defaults to SLA, so the top of the list is always the case that
        will breach first. That is the whole job of a queue.
+
+   Deep links carry working sets (`asQueuePreset`), and whatever a preset
+   narrows is spelled out in a "recorte" strip above the list — a filtered list
+   that does not say it is filtered is just a list with cases missing.
    ========================================================================== */
 
-type Tab = 'meus-pendentes' | 'meus-ativos' | 'sem-dono' | 'equipe' | 'encerrados';
+type Tab = 'minha-fila' | 'sem-dono' | 'equipe' | 'encerrados';
 type SortKey = 'sla' | 'prioridade' | 'score' | 'abertura';
 
-const TAB_LABEL: Record<Tab, string> = {
-  'meus-pendentes': 'Meus pendentes',
-  'meus-ativos': 'Em tratativa',
-  'sem-dono': 'Sem dono',
-  equipe: 'Toda a equipe',
-  encerrados: 'Encerrados',
-};
+/** SLA lens, applicable to any list of open cases. */
+type SlaScope = 'todos' | 'vencendo';
+/** Where a case of mine stands: awaiting first contact, or already moving. */
+type StatusScope = 'todas' | 'pendentes' | 'tratativa';
+/** Which unowned cases: my specialty only, or every specialty. */
+type SpecialtyScope = 'minha' | 'todas';
+/** Closed cases: everything, or just what I closed in this shift. */
+type ClosedScope = 'todos' | 'meus-hoje';
+
+function startOfToday(): number {
+  const d = new Date();
+  d.setHours(0, 0, 0, 0);
+  return d.getTime();
+}
+
+/** Which tab a case lives in, given who owns it and where it is. */
+function homeTabFor(kase: Case, userId: string): Tab {
+  if (isTerminal(kase.status)) return 'encerrados';
+  if (kase.assigneeId === null) return 'sem-dono';
+  if (kase.assigneeId !== userId) return 'equipe';
+  return 'minha-fila';
+}
+
+/**
+ * Whether a case satisfies a tab's *defining* predicate. Deliberately blind to
+ * radar, priority, SLA and search: those hide a case without moving it, and
+ * yanking the user to another tab because they filtered something out would be
+ * wrong. Note that "Toda a equipe" holds every open case, including ones whose
+ * home tab is elsewhere.
+ */
+function belongsToTab(kase: Case, tab: Tab, userId: string): boolean {
+  switch (tab) {
+    case 'minha-fila':
+      return kase.assigneeId === userId && isOpen(kase.status);
+    case 'sem-dono':
+      return kase.assigneeId === null && isOpen(kase.status);
+    case 'equipe':
+      return isOpen(kase.status);
+    case 'encerrados':
+      return isTerminal(kase.status);
+  }
+}
+
+/** The working set a deep-link preset opens into. */
+function stateForPreset(preset: QueuePreset | null): {
+  tab: Tab;
+  sla: SlaScope;
+  closed: ClosedScope;
+} {
+  return {
+    tab:
+      preset === 'sem-dono'
+        ? 'sem-dono'
+        : preset === 'equipe'
+          ? 'equipe'
+          : preset === 'resolvidos-hoje'
+            ? 'encerrados'
+            : 'minha-fila',
+    sla: preset === 'vencendo-sla' ? 'vencendo' : 'todos',
+    closed: preset === 'resolvidos-hoje' ? 'meus-hoje' : 'todos',
+  };
+}
 
 export function QueueView({
   actions,
@@ -65,50 +130,109 @@ export function QueueView({
     useApp();
   const now = useClock();
 
-  const [tab, setTab] = useState<Tab>('meus-pendentes');
+  const initial = stateForPreset(asQueuePreset(selectedCaseId));
+
+  const [tab, setTab] = useState<Tab>(initial.tab);
   const [query, setQuery] = useState('');
   const [radarFilter, setRadarFilter] = useState<RadarKey | 'todos'>('todos');
   const [priorityFilter, setPriorityFilter] = useState<Priority | 'todas'>('todas');
+  const [slaScope, setSlaScope] = useState<SlaScope>(initial.sla);
+  const [statusScope, setStatusScope] = useState<StatusScope>('todas');
+  const [specialtyScope, setSpecialtyScope] = useState<SpecialtyScope>('minha');
+  const [closedScope, setClosedScope] = useState<ClosedScope>(initial.closed);
   const [sort, setSort] = useState<SortKey>('sla');
   const [showFilters, setShowFilters] = useState(false);
-  const [activeId, setActiveId] = useState<string | null>(selectedCaseId);
+  const [activeId, setActiveId] = useState<string | null>(
+    asQueuePreset(selectedCaseId) ? null : selectedCaseId,
+  );
 
-  /* A deep link (#/fila/case-123) must select that case and switch to a tab
-     that actually contains it — otherwise the user lands on an empty list. */
-  useEffect(() => {
-    if (!selectedCaseId) return;
-    const kase = cases.find((c) => c.id === selectedCaseId);
-    if (!kase) return;
-    setActiveId(selectedCaseId);
-    if (isTerminal(kase.status)) setTab('encerrados');
-    else if (kase.assigneeId === null) setTab('sem-dono');
-    else if (kase.assigneeId !== currentUser.id) setTab('equipe');
-    else setTab(kase.status === 'Pendente' ? 'meus-pendentes' : 'meus-ativos');
-  }, [selectedCaseId, cases, currentUser.id]);
+  /** Contextual scopes are per-tab, so switching tabs never leaves an inert
+      filter silently applied to a list it does not describe. */
+  const changeTab = useCallback((next: Tab) => {
+    setTab(next);
+    setActiveId(null);
+    setSlaScope('todos');
+    setStatusScope('todas');
+    setClosedScope('todos');
+  }, []);
 
+  /* A deep link is either a working set (#/fila/vencendo-sla) or a single case
+     (#/fila/case-0891). A case must land on a tab that actually contains it,
+     otherwise the user arrives at an empty list.
+
+     This runs during render rather than in an effect, which is the shape React
+     sanctions for resetting state when a prop changes. An effect would fire
+     *after* the list had already been computed from the previous tab, and the
+     "keep the selected case on screen" effect below would then re-pin that
+     stale case — leaving the list showing one working set while the panel showed
+     a case from another. */
+  const [routeParam, setRouteParam] = useState<string | null>(selectedCaseId);
+  if (selectedCaseId !== routeParam) {
+    setRouteParam(selectedCaseId);
+    const preset = asQueuePreset(selectedCaseId);
+    if (preset) {
+      const next = stateForPreset(preset);
+      setActiveId(null);
+      setTab(next.tab);
+      setSlaScope(next.sla);
+      setClosedScope(next.closed);
+      setStatusScope('todas');
+      if (preset === 'sem-dono') setSpecialtyScope('minha');
+    } else if (selectedCaseId) {
+      const kase = cases.find((c) => c.id === selectedCaseId);
+      if (kase) {
+        setActiveId(selectedCaseId);
+        setTab(homeTabFor(kase, currentUser.id));
+      }
+    }
+  }
+
+  /* Tab counts reflect only what *defines* each tab — ownership, terminality,
+     and the specialty lens that decides which unowned pool is yours. Radar,
+     priority, SLA and search are refinements; their effect shows in the list
+     header instead, so the tabs stay a stable map of the workload. */
   const counts = useMemo(() => {
-    const mine = scopedCases.filter((c) => c.assigneeId === currentUser.id);
+    const open = scopedCases.filter((c) => isOpen(c.status));
+    const unowned = open.filter((c) => c.assigneeId === null);
     return {
-      'meus-pendentes': mine.filter((c) => c.status === 'Pendente').length,
-      'meus-ativos': mine.filter((c) => isOpen(c.status) && c.status !== 'Pendente').length,
-      'sem-dono': scopedCases.filter((c) => c.assigneeId === null && isOpen(c.status)).length,
-      equipe: scopedCases.filter((c) => isOpen(c.status)).length,
+      'minha-fila': open.filter((c) => c.assigneeId === currentUser.id).length,
+      'sem-dono': (specialtyScope === 'minha'
+        ? unowned.filter((c) => c.specialty === currentUser.specialty)
+        : unowned
+      ).length,
+      equipe: open.length,
       encerrados: scopedCases.filter((c) => isTerminal(c.status)).length,
     } satisfies Record<Tab, number>;
-  }, [scopedCases, currentUser.id]);
+  }, [scopedCases, currentUser.id, currentUser.specialty, specialtyScope]);
 
   const filtered = useMemo(() => {
+    const dayStart = startOfToday();
+
     const list = scopedCases.filter((c) => {
       // Tab
-      if (tab === 'meus-pendentes' && !(c.assigneeId === currentUser.id && c.status === 'Pendente')) return false;
-      if (
-        tab === 'meus-ativos' &&
-        !(c.assigneeId === currentUser.id && isOpen(c.status) && c.status !== 'Pendente')
-      )
-        return false;
-      if (tab === 'sem-dono' && !(c.assigneeId === null && isOpen(c.status))) return false;
+      if (tab === 'minha-fila') {
+        if (!(c.assigneeId === currentUser.id && isOpen(c.status))) return false;
+        if (statusScope === 'pendentes' && c.status !== 'Pendente') return false;
+        if (statusScope === 'tratativa' && c.status === 'Pendente') return false;
+      }
+      if (tab === 'sem-dono') {
+        if (!(c.assigneeId === null && isOpen(c.status))) return false;
+        if (specialtyScope === 'minha' && c.specialty !== currentUser.specialty) return false;
+      }
       if (tab === 'equipe' && !isOpen(c.status)) return false;
-      if (tab === 'encerrados' && !isTerminal(c.status)) return false;
+      if (tab === 'encerrados') {
+        if (!isTerminal(c.status)) return false;
+        if (closedScope === 'meus-hoje') {
+          if (c.assigneeId !== currentUser.id) return false;
+          if (!c.closedAt || new Date(c.closedAt).getTime() < dayStart) return false;
+        }
+      }
+
+      // The SLA clock only runs on open cases.
+      if (slaScope === 'vencendo' && tab !== 'encerrados') {
+        const state = slaStatus(c, now).state;
+        if (state !== 'warning' && state !== 'breach') return false;
+      }
 
       if (radarFilter !== 'todos' && c.radar !== radarFilter) return false;
       if (priorityFilter !== 'todas' && c.priority !== priorityFilter) return false;
@@ -138,7 +262,22 @@ export function QueueView({
     else sorted.sort((a, b) => new Date(b.openedAt).getTime() - new Date(a.openedAt).getTime());
 
     return sorted;
-  }, [scopedCases, tab, radarFilter, priorityFilter, query, sort, now, currentUser.id, getStudent]);
+  }, [
+    scopedCases,
+    tab,
+    radarFilter,
+    priorityFilter,
+    slaScope,
+    statusScope,
+    specialtyScope,
+    closedScope,
+    query,
+    sort,
+    now,
+    currentUser.id,
+    currentUser.specialty,
+    getStudent,
+  ]);
 
   /**
    * The selected case is resolved from ALL scoped cases, not just the filtered
@@ -156,29 +295,54 @@ export function QueueView({
     if (active && active.id !== activeId) setActiveId(active.id);
   }, [active, activeId]);
 
-  /** Which tab a case belongs in, given who owns it and where it is. */
-  const tabOf = useCallback(
-    (kase: Case): Tab => {
-      if (isTerminal(kase.status)) return 'encerrados';
-      if (kase.assigneeId === null) return 'sem-dono';
-      if (kase.assigneeId !== currentUser.id) return 'equipe';
-      return kase.status === 'Pendente' ? 'meus-pendentes' : 'meus-ativos';
-    },
-    [currentUser.id],
-  );
-
-  // Re-home the tab when the selected case moves out of it, so the list on the
-  // left always contains the case shown on the right.
+  // Re-home the tab when the selected case moves *out* of it — claiming an
+  // unowned case, closing one — so the list on the left always contains the case
+  // shown on the right. Merely having a different home tab is not enough:
+  // "Toda a equipe" legitimately holds cases that live elsewhere.
   const activeStatusKey = active ? `${active.id}:${active.status}:${active.assigneeId}` : '';
   useEffect(() => {
     if (!active) return;
-    const home = tabOf(active);
-    if (home !== tab) setTab(home);
+    if (!belongsToTab(active, tab, currentUser.id)) setTab(homeTabFor(active, currentUser.id));
     // Keyed on the case's identity + status so this only fires on a real move.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeStatusKey]);
 
-  const localFiltersActive = radarFilter !== 'todos' || priorityFilter !== 'todas' || query.trim() !== '';
+  /* -- What is narrowing this list, in words ----------------------------- */
+  const refinements = useMemo(() => {
+    const out: { label: string; clear: () => void }[] = [];
+    if (slaScope === 'vencendo' && tab !== 'encerrados')
+      out.push({ label: 'SLA vencendo ou estourado', clear: () => setSlaScope('todos') });
+    if (tab === 'minha-fila' && statusScope !== 'todas')
+      out.push({
+        label: statusScope === 'pendentes' ? 'Aguardando 1º contato' : 'Já em tratativa',
+        clear: () => setStatusScope('todas'),
+      });
+    if (tab === 'encerrados' && closedScope === 'meus-hoje')
+      out.push({ label: 'Encerrados por mim hoje', clear: () => setClosedScope('todos') });
+    if (radarFilter !== 'todos')
+      out.push({ label: RADARS[radarFilter].shortLabel, clear: () => setRadarFilter('todos') });
+    if (priorityFilter !== 'todas')
+      out.push({ label: `Prioridade ${priorityFilter}`, clear: () => setPriorityFilter('todas') });
+    return out;
+  }, [slaScope, statusScope, closedScope, radarFilter, priorityFilter, tab]);
+
+  const localFiltersActive = refinements.length > 0 || query.trim() !== '';
+
+  const clearLocal = useCallback(() => {
+    setRadarFilter('todos');
+    setPriorityFilter('todas');
+    setSlaScope('todos');
+    setStatusScope('todas');
+    setClosedScope('todos');
+    setQuery('');
+  }, []);
+
+  const tabLabel: Record<Tab, string> = {
+    'minha-fila': 'Minha fila',
+    'sem-dono': specialtyScope === 'minha' ? `Sem dono · ${currentUser.specialty}` : 'Sem dono',
+    equipe: 'Toda a equipe',
+    encerrados: 'Encerrados',
+  };
 
   return (
     <motion.div
@@ -214,13 +378,10 @@ export function QueueView({
           <Segmented<Tab>
             layoutId="queue-tabs"
             value={tab}
-            onChange={(v) => {
-              setTab(v);
-              setActiveId(null);
-            }}
-            options={(Object.keys(TAB_LABEL) as Tab[]).map((key) => ({
+            onChange={changeTab}
+            options={(Object.keys(tabLabel) as Tab[]).map((key) => ({
               value: key,
-              label: TAB_LABEL[key],
+              label: tabLabel[key],
               count: counts[key],
             }))}
           />
@@ -259,8 +420,109 @@ export function QueueView({
           </label>
         </div>
 
+        {/* The recorte strip. A list narrowed by a deep link has to say so. */}
+        {refinements.length > 0 && (
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5 rounded-lg bg-brand-soft px-3 py-2">
+            <span className="text-[11px] font-medium text-brand-text">Recorte</span>
+            {refinements.map((r) => (
+              <button
+                key={r.label}
+                onClick={r.clear}
+                title="Remover este recorte"
+                className="inline-flex h-6 items-center gap-1.5 rounded-full bg-surface px-2.5 text-[11.5px] font-semibold text-ink-2 transition-colors hover:text-ink"
+              >
+                {r.label}
+                <span className="text-ink-4">×</span>
+              </button>
+            ))}
+            <button
+              onClick={clearLocal}
+              className="ml-auto shrink-0 text-[11.5px] font-semibold text-brand-text hover:text-brand-2"
+            >
+              Limpar recorte
+            </button>
+          </div>
+        )}
+
         {showFilters && (
           <div className="flex flex-wrap items-center gap-x-4 gap-y-2.5 rounded-lg bg-surface-2 p-3.5">
+            {/* Contextual lens: what this tab can legitimately be narrowed by */}
+            {tab === 'encerrados' ? (
+              <div className="flex flex-wrap items-center gap-1.5">
+                <span className="mr-1 text-[11px] font-medium text-ink-4">Encerramento</span>
+                <Chip active={closedScope === 'todos'} onClick={() => setClosedScope('todos')}>
+                  Todos
+                </Chip>
+                <Chip
+                  active={closedScope === 'meus-hoje'}
+                  onClick={() => setClosedScope('meus-hoje')}
+                >
+                  Meus de hoje
+                </Chip>
+              </div>
+            ) : (
+              <div className="flex flex-wrap items-center gap-1.5">
+                <span className="mr-1 text-[11px] font-medium text-ink-4">SLA</span>
+                <Chip active={slaScope === 'todos'} onClick={() => setSlaScope('todos')}>
+                  Todos
+                </Chip>
+                <Chip
+                  active={slaScope === 'vencendo'}
+                  onClick={() => setSlaScope('vencendo')}
+                  tone="crit"
+                >
+                  Vencendo
+                </Chip>
+              </div>
+            )}
+
+            {tab === 'minha-fila' && (
+              <>
+                <span className="hidden h-5 w-px bg-hairline sm:block" />
+                <div className="flex flex-wrap items-center gap-1.5">
+                  <span className="mr-1 text-[11px] font-medium text-ink-4">Situação</span>
+                  <Chip active={statusScope === 'todas'} onClick={() => setStatusScope('todas')}>
+                    Todas
+                  </Chip>
+                  <Chip
+                    active={statusScope === 'pendentes'}
+                    onClick={() => setStatusScope('pendentes')}
+                  >
+                    Aguardando 1º contato
+                  </Chip>
+                  <Chip
+                    active={statusScope === 'tratativa'}
+                    onClick={() => setStatusScope('tratativa')}
+                  >
+                    Em tratativa
+                  </Chip>
+                </div>
+              </>
+            )}
+
+            {tab === 'sem-dono' && (
+              <>
+                <span className="hidden h-5 w-px bg-hairline sm:block" />
+                <div className="flex flex-wrap items-center gap-1.5">
+                  <span className="mr-1 text-[11px] font-medium text-ink-4">Especialidade</span>
+                  <Chip
+                    active={specialtyScope === 'minha'}
+                    onClick={() => setSpecialtyScope('minha')}
+                  >
+                    {currentUser.specialty}
+                  </Chip>
+                  <Chip
+                    active={specialtyScope === 'todas'}
+                    onClick={() => setSpecialtyScope('todas')}
+                  >
+                    Todas
+                  </Chip>
+                </div>
+              </>
+            )}
+
+            <span className="hidden h-5 w-px bg-hairline sm:block" />
+
             <div className="flex flex-wrap items-center gap-1.5">
               <span className="mr-1 text-[11px] font-medium text-ink-4">
                 Radar
@@ -309,9 +571,7 @@ export function QueueView({
                 className="ml-auto"
                 icon={<FilterX className="h-3.5 w-3.5" />}
                 onClick={() => {
-                  setRadarFilter('todos');
-                  setPriorityFilter('todas');
-                  setQuery('');
+                  clearLocal();
                   resetFilters();
                 }}
               >
@@ -345,41 +605,47 @@ export function QueueView({
             {filtered.length === 0 ? (
               <EmptyState
                 icon={
-                  tab === 'meus-pendentes' ? (
+                  tab === 'minha-fila' ? (
                     <CheckCircle2 className="h-5 w-5 text-ok" />
                   ) : (
                     <Inbox className="h-5 w-5" />
                   )
                 }
                 title={
-                  tab === 'meus-pendentes'
-                    ? 'Nenhum caso pendente seu'
-                    : tab === 'sem-dono'
-                      ? 'Todos os casos têm responsável'
-                      : 'Nenhum caso neste recorte'
+                  localFiltersActive
+                    ? 'Nenhum caso neste recorte'
+                    : tab === 'minha-fila'
+                      ? 'Sua fila está limpa'
+                      : tab === 'sem-dono'
+                        ? 'Nenhum caso sem responsável'
+                        : 'Nenhum caso neste recorte'
                 }
                 message={
                   localFiltersActive
-                    ? 'Os filtros aplicados não retornaram resultados. Limpe-os para ver a fila completa.'
-                    : tab === 'meus-pendentes'
-                      ? 'Você não tem casos aguardando primeiro contato. Veja "Em tratativa" ou assuma um caso sem dono.'
-                      : 'Ajuste os filtros no topo ou troque de aba.'
+                    ? 'O recorte aplicado não retornou casos. Limpe-o para ver a aba inteira.'
+                    : tab === 'minha-fila'
+                      ? 'Nenhum caso atribuído a você em aberto. Assuma um caso sem dono da sua especialidade.'
+                      : tab === 'sem-dono'
+                        ? specialtyScope === 'minha'
+                          ? `Nenhum caso sem dono em ${currentUser.specialty}. Veja todas as especialidades para ajudar outra fila.`
+                          : 'Todos os casos abertos têm responsável.'
+                        : 'Ajuste os filtros no topo ou troque de aba.'
                 }
                 action={
                   localFiltersActive ? (
+                    <Button size="sm" variant="secondary" onClick={clearLocal}>
+                      Limpar recorte
+                    </Button>
+                  ) : tab === 'sem-dono' && specialtyScope === 'minha' ? (
                     <Button
                       size="sm"
                       variant="secondary"
-                      onClick={() => {
-                        setRadarFilter('todos');
-                        setPriorityFilter('todas');
-                        setQuery('');
-                      }}
+                      onClick={() => setSpecialtyScope('todas')}
                     >
-                      Limpar filtros
+                      Ver todas as especialidades
                     </Button>
                   ) : counts['sem-dono'] > 0 && tab !== 'sem-dono' ? (
-                    <Button size="sm" variant="secondary" onClick={() => setTab('sem-dono')}>
+                    <Button size="sm" variant="secondary" onClick={() => changeTab('sem-dono')}>
                       Ver {counts['sem-dono']} casos sem dono
                     </Button>
                   ) : undefined

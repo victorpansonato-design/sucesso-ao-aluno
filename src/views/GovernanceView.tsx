@@ -20,6 +20,7 @@ import { MeterBar } from '../components/ui/Charts';
 import { HealthBadge, Pill, RadarBadge } from '../components/ui/Badges';
 import { DEFAULT_WEIGHTS, DIMENSION_LABEL, PROFILE_LABEL } from '../lib/healthScore';
 import { RADARS, RADAR_ORDER } from '../lib/radars';
+import { MODALITIES } from '../data/catalog';
 import { int, percent } from '../lib/format';
 
 /* ==========================================================================
@@ -101,11 +102,7 @@ export function GovernanceView() {
               layoutId="governance-profile"
               value={profile}
               onChange={setProfile}
-              options={[
-                { value: 'Presencial', label: 'Presencial' },
-                { value: 'Híbrido', label: 'Híbrido' },
-                { value: 'EaD', label: 'EaD 100%' },
-              ]}
+              options={MODALITIES.map((m) => ({ value: m, label: m }))}
             />
           </div>
 
@@ -187,7 +184,7 @@ export function GovernanceView() {
             {/* Live impact */}
             <aside className="rounded-lg bg-surface-2 p-4">
               <p className="text-[11px] font-medium text-ink-4">
-                Impacto imediato · {profile === 'EaD' ? 'EaD 100%' : profile}
+                Impacto imediato · {profile}
               </p>
 
               <div className="mt-3.5 text-center">
@@ -536,9 +533,9 @@ export function GovernanceView() {
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <StatTile
           label="Perfis de peso"
-          value={3}
+          value={MODALITIES.length}
           icon={<Scale className="h-3.5 w-3.5" />}
-          footer={<span>Presencial · Híbrido · EaD</span>}
+          footer={<span>{MODALITIES.join(' · ')}</span>}
         />
         <StatTile
           label="Radares configurados"

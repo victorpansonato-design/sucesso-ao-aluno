@@ -16,7 +16,7 @@ import { DEFAULT_WEIGHTS } from '../lib/healthScore';
 import { DEFAULT_WINDOW, addBusinessHours } from '../lib/sla';
 import { RADARS } from '../lib/radars';
 import { initialsOf, isoMinusMinutes, isoPlusDays } from '../lib/format';
-import { COURSES, courseInfo } from './catalog';
+import { CAMPUS, COURSES, courseInfo } from './catalog';
 
 /* ==========================================================================
    Demonstration base
@@ -67,7 +67,7 @@ export const SPECIALISTS: Specialist[] = [
     id: 'spec-fernanda',
     name: 'Fernanda Costa',
     initials: 'FC',
-    role: 'Especialista de Engajamento · Híbrido & EaD',
+    role: 'Especialista de Engajamento · Híbrido e AVA',
     email: 'fernanda.costa@anchieta.br',
     modality: 'Híbrido',
     specialty: 'Engajamento',
@@ -248,7 +248,7 @@ const DEFAULT_ONBOARDING_STEPS = [
 function makeStudent(spec: StudentSpec): Student {
   const info = courseInfo(spec.course);
   const cohort = spec.daysSinceEnrollment <= ONBOARDING_WINDOW ? 'Calouro' : 'Veterano';
-  const subjects = spec.disciplines?.length ?? (spec.modality === 'EaD' ? 4 : 5);
+  const subjects = spec.disciplines?.length ?? 5;
   const progress = Math.min(
     97,
     Math.round(((spec.period - 1) / info.totalPeriods) * 100 + (100 / info.totalPeriods) * 0.35),
@@ -311,7 +311,7 @@ const victor = makeStudent({
   phone: '(11) 98765-4321',
   course: 'Bacharelado em Ciências Contábeis',
   modality: 'Presencial',
-  campus: 'Campus Central — Jundiaí',
+  campus: CAMPUS,
   period: 2,
   shift: 'Noturno',
   daysSinceEnrollment: 183,
@@ -418,7 +418,7 @@ const victor = makeStudent({
       at: isoPlusDays(-24, BOOT),
       kind: 'marco',
       title: 'Início do semestre 2026/2',
-      detail: 'Matrícula em 3 disciplinas confirmada. Turno noturno, Campus Central.',
+      detail: 'Matrícula em 3 disciplinas confirmada. Turno noturno.',
       author: 'Sistema',
       tag: 'Jornada',
     }),
@@ -453,7 +453,7 @@ const deep: Student[] = [
     phone: '(11) 99120-7788',
     course: 'Bacharelado em Administração',
     modality: 'Presencial',
-    campus: 'Campus Central — Jundiaí',
+    campus: CAMPUS,
     period: 4,
     shift: 'Matutino',
     daysSinceEnrollment: 560,
@@ -517,7 +517,7 @@ const deep: Student[] = [
     phone: '(11) 98411-2233',
     course: 'Tecnologia em Logística',
     modality: 'Híbrido',
-    campus: 'Campus Anchieta — Jundiaí',
+    campus: CAMPUS,
     period: 3,
     shift: 'Noturno',
     daysSinceEnrollment: 420,
@@ -571,7 +571,7 @@ const deep: Student[] = [
     phone: '(11) 97655-3311',
     course: 'Bacharelado em Fisioterapia',
     modality: 'Presencial',
-    campus: 'Campus Central — Jundiaí',
+    campus: CAMPUS,
     period: 6,
     shift: 'Matutino',
     daysSinceEnrollment: 900,
@@ -620,7 +620,7 @@ const deep: Student[] = [
     phone: '(11) 98277-4455',
     course: 'Engenharia de Software',
     modality: 'Híbrido',
-    campus: 'Campus Anchieta — Jundiaí',
+    campus: CAMPUS,
     period: 3,
     shift: 'Noturno',
     daysSinceEnrollment: 400,
@@ -666,7 +666,7 @@ const deep: Student[] = [
     phone: '(11) 99833-1020',
     course: 'Licenciatura em Pedagogia',
     modality: 'Híbrido',
-    campus: 'Polo Digital — Várzea Paulista',
+    campus: CAMPUS,
     period: 1,
     shift: 'Noturno',
     daysSinceEnrollment: 22,
@@ -716,7 +716,7 @@ const deep: Student[] = [
     timeline: [
       evt({ at: isoPlusDays(-1, BOOT), kind: 'alerta', title: 'Radar de Onboarding acionado', detail: 'Calouro sem ambientação após 22 dias. Roteado para a régua de acolhimento — fora da fila de evasão.', author: 'Radar', tag: 'Onboarding' }),
       evt({ at: isoPlusDays(-5, BOOT), kind: 'atendimento', title: 'Segundo chamado sobre acesso às aulas', detail: 'Aluno relata não localizar as videoaulas do Módulo 1.', author: 'Aluno', tag: 'Atendimento' }),
-      evt({ at: isoPlusDays(-22, BOOT), kind: 'matricula', title: 'Matrícula efetivada', detail: 'Ingresso em Pedagogia híbrida, Polo Digital. Início da régua de onboarding de 90 dias.', author: 'Sistema', tag: 'Matrícula' }),
+      evt({ at: isoPlusDays(-22, BOOT), kind: 'matricula', title: 'Matrícula efetivada', detail: 'Ingresso em Pedagogia híbrida. Início da régua de onboarding de 90 dias.', author: 'Sistema', tag: 'Matrícula' }),
     ],
   }),
 
@@ -727,7 +727,7 @@ const deep: Student[] = [
     phone: '(11) 98544-9911',
     course: 'Ciência da Computação',
     modality: 'Presencial',
-    campus: 'Campus Central — Jundiaí',
+    campus: CAMPUS,
     period: 3,
     shift: 'Noturno',
     daysSinceEnrollment: 410,
@@ -771,7 +771,7 @@ const deep: Student[] = [
     phone: '(11) 97122-8877',
     course: 'Bacharelado em Enfermagem',
     modality: 'Híbrido',
-    campus: 'Campus Anchieta — Jundiaí',
+    campus: CAMPUS,
     period: 5,
     shift: 'Noturno',
     daysSinceEnrollment: 720,
@@ -797,8 +797,8 @@ const deep: Student[] = [
     name: 'Patrícia Naves Godoy',
     phone: '(11) 99778-5544',
     course: 'Tecnologia em Gestão de Recursos Humanos',
-    modality: 'EaD',
-    campus: 'Polo Digital — Várzea Paulista',
+    modality: 'Híbrido',
+    campus: CAMPUS,
     period: 1,
     shift: 'Noturno',
     daysSinceEnrollment: 47,
@@ -817,7 +817,7 @@ const deep: Student[] = [
     ],
     timeline: [
       evt({ at: isoPlusDays(-3, BOOT), kind: 'marco', title: 'Onboarding concluído com todas as etapas', detail: 'Calouro modelo: seis de seis marcos da régua de acolhimento cumpridos em 47 dias.', author: 'Sistema', tag: 'Onboarding' }),
-      evt({ at: isoPlusDays(-47, BOOT), kind: 'matricula', title: 'Matrícula efetivada', detail: 'Ingresso em Gestão de RH, EaD 100%, Polo Digital.', author: 'Sistema', tag: 'Matrícula' }),
+      evt({ at: isoPlusDays(-47, BOOT), kind: 'matricula', title: 'Matrícula efetivada', detail: 'Ingresso em Gestão de RH, modalidade híbrida.', author: 'Sistema', tag: 'Matrícula' }),
     ],
   }),
 
@@ -828,7 +828,7 @@ const deep: Student[] = [
     phone: '(11) 97455-6611',
     course: 'Bacharelado em Direito',
     modality: 'Presencial',
-    campus: 'Campus Central — Jundiaí',
+    campus: CAMPUS,
     period: 9,
     shift: 'Matutino',
     daysSinceEnrollment: 1450,
@@ -850,8 +850,8 @@ const deep: Student[] = [
     name: 'Thiago Almeida Prado',
     phone: '(11) 98600-7712',
     course: 'Tecnologia em Análise e Desenv. de Sistemas',
-    modality: 'EaD',
-    campus: 'Polo Digital — Várzea Paulista',
+    modality: 'Híbrido',
+    campus: CAMPUS,
     period: 4,
     shift: 'Noturno',
     daysSinceEnrollment: 520,
@@ -871,7 +871,7 @@ const deep: Student[] = [
         severity: 'Risco',
         title: 'Queda de 62% nos acessos em curso 100% digital',
         detail:
-          'Em EaD o AVA é a sala de aula, e o peso do engajamento no score é 37%. Oito dias sem login com duas sprints em aberto e negociação financeira ativa em paralelo.',
+          'No híbrido o AVA carrega o peso que a presença quinzenal não pode carregar — 27% do score. Oito dias sem login com duas entregas em aberto e negociação financeira ativa em paralelo.',
         detectedAt: isoPlusDays(-1, BOOT),
         signals: [
           '8 dias sem login no AVA',
@@ -883,7 +883,7 @@ const deep: Student[] = [
       }),
     ],
     timeline: [
-      evt({ at: isoPlusDays(-1, BOOT), kind: 'alerta', title: 'Radar de Engajamento AVA acionado', detail: 'Queda de 62% nos acessos em modalidade EaD.', author: 'Radar', tag: 'Engajamento' }),
+      evt({ at: isoPlusDays(-1, BOOT), kind: 'alerta', title: 'Radar de Engajamento AVA acionado', detail: 'Queda de 62% nos acessos no AVA.', author: 'Radar', tag: 'Engajamento' }),
       evt({ at: isoPlusDays(-9, BOOT), kind: 'financeiro', title: 'Termo de negociação assinado', detail: 'Parcela repactuada com vencimento em 5 dias. Aguardando confirmação.', author: 'Especialista', tag: 'Financeiro' }),
     ],
   }),
@@ -895,7 +895,7 @@ const deep: Student[] = [
     phone: '(11) 99011-3366',
     course: 'Bacharelado em Psicologia',
     modality: 'Presencial',
-    campus: 'Campus Central — Jundiaí',
+    campus: CAMPUS,
     period: 1,
     shift: 'Noturno',
     daysSinceEnrollment: 31,
@@ -945,7 +945,7 @@ const deep: Student[] = [
     phone: '(11) 98155-2244',
     course: 'Engenharia Civil',
     modality: 'Presencial',
-    campus: 'Campus Central — Jundiaí',
+    campus: CAMPUS,
     period: 7,
     shift: 'Noturno',
     daysSinceEnrollment: 1090,
@@ -990,7 +990,7 @@ const deep: Student[] = [
     phone: '(11) 97333-8899',
     course: 'Bacharelado em Nutrição',
     modality: 'Presencial',
-    campus: 'Campus Anchieta — Jundiaí',
+    campus: CAMPUS,
     period: 4,
     shift: 'Matutino',
     daysSinceEnrollment: 620,
@@ -1009,7 +1009,7 @@ const deep: Student[] = [
     phone: '(11) 98112-9900',
     course: 'Bacharelado em Administração',
     modality: 'Presencial',
-    campus: 'Campus Central — Jundiaí',
+    campus: CAMPUS,
     period: 3,
     shift: 'Noturno',
     daysSinceEnrollment: 430,
@@ -1030,7 +1030,7 @@ const deep: Student[] = [
     phone: '(11) 98322-1100',
     course: 'Bacharelado em Educação Física',
     modality: 'Presencial',
-    campus: 'Campus Anchieta — Jundiaí',
+    campus: CAMPUS,
     period: 5,
     shift: 'Matutino',
     daysSinceEnrollment: 780,
@@ -1070,7 +1070,6 @@ interface BreadthSpec {
   name: string;
   courseIndex: number;
   modality: Student['modality'];
-  campusIndex: 0 | 1 | 2;
   period: number;
   shift: Student['shift'];
   days: number;
@@ -1091,52 +1090,46 @@ interface BreadthSpec {
   cancelPage?: boolean;
 }
 
-const CAMPUS_BY_INDEX = [
-  'Campus Central — Jundiaí',
-  'Campus Anchieta — Jundiaí',
-  'Polo Digital — Várzea Paulista',
-] as const;
-
 const BREADTH: BreadthSpec[] = [
-  { ra: '2648770', name: 'Sofia Meireles Aguiar', courseIndex: 3, modality: 'Presencial', campusIndex: 0, period: 1, shift: 'Noturno', days: 18, gpa: 8.4, att: 96, lastAccess: 0, acc30: 19, accPrev: 8, delivery: 92 },
-  { ra: '2647120', name: 'Enzo Gabriel Nogueira', courseIndex: 8, modality: 'Híbrido', campusIndex: 1, period: 1, shift: 'Noturno', days: 26, gpa: 7.1, att: 75, attPrev: 100, lastAccess: 6, acc30: 7, accPrev: 4, delivery: 55, late: 2 },
-  { ra: '2646003', name: 'Manuela Ferraz Coelho', courseIndex: 15, modality: 'EaD', campusIndex: 2, period: 1, shift: 'Noturno', days: 55, gpa: 8.8, att: 100, lastAccess: 0, acc30: 30, accPrev: 26, delivery: 99 },
-  { ra: '2644891', name: 'Otávio Bastos Lemes', courseIndex: 12, modality: 'EaD', campusIndex: 2, period: 1, shift: 'Noturno', days: 61, gpa: 5.4, att: 100, lastAccess: 17, acc30: 2, accPrev: 15, delivery: 30, late: 3, failing: 2 },
-  { ra: '2643220', name: 'Helena Quintana Bruno', courseIndex: 6, modality: 'Presencial', campusIndex: 1, period: 1, shift: 'Matutino', days: 72, gpa: 7.8, att: 92, lastAccess: 1, acc30: 21, accPrev: 18, delivery: 88 },
-  { ra: '2641005', name: 'Caio Vinícius Tavares', courseIndex: 13, modality: 'Híbrido', campusIndex: 2, period: 2, shift: 'Noturno', days: 88, gpa: 6.4, att: 70, attPrev: 92, lastAccess: 11, acc30: 5, accPrev: 20, delivery: 48, overdue: 1, daysOverdue: 14, late: 2 },
+  { ra: '2648770', name: 'Sofia Meireles Aguiar', courseIndex: 3, modality: 'Presencial', period: 1, shift: 'Noturno', days: 18, gpa: 8.4, att: 96, lastAccess: 0, acc30: 19, accPrev: 8, delivery: 92 },
+  { ra: '2647120', name: 'Enzo Gabriel Nogueira', courseIndex: 8, modality: 'Híbrido', period: 1, shift: 'Noturno', days: 26, gpa: 7.1, att: 75, attPrev: 100, lastAccess: 6, acc30: 7, accPrev: 4, delivery: 55, late: 2 },
+  { ra: '2646003', name: 'Manuela Ferraz Coelho', courseIndex: 15, modality: 'Híbrido', period: 1, shift: 'Noturno', days: 55, gpa: 8.8, att: 100, lastAccess: 0, acc30: 30, accPrev: 26, delivery: 99 },
+  { ra: '2644891', name: 'Otávio Bastos Lemes', courseIndex: 12, modality: 'Híbrido', period: 1, shift: 'Noturno', days: 61, gpa: 5.4, att: 100, lastAccess: 17, acc30: 2, accPrev: 15, delivery: 30, late: 3, failing: 2 },
+  { ra: '2643220', name: 'Helena Quintana Bruno', courseIndex: 6, modality: 'Presencial', period: 1, shift: 'Matutino', days: 72, gpa: 7.8, att: 92, lastAccess: 1, acc30: 21, accPrev: 18, delivery: 88 },
+  { ra: '2641005', name: 'Caio Vinícius Tavares', courseIndex: 13, modality: 'Híbrido', period: 2, shift: 'Noturno', days: 88, gpa: 6.4, att: 70, attPrev: 92, lastAccess: 11, acc30: 5, accPrev: 20, delivery: 48, overdue: 1, daysOverdue: 14, late: 2 },
 
-  { ra: '2596440', name: 'Larissa Fontes Medeiros', courseIndex: 2, modality: 'Presencial', campusIndex: 0, period: 6, shift: 'Matutino', days: 980, gpa: 9.2, att: 99, lastAccess: 0, acc30: 34, accPrev: 32, delivery: 100 },
-  { ra: '2588211', name: 'Pedro Henrique Salgado', courseIndex: 10, modality: 'Presencial', campusIndex: 0, period: 5, shift: 'Noturno', days: 810, gpa: 7.6, att: 89, lastAccess: 2, acc30: 20, accPrev: 22, delivery: 86 },
-  { ra: '2577309', name: 'Yasmin Torres Delgado', courseIndex: 4, modality: 'Híbrido', campusIndex: 1, period: 6, shift: 'Noturno', days: 940, gpa: 8.2, att: 91, lastAccess: 1, acc30: 26, accPrev: 24, delivery: 94 },
-  { ra: '2571002', name: 'Vitor Hugo Assunção', courseIndex: 16, modality: 'Presencial', campusIndex: 0, period: 8, shift: 'Integral', days: 1210, gpa: 8.5, att: 95, lastAccess: 0, acc30: 28, accPrev: 27, delivery: 96 },
-  { ra: '2566880', name: 'Nathália Bezerra Vaz', courseIndex: 1, modality: 'Presencial', campusIndex: 1, period: 7, shift: 'Noturno', days: 1120, gpa: 6.1, att: 72, attPrev: 84, lastAccess: 9, acc30: 8, accPrev: 19, delivery: 58, overdue: 2, daysOverdue: 31, late: 3, failing: 1 },
-  { ra: '2562144', name: 'Ricardo Estevão Lins', courseIndex: 9, modality: 'Presencial', campusIndex: 0, period: 6, shift: 'Noturno', days: 990, gpa: 5.7, att: 66, attPrev: 88, lastAccess: 21, acc30: 1, accPrev: 16, delivery: 34, overdue: 3, daysOverdue: 61, deps: 1, failing: 2, cancelPage: true },
-  { ra: '2558931', name: 'Aline Castro Peixoto', courseIndex: 5, modality: 'Presencial', campusIndex: 1, period: 7, shift: 'Matutino', days: 1080, gpa: 8.7, att: 97, lastAccess: 0, acc30: 25, accPrev: 24, delivery: 95 },
-  { ra: '2554700', name: 'Murilo Sant’Anna Reis', courseIndex: 11, modality: 'Híbrido', campusIndex: 2, period: 4, shift: 'Noturno', days: 690, gpa: 7.3, att: 83, attPrev: 90, lastAccess: 4, acc30: 14, accPrev: 21, delivery: 74, late: 1 },
-  { ra: '2549812', name: 'Bianca Ozório Falcão', courseIndex: 14, modality: 'EaD', campusIndex: 2, period: 3, shift: 'Noturno', days: 610, gpa: 8.0, att: 100, lastAccess: 1, acc30: 23, accPrev: 22, delivery: 90 },
-  { ra: '2545003', name: 'Leandro Bittencourt Sá', courseIndex: 12, modality: 'EaD', campusIndex: 2, period: 3, shift: 'Noturno', days: 640, gpa: 6.3, att: 100, lastAccess: 13, acc30: 4, accPrev: 18, delivery: 44, overdue: 1, daysOverdue: 22, late: 2 },
-  { ra: '2541190', name: 'Tainá Rodrigues Melo', courseIndex: 7, modality: 'Presencial', campusIndex: 1, period: 6, shift: 'Matutino', days: 950, gpa: 7.9, att: 90, lastAccess: 2, acc30: 19, accPrev: 20, delivery: 87 },
-  { ra: '2537744', name: 'Fábio Junqueira Neto', courseIndex: 0, modality: 'Presencial', campusIndex: 0, period: 6, shift: 'Noturno', days: 960, gpa: 7.0, att: 85, lastAccess: 3, acc30: 17, accPrev: 19, delivery: 81, scholarship: 50 },
-  { ra: '2532001', name: 'Priscila Amaral Guedes', courseIndex: 3, modality: 'Presencial', campusIndex: 0, period: 8, shift: 'Noturno', days: 1300, gpa: 8.9, att: 98, lastAccess: 0, acc30: 31, accPrev: 30, delivery: 98 },
-  { ra: '2528655', name: 'Anderson Klein Poli', courseIndex: 8, modality: 'Híbrido', campusIndex: 1, period: 6, shift: 'Noturno', days: 1010, gpa: 6.6, att: 78, attPrev: 86, lastAccess: 8, acc30: 9, accPrev: 20, delivery: 62, late: 2, failing: 1 },
-  { ra: '2524410', name: 'Débora Nascimento Pires', courseIndex: 4, modality: 'Híbrido', campusIndex: 1, period: 7, shift: 'Noturno', days: 1150, gpa: 8.3, att: 93, lastAccess: 1, acc30: 24, accPrev: 23, delivery: 93 },
-  { ra: '2519903', name: 'Wesley Portela Cunha', courseIndex: 13, modality: 'EaD', campusIndex: 2, period: 4, shift: 'Noturno', days: 700, gpa: 5.9, att: 100, lastAccess: 19, acc30: 2, accPrev: 14, delivery: 36, overdue: 2, daysOverdue: 44, failing: 2, cancelPage: true },
-  { ra: '2515220', name: 'Carolina Vasconcelos Dias', courseIndex: 6, modality: 'Híbrido', campusIndex: 1, period: 5, shift: 'Noturno', days: 830, gpa: 8.6, att: 94, lastAccess: 0, acc30: 27, accPrev: 25, delivery: 96 },
-  { ra: '2511008', name: 'Igor Sampaio Furtado', courseIndex: 10, modality: 'Presencial', campusIndex: 0, period: 7, shift: 'Noturno', days: 1140, gpa: 7.2, att: 87, lastAccess: 3, acc30: 18, accPrev: 20, delivery: 83, deps: 1 },
-  { ra: '2506611', name: 'Renata Bulhões Aquino', courseIndex: 1, modality: 'Presencial', campusIndex: 1, period: 8, shift: 'Matutino', days: 1290, gpa: 9.0, att: 99, lastAccess: 0, acc30: 33, accPrev: 31, delivery: 99 },
-  { ra: '2502244', name: 'Alexandre Prado Vilela', courseIndex: 11, modality: 'Presencial', campusIndex: 0, period: 7, shift: 'Noturno', days: 1160, gpa: 6.8, att: 80, attPrev: 87, lastAccess: 6, acc30: 12, accPrev: 19, delivery: 70, late: 1, negotiation: true, overdue: 1, daysOverdue: 11 },
-  { ra: '2498100', name: 'Sabrina Elias Moretti', courseIndex: 15, modality: 'EaD', campusIndex: 2, period: 5, shift: 'Noturno', days: 880, gpa: 8.1, att: 100, lastAccess: 2, acc30: 21, accPrev: 20, delivery: 89 },
-  { ra: '2493377', name: 'Douglas Cerqueira Rangel', courseIndex: 9, modality: 'Presencial', campusIndex: 0, period: 9, shift: 'Noturno', days: 1420, gpa: 7.5, att: 88, lastAccess: 1, acc30: 22, accPrev: 21, delivery: 88, deps: 1 },
-  { ra: '2488905', name: 'Milena Toscano Barreto', courseIndex: 5, modality: 'Presencial', campusIndex: 1, period: 8, shift: 'Matutino', days: 1310, gpa: 8.8, att: 97, lastAccess: 0, acc30: 30, accPrev: 29, delivery: 97 },
-  { ra: '2484412', name: 'Tomás Erthal Siqueira', courseIndex: 2, modality: 'Presencial', campusIndex: 0, period: 8, shift: 'Noturno', days: 1330, gpa: 6.4, att: 74, attPrev: 83, lastAccess: 10, acc30: 7, accPrev: 17, delivery: 60, overdue: 1, daysOverdue: 18, failing: 1 },
-  { ra: '2479008', name: 'Kelly Andrade Vilar', courseIndex: 16, modality: 'Presencial', campusIndex: 0, period: 9, shift: 'Integral', days: 1470, gpa: 8.4, att: 95, lastAccess: 0, acc30: 26, accPrev: 25, delivery: 94 },
-  { ra: '2474550', name: 'Eduardo Rezende Mota', courseIndex: 7, modality: 'Presencial', campusIndex: 1, period: 7, shift: 'Matutino', days: 1180, gpa: 7.7, att: 91, lastAccess: 2, acc30: 20, accPrev: 21, delivery: 86 },
-  { ra: '2470117', name: 'Juliana Prates Cordeiro', courseIndex: 0, modality: 'Híbrido', campusIndex: 1, period: 5, shift: 'Noturno', days: 870, gpa: 8.0, att: 90, lastAccess: 1, acc30: 25, accPrev: 24, delivery: 92, scholarship: 30 },
-  { ra: '2465990', name: 'Sérgio Bandeira Fialho', courseIndex: 14, modality: 'EaD', campusIndex: 2, period: 4, shift: 'Noturno', days: 760, gpa: 5.2, att: 100, lastAccess: 24, acc30: 0, accPrev: 12, delivery: 22, overdue: 3, daysOverdue: 73, failing: 2, cancelPage: true },
-  { ra: '2461203', name: 'Amanda Vilaça Brandão', courseIndex: 3, modality: 'Presencial', campusIndex: 0, period: 9, shift: 'Noturno', days: 1490, gpa: 9.3, att: 100, lastAccess: 0, acc30: 35, accPrev: 34, delivery: 100 },
-  { ra: '2457880', name: 'Rogério Pacheco Nunes', courseIndex: 8, modality: 'Híbrido', campusIndex: 1, period: 8, shift: 'Noturno', days: 1350, gpa: 7.4, att: 86, lastAccess: 4, acc30: 16, accPrev: 20, delivery: 79 },
-  { ra: '2452144', name: 'Letícia Marques Bomfim', courseIndex: 6, modality: 'Presencial', campusIndex: 1, period: 8, shift: 'Matutino', days: 1290, gpa: 8.5, att: 96, lastAccess: 1, acc30: 24, accPrev: 23, delivery: 95 },
-  { ra: '2448702', name: 'Cristiano Belfort Aguiar', courseIndex: 12, modality: 'Híbrido', campusIndex: 2, period: 4, shift: 'Noturno', days: 720, gpa: 6.0, att: 68, attPrev: 82, lastAccess: 14, acc30: 3, accPrev: 15, delivery: 40, overdue: 2, daysOverdue: 36, late: 3 },
+  { ra: '2596440', name: 'Larissa Fontes Medeiros', courseIndex: 2, modality: 'Presencial', period: 6, shift: 'Matutino', days: 980, gpa: 9.2, att: 99, lastAccess: 0, acc30: 34, accPrev: 32, delivery: 100 },
+  { ra: '2588211', name: 'Pedro Henrique Salgado', courseIndex: 10, modality: 'Presencial', period: 5, shift: 'Noturno', days: 810, gpa: 7.6, att: 89, lastAccess: 2, acc30: 20, accPrev: 22, delivery: 86 },
+  { ra: '2577309', name: 'Yasmin Torres Delgado', courseIndex: 4, modality: 'Híbrido', period: 6, shift: 'Noturno', days: 940, gpa: 8.2, att: 91, lastAccess: 1, acc30: 26, accPrev: 24, delivery: 94 },
+  { ra: '2571002', name: 'Vitor Hugo Assunção', courseIndex: 16, modality: 'Presencial', period: 8, shift: 'Integral', days: 1210, gpa: 8.5, att: 95, lastAccess: 0, acc30: 28, accPrev: 27, delivery: 96 },
+  { ra: '2566880', name: 'Nathália Bezerra Vaz', courseIndex: 1, modality: 'Presencial', period: 7, shift: 'Noturno', days: 1120, gpa: 6.1, att: 72, attPrev: 84, lastAccess: 9, acc30: 8, accPrev: 19, delivery: 58, overdue: 2, daysOverdue: 31, late: 3, failing: 1 },
+  { ra: '2562144', name: 'Ricardo Estevão Lins', courseIndex: 9, modality: 'Presencial', period: 6, shift: 'Noturno', days: 990, gpa: 5.7, att: 66, attPrev: 88, lastAccess: 21, acc30: 1, accPrev: 16, delivery: 34, overdue: 3, daysOverdue: 61, deps: 1, failing: 2, cancelPage: true },
+  { ra: '2558931', name: 'Aline Castro Peixoto', courseIndex: 5, modality: 'Presencial', period: 7, shift: 'Matutino', days: 1080, gpa: 8.7, att: 97, lastAccess: 0, acc30: 25, accPrev: 24, delivery: 95 },
+  { ra: '2554700', name: 'Murilo Sant’Anna Reis', courseIndex: 11, modality: 'Híbrido', period: 4, shift: 'Noturno', days: 690, gpa: 7.3, att: 83, attPrev: 90, lastAccess: 4, acc30: 14, accPrev: 21, delivery: 74, late: 1 },
+  { ra: '2549812', name: 'Bianca Ozório Falcão', courseIndex: 14, modality: 'Híbrido', period: 3, shift: 'Noturno', days: 610, gpa: 8.0, att: 100, lastAccess: 1, acc30: 23, accPrev: 22, delivery: 90 },
+  { ra: '2545003', name: 'Leandro Bittencourt Sá', courseIndex: 12, modality: 'Híbrido', period: 3, shift: 'Noturno', days: 640, gpa: 6.3, att: 100, lastAccess: 13, acc30: 4, accPrev: 18, delivery: 44, overdue: 1, daysOverdue: 22, late: 2 },
+  { ra: '2541190', name: 'Tainá Rodrigues Melo', courseIndex: 7, modality: 'Presencial', period: 6, shift: 'Matutino', days: 950, gpa: 7.9, att: 90, lastAccess: 2, acc30: 19, accPrev: 20, delivery: 87 },
+  { ra: '2537744', name: 'Fábio Junqueira Neto', courseIndex: 0, modality: 'Presencial', period: 6, shift: 'Noturno', days: 960, gpa: 7.0, att: 85, lastAccess: 3, acc30: 17, accPrev: 19, delivery: 81, scholarship: 50 },
+  { ra: '2532001', name: 'Priscila Amaral Guedes', courseIndex: 3, modality: 'Presencial', period: 8, shift: 'Noturno', days: 1300, gpa: 8.9, att: 98, lastAccess: 0, acc30: 31, accPrev: 30, delivery: 98 },
+  { ra: '2528655', name: 'Anderson Klein Poli', courseIndex: 8, modality: 'Híbrido', period: 6, shift: 'Noturno', days: 1010, gpa: 6.6, att: 78, attPrev: 86, lastAccess: 8, acc30: 9, accPrev: 20, delivery: 62, late: 2, failing: 1 },
+  { ra: '2524410', name: 'Débora Nascimento Pires', courseIndex: 4, modality: 'Híbrido', period: 7, shift: 'Noturno', days: 1150, gpa: 8.3, att: 93, lastAccess: 1, acc30: 24, accPrev: 23, delivery: 93 },
+  { ra: '2519903', name: 'Wesley Portela Cunha', courseIndex: 13, modality: 'Híbrido', period: 4, shift: 'Noturno', days: 700, gpa: 5.9, att: 100, lastAccess: 19, acc30: 2, accPrev: 14, delivery: 36, overdue: 2, daysOverdue: 44, failing: 2, cancelPage: true },
+  { ra: '2515220', name: 'Carolina Vasconcelos Dias', courseIndex: 6, modality: 'Híbrido', period: 5, shift: 'Noturno', days: 830, gpa: 8.6, att: 94, lastAccess: 0, acc30: 27, accPrev: 25, delivery: 96 },
+  { ra: '2511008', name: 'Igor Sampaio Furtado', courseIndex: 10, modality: 'Presencial', period: 7, shift: 'Noturno', days: 1140, gpa: 7.2, att: 87, lastAccess: 3, acc30: 18, accPrev: 20, delivery: 83, deps: 1 },
+  { ra: '2506611', name: 'Renata Bulhões Aquino', courseIndex: 1, modality: 'Presencial', period: 8, shift: 'Matutino', days: 1290, gpa: 9.0, att: 99, lastAccess: 0, acc30: 33, accPrev: 31, delivery: 99 },
+  { ra: '2502244', name: 'Alexandre Prado Vilela', courseIndex: 11, modality: 'Presencial', period: 7, shift: 'Noturno', days: 1160, gpa: 6.8, att: 80, attPrev: 87, lastAccess: 6, acc30: 12, accPrev: 19, delivery: 70, late: 1, negotiation: true, overdue: 1, daysOverdue: 11 },
+  { ra: '2498100', name: 'Sabrina Elias Moretti', courseIndex: 15, modality: 'Híbrido', period: 5, shift: 'Noturno', days: 880, gpa: 8.1, att: 100, lastAccess: 2, acc30: 21, accPrev: 20, delivery: 89 },
+  { ra: '2493377', name: 'Douglas Cerqueira Rangel', courseIndex: 9, modality: 'Presencial', period: 9, shift: 'Noturno', days: 1420, gpa: 7.5, att: 88, lastAccess: 1, acc30: 22, accPrev: 21, delivery: 88, deps: 1 },
+  { ra: '2488905', name: 'Milena Toscano Barreto', courseIndex: 5, modality: 'Presencial', period: 8, shift: 'Matutino', days: 1310, gpa: 8.8, att: 97, lastAccess: 0, acc30: 30, accPrev: 29, delivery: 97 },
+  { ra: '2484412', name: 'Tomás Erthal Siqueira', courseIndex: 2, modality: 'Presencial', period: 8, shift: 'Noturno', days: 1330, gpa: 6.4, att: 74, attPrev: 83, lastAccess: 10, acc30: 7, accPrev: 17, delivery: 60, overdue: 1, daysOverdue: 18, failing: 1 },
+  { ra: '2479008', name: 'Kelly Andrade Vilar', courseIndex: 16, modality: 'Presencial', period: 9, shift: 'Integral', days: 1470, gpa: 8.4, att: 95, lastAccess: 0, acc30: 26, accPrev: 25, delivery: 94 },
+  { ra: '2474550', name: 'Eduardo Rezende Mota', courseIndex: 7, modality: 'Presencial', period: 7, shift: 'Matutino', days: 1180, gpa: 7.7, att: 91, lastAccess: 2, acc30: 20, accPrev: 21, delivery: 86 },
+  { ra: '2470117', name: 'Juliana Prates Cordeiro', courseIndex: 0, modality: 'Híbrido', period: 5, shift: 'Noturno', days: 870, gpa: 8.0, att: 90, lastAccess: 1, acc30: 25, accPrev: 24, delivery: 92, scholarship: 30 },
+  { ra: '2465990', name: 'Sérgio Bandeira Fialho', courseIndex: 14, modality: 'Híbrido', period: 4, shift: 'Noturno', days: 760, gpa: 5.2, att: 100, lastAccess: 24, acc30: 0, accPrev: 12, delivery: 22, overdue: 3, daysOverdue: 73, failing: 2, cancelPage: true },
+  { ra: '2461203', name: 'Amanda Vilaça Brandão', courseIndex: 3, modality: 'Presencial', period: 9, shift: 'Noturno', days: 1490, gpa: 9.3, att: 100, lastAccess: 0, acc30: 35, accPrev: 34, delivery: 100 },
+  { ra: '2457880', name: 'Rogério Pacheco Nunes', courseIndex: 8, modality: 'Híbrido', period: 8, shift: 'Noturno', days: 1350, gpa: 7.4, att: 86, lastAccess: 4, acc30: 16, accPrev: 20, delivery: 79 },
+  { ra: '2452144', name: 'Letícia Marques Bomfim', courseIndex: 6, modality: 'Presencial', period: 8, shift: 'Matutino', days: 1290, gpa: 8.5, att: 96, lastAccess: 1, acc30: 24, accPrev: 23, delivery: 95 },
+  { ra: '2448702', name: 'Cristiano Belfort Aguiar', courseIndex: 12, modality: 'Híbrido', period: 4, shift: 'Noturno', days: 720, gpa: 6.0, att: 68, attPrev: 82, lastAccess: 14, acc30: 3, accPrev: 15, delivery: 40, overdue: 2, daysOverdue: 36, late: 3 },
 ];
 
 const breadth: Student[] = BREADTH.map((b, i) => {
@@ -1147,7 +1140,7 @@ const breadth: Student[] = BREADTH.map((b, i) => {
     name: b.name,
     course: course.name,
     modality: b.modality,
-    campus: CAMPUS_BY_INDEX[b.campusIndex],
+    campus: CAMPUS,
     period: b.period,
     shift: b.shift,
     daysSinceEnrollment: b.days,
@@ -1498,7 +1491,7 @@ export const CASES: Case[] = [
     assigneeId: 'spec-fernanda',
     openedMinutesAgo: 1320,
     diagnosis:
-      'Em EaD o AVA é a sala de aula e responde por 37% do Health Score, o que amplifica o impacto da ausência. Há um segundo fio solto: o termo de negociação assinado há 9 dias sem confirmação de pagamento.',
+      'No híbrido o AVA responde por 27% do Health Score, o que amplifica o impacto da ausência entre encontros. Há um segundo fio solto: o termo de negociação assinado há 9 dias sem confirmação de pagamento.',
     recommendedAction:
       'Contato único resolvendo os dois pontos: confirmar o acordo financeiro e liberar o cronograma das sprints em atraso. Evitar dois contatos separados.',
   }),
@@ -1580,7 +1573,7 @@ export const CASES: Case[] = [
     assigneeId: null,
     openedMinutesAgo: 3100,
     diagnosis:
-      'Aluno de EaD no 4º período com convergência completa de sinais. Sem responsável atribuído — este caso já consumiu 100% do SLA e precisa de dono agora.',
+      'Aluno híbrido no 4º período com convergência completa de sinais. Sem responsável atribuído — este caso já consumiu 100% do SLA e precisa de dono agora.',
     recommendedAction: 'Atribuir imediatamente ao Especialista de Retenção e iniciar contato telefônico.',
   }),
 
@@ -1639,6 +1632,41 @@ export const CASES: Case[] = [
     recommendedAction: 'Plano de integralização priorizando a quitação das dependências.',
   }),
 
+  /* Closed inside the current shift by the attendant the app boots as — so
+     "resolvidos hoje" is a live number from the first render, not a zero that
+     only moves if someone closes a case during the demo. */
+  makeCase({
+    id: 'case-0894',
+    protocol: 'CSA-2026-0894',
+    studentId: 'st-b14',
+    title: 'Queda de ritmo no AVA após mudança de turno no trabalho',
+    radar: 'engajamento',
+    signals: [
+      'Acessos ao AVA caíram de 21 para 14 no ciclo',
+      'Frequência de 90% para 83%',
+      '1 atividade entregue em atraso',
+    ],
+    priority: 'Médio',
+    status: 'Acordo Firmado',
+    specialty: 'Retenção',
+    assigneeId: 'spec-mariana',
+    openedMinutesAgo: 400,
+    firstContactMinutesAgo: 260,
+    closedMinutesAgo: 90,
+    closingReason: 'Plano de estudos reorganizado com o aluno',
+    diagnosis:
+      'Queda simultânea de acesso e frequência sem nenhum sinal financeiro ou acadêmico grave por trás. Perfil de sobrecarga de rotina, não de desistência.',
+    recommendedAction:
+      'Remanejar o estudo dirigido para o fim de semana e confirmar presença no próximo encontro quinzenal.',
+    notes: [
+      {
+        author: 'Mariana Ribeiro',
+        text: 'Mudou de turno no trabalho e perdeu a janela de estudo da noite. Combinamos sábado de manhã e ele confirmou o encontro quinzenal.',
+        minutesAgo: 95,
+      },
+    ],
+  }),
+
   makeCase({
     id: 'case-0855',
     protocol: 'CSA-2026-0855',
@@ -1663,7 +1691,7 @@ export const CASES: Case[] = [
     id: 'case-0848',
     protocol: 'CSA-2026-0848',
     studentId: 'st-b04',
-    title: 'Desengajamento total em curso EaD',
+    title: 'Desengajamento total em curso híbrido',
     radar: 'evasao',
     signals: ['17 dias sem acesso', 'Taxa de entrega em 30%', '2 disciplinas abaixo de 5,0'],
     priority: 'Crítico',
@@ -1676,7 +1704,7 @@ export const CASES: Case[] = [
     closingReason: 'Mudança de cidade ou de rotina de trabalho',
     diagnosis:
       'Aluno assumiu turno fixo incompatível com os encontros síncronos após mudança de emprego.',
-    recommendedAction: 'Oferecida migração para EaD assíncrono. Aluno optou por trancar e retornar em 2027.',
+    recommendedAction: 'Oferecida migração de turno e plano de recuperação. Aluno optou por trancar e retornar em 2027.',
   }),
 
   makeCase({
@@ -1937,7 +1965,7 @@ export const NOTIFICATIONS: AppNotification[] = [
     id: 'ntf-2',
     kind: 'sla',
     title: 'SLA estourado sem responsável',
-    detail: 'CSA-2026-0869 (EaD, 4º período) está sem atribuição e já passou do prazo de 4 horas úteis.',
+    detail: 'CSA-2026-0869 (híbrido, 4º período) está sem atribuição e já passou do prazo de 4 horas úteis.',
     at: isoMinusMinutes(140, BOOT),
     read: false,
     caseId: 'case-0869',

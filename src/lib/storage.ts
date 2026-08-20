@@ -7,7 +7,7 @@
    namespace and reseeds.
    ========================================================================== */
 
-export const SCHEMA = 'v3';
+export const SCHEMA = 'v4';
 const PREFIX = `csa.${SCHEMA}.`;
 
 export const KEYS = {
