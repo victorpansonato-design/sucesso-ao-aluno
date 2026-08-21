@@ -10,6 +10,7 @@ import { useCallback, useEffect, useState } from 'react';
 
    Routes
      #/cockpit
+     #/dashboard
      #/fila                       #/fila/:caseId | #/fila/:preset
      #/alunos                     #/alunos/:studentId
      #/radares                    #/radares/:radarKey
@@ -23,6 +24,7 @@ import { useCallback, useEffect, useState } from 'react';
 
 export type RouteName =
   | 'cockpit'
+  | 'dashboard'
   | 'fila'
   | 'alunos'
   | 'radares'
@@ -61,6 +63,7 @@ export function asQueuePreset(param: string | null): QueuePreset | null {
 
 const VALID: RouteName[] = [
   'cockpit',
+  'dashboard',
   'fila',
   'alunos',
   'radares',

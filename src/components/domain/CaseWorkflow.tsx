@@ -5,7 +5,6 @@ import {
   BellOff,
   CalendarClock,
   CheckCircle2,
-  ExternalLink,
   Forward,
   Hand,
   MessageSquare,
@@ -32,11 +31,18 @@ import { SlaBanner } from './SlaPill';
 import { Timeline } from './Timeline';
 import { RADARS } from '../../lib/radars';
 import { isTerminal, nextStatuses } from '../../lib/caseFlow';
+import { SCORE_BANDS } from '../../lib/healthScore';
 import { stamp } from '../../lib/format';
 
 /* ==========================================================================
-   Case workflow panel
+   O caso — a única tela de um aluno em atendimento
    --------------------------------------------------------------------------
+   Este painel É o dossiê. Não existe mais uma "visualização rápida" aqui e uma
+   ficha completa em outra rota: os dois mostravam identidade, sinais, score e
+   linha do tempo, o atendente lia tudo duas vezes e nunca sabia qual dos dois
+   estava atualizado. O que a ficha tinha a mais virou aba aqui dentro
+   (Jornada, Protocolo, Histórico), e a fila abre este painel em tela cheia.
+
    An attendant about to pick up the phone needs six things, and the old panel
    made them scroll through seven stacked sections to collect them. Scrolling
    inside a box to find what matters is the failure this rewrite fixes.
@@ -71,10 +77,52 @@ export interface CaseActions {
   onClose: (caseId: string, mode: 'retido' | 'perdido' | 'descartar') => void;
   onReopen: (caseId: string) => void;
   onFollowUp: (studentId: string, caseId: string) => void;
-  onOpenStudent: (studentId: string) => void;
 }
 
 type Tab = 'resumo' | 'jornada' | 'protocolo' | 'notas' | 'historico';
+
+/** Mini pizza do health score: uma olhada mais rápida que ler "66/100" e
+    procurar o rótulo do status ao lado — a cor da faixa já carrega o veredito. */
+function ScorePie({
+  value,
+  color,
+  trackColor = 'var(--track)',
+  size = 52,
+  thickness = 6,
+  valueClassName = 'text-ink',
+}: {
+  value: number;
+  color: string;
+  trackColor?: string;
+  size?: number;
+  thickness?: number;
+  valueClassName?: string;
+}) {
+  const radius = (size - thickness) / 2;
+  const circumference = 2 * Math.PI * radius;
+  const dash = (Math.max(0, Math.min(100, value)) / 100) * circumference;
+
+  return (
+    <div className="relative shrink-0" style={{ width: size, height: size }}>
+      <svg width={size} height={size} className="-rotate-90 overflow-visible">
+        <circle cx={size / 2} cy={size / 2} r={radius} fill="none" stroke={trackColor} strokeWidth={thickness} />
+        <circle
+          cx={size / 2}
+          cy={size / 2}
+          r={radius}
+          fill="none"
+          stroke={color}
+          strokeWidth={thickness}
+          strokeLinecap="round"
+          strokeDasharray={`${dash} ${circumference}`}
+        />
+      </svg>
+      <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
+        <span className={['font-mono text-[13px] font-semibold', valueClassName].join(' ')}>{value}</span>
+      </div>
+    </div>
+  );
+}
 
 export function CaseWorkflow({ kase, actions }: { kase: Case; actions: CaseActions }) {
   const {
@@ -86,12 +134,17 @@ export function CaseWorkflow({ kase, actions }: { kase: Case; actions: CaseActio
     currentUser,
     transitionCase,
     scoreOf,
+    theme,
   } = useApp();
   const student = getStudent(kase.studentId);
   const [note, setNote] = useState('');
   const [tab, setTab] = useState<Tab>('resumo');
 
   const score = scoreOf(kase.studentId);
+  const dark = theme === 'dark';
+  const scoreColor = score
+    ? SCORE_BANDS.find((band) => band.status === score.status)?.hex(dark) ?? 'var(--brand)'
+    : 'var(--brand)';
 
   /* The single dimension dragging the score down. Five meters side by side is
      a chart; one named weakness is a talking point for the call. */
@@ -112,45 +165,64 @@ export function CaseWorkflow({ kase, actions }: { kase: Case; actions: CaseActio
   const digits = student.phone.replace(/\D/g, '');
 
   return (
-    <div className="flex h-full min-h-0 flex-col">
-      {/* ---- 1 · Identity, 5 · SLA — always on screen -------------------- */}
-      <div className="shrink-0 px-5 pt-5">
+    <div className="flex flex-col">
+      {/* ---- 1 · Quem é. O único elemento em azul preenchido desta tela ---
+              A faixa é o âncora: quando ela está na tela, você está tratando
+              UMA pessoa, e não navegando uma lista. É o que sobrou da antiga
+              divisão entre "visualização rápida" e "dossiê 360°" — os dois
+              mostravam identidade, sinais, score e timeline, e o segundo era uma
+              página inteira para repetir a primeira. Agora é um lugar só, e o
+              que era o dossiê virou as abas Jornada e Histórico aqui embaixo.
+
+              Só a identidade fica no azul. SLA e badges carregam a sua própria
+              semântica de cor (âmbar, vermelho) e sobre azul brigariam com ela,
+              então ficam na superfície neutra logo abaixo. */}
+      <div className="shrink-0 bg-brand px-5 py-4 sm:px-6">
         <div className="flex flex-wrap items-start justify-between gap-x-6 gap-y-3">
-          <div className="min-w-0">
-            <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1">
-              <span className="font-mono text-[12px] font-medium text-ink-3">{kase.protocol}</span>
-              <PriorityBadge priority={kase.priority} />
-              <CaseStatusBadge status={kase.status} />
-            </div>
-
-            <button
-              onClick={() => actions.onOpenStudent(student.id)}
-              className="group mt-3 flex items-center gap-3 text-left"
-            >
-              <Avatar initials={student.initials} size="md" tone={student.status} />
-              <span className="min-w-0">
-                <span className="flex items-center gap-1.5">
-                  <span className="truncate text-[20px] leading-tight font-semibold text-ink group-hover:underline">
-                    {student.name}
-                  </span>
-                  <ExternalLink className="h-3.5 w-3.5 shrink-0 text-ink-4" />
-                </span>
-                <span className="mt-0.5 block truncate text-[12px] text-ink-3">
-                  RA <span className="font-mono">{student.ra}</span> · {student.course} ·{' '}
-                  {student.period}º período
-                </span>
-              </span>
-            </button>
-
-            <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
-              <RadarBadge radar={kase.radar} full />
-              <ModalityBadge modality={student.modality} />
-              <CohortBadge cohort={student.cohort} days={student.journey.daysSinceEnrollment} />
+          <div className="flex min-w-0 items-center gap-3.5">
+            <Avatar initials={student.initials} size="md" tone="onBrand" />
+            <div className="min-w-0">
+              <p className="font-mono text-[11.5px] font-medium text-on-brand/70">
+                {kase.protocol}
+              </p>
+              <h2 className="mt-0.5 truncate text-[21px] leading-tight font-semibold text-on-brand">
+                {student.name}
+              </h2>
+              <p className="mt-0.5 truncate text-[12.5px] text-on-brand/75">
+                RA <span className="font-mono">{student.ra}</span> · {student.course} ·{' '}
+                {student.modality} · {student.period}º período
+              </p>
             </div>
           </div>
 
-          <div className="flex shrink-0 flex-col items-end gap-2">
-            <SlaBanner kase={kase} />
+          {score && (
+            <div className="flex shrink-0 items-center gap-2.5">
+              <ScorePie
+                value={score.total}
+                color={scoreColor}
+                trackColor="rgba(255,255,255,0.28)"
+                valueClassName="text-on-brand"
+              />
+              <p className="text-[11.5px] font-semibold tracking-wide text-on-brand/85 uppercase">
+                {score.status}
+              </p>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* ---- 5 · SLA, dono e a classificação do caso -------------------- */}
+      <div className="shrink-0 px-5 pt-4 sm:px-6">
+        <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-2.5">
+          <div className="flex flex-wrap items-center gap-1.5">
+            <PriorityBadge priority={kase.priority} />
+            <CaseStatusBadge status={kase.status} />
+            <RadarBadge radar={kase.radar} full />
+            <ModalityBadge modality={student.modality} />
+            <CohortBadge cohort={student.cohort} days={student.journey.daysSinceEnrollment} />
+          </div>
+
+          <div className="flex shrink-0 flex-wrap items-center gap-x-4 gap-y-2">
             <span className="flex items-center gap-1.5 text-[12px] text-ink-3">
               <UserRound className="h-3.5 w-3.5" />
               {owner ? (
@@ -162,6 +234,7 @@ export function CaseWorkflow({ kase, actions }: { kase: Case; actions: CaseActio
                 <span className="font-semibold text-crit-ink">Sem responsável</span>
               )}
             </span>
+            <SlaBanner kase={kase} />
           </div>
         </div>
 
@@ -181,12 +254,13 @@ export function CaseWorkflow({ kase, actions }: { kase: Case; actions: CaseActio
         </div>
       </div>
 
-      {/* ---- The tab body. `Resumo` is sized to fit a 900px viewport without
-              scrolling — that is the design constraint, and it is met by
-              cutting content, not by forbidding overflow. Scroll stays enabled
-              as a safety valve, because clipping a phone number on a short
-              laptop screen would be worse than a scrollbar. ------------- */}
-      <div className="scroll-slim min-h-0 flex-1 overflow-y-auto p-5">
+      {/* ---- O corpo da aba.
+              Sem scroll interno: o caso ocupa a tela inteira agora, então quem
+              rola é a PÁGINA. Enquanto o painel vivia numa coluna de 400px, esta
+              área era um scroller com altura limitada — e rolar dentro de uma
+              caixa que já está dentro de uma página com barra própria é a
+              sensação de estar preso numa janelinha. --------------------- */}
+      <div className="p-5 sm:p-6">
         {tab === 'resumo' && (
           <div className="space-y-4">
             {!owner && (
@@ -226,14 +300,9 @@ export function CaseWorkflow({ kase, actions }: { kase: Case; actions: CaseActio
             {/* 4 · Score and the one dimension pulling it down */}
             {score && weakest && (
               <div className="flex items-center gap-5">
-                <div className="shrink-0">
-                  <span className="block font-mono text-[30px] leading-none font-medium text-ink">
-                    {score.total}
-                    <span className="text-[15px] text-ink-4">/100</span>
-                  </span>
-                  <span className="mt-1.5 block text-[12px] font-medium text-ink-3">
-                    Health Score
-                  </span>
+                <div className="flex shrink-0 flex-col items-center gap-1.5">
+                  <ScorePie value={score.total} color={scoreColor} size={64} thickness={7} />
+                  <span className="text-[11px] font-medium text-ink-3">Health Score</span>
                 </div>
                 <div className="min-w-0 flex-1">
                   <div className="flex items-baseline justify-between gap-3">
@@ -413,8 +482,10 @@ export function CaseWorkflow({ kase, actions }: { kase: Case; actions: CaseActio
             >
               Reabrir
             </Button>
-            <Button size="sm" variant="ghost" onClick={() => actions.onOpenStudent(student.id)}>
-              Ver dossiê
+            {/* "Ver dossiê" saiu daqui: o dossiê é este painel. O que ele
+                mostrava a mais está nas abas Jornada e Histórico acima. */}
+            <Button size="sm" variant="ghost" onClick={() => setTab('historico')}>
+              Ver histórico completo
             </Button>
           </div>
         ) : (
@@ -457,26 +528,6 @@ export function CaseWorkflow({ kase, actions }: { kase: Case; actions: CaseActio
                   title="Alerta improcedente — descarta o caso e alimenta a calibração do radar"
                 >
                   Descartar
-                </Button>
-              )}
-
-              {allowed.includes('Evasão Inevitável') && (
-                <Button
-                  size="sm"
-                  variant="secondary"
-                  onClick={() => actions.onClose(kase.id, 'perdido')}
-                >
-                  Saída inevitável
-                </Button>
-              )}
-
-              {allowed.includes('Acordo Firmado') && (
-                <Button
-                  size="sm"
-                  variant="secondary"
-                  onClick={() => actions.onClose(kase.id, 'retido')}
-                >
-                  Acordo firmado
                 </Button>
               )}
 

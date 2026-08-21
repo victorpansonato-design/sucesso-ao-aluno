@@ -18,6 +18,7 @@ import {
   ReopenCaseModal,
 } from './components/modals/CaseModals';
 import { CockpitView } from './views/CockpitView';
+import { DashboardView } from './views/DashboardView';
 import { QueueView } from './views/QueueView';
 import { StudentsView } from './views/StudentsView';
 import { Student360View } from './views/Student360View';
@@ -108,6 +109,8 @@ function Shell() {
     switch (route.name) {
       case 'cockpit':
         return <CockpitView key="cockpit" actions={actions} />;
+      case 'dashboard':
+        return <DashboardView key="dashboard" actions={actions} />;
       case 'fila':
         return <QueueView key="fila" actions={actions} selectedCaseId={route.param} />;
       case 'alunos':
@@ -148,6 +151,9 @@ function Shell() {
           onOpenCase={openCase}
           onOpenStudent={openStudent}
           onCreateCase={() => setCreateFor({ open: true })}
+          // O Dashboard tem a sua própria barra com os cinco recortes; o
+          // Cockpit usa modalidade e coorte daqui.
+          hideScopeControls={route.name === 'dashboard'}
         />
 
         <main className="min-w-0 flex-1 px-4 py-6 sm:px-6 lg:px-8">

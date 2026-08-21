@@ -276,15 +276,18 @@ export function Avatar({
 }: {
   initials: string;
   size?: keyof typeof AVATAR_SIZE;
-  tone?: 'neutral' | 'brand' | HealthStatus;
+  /** `onBrand` é para quando o avatar já está *sobre* uma superfície azul. */
+  tone?: 'neutral' | 'brand' | 'onBrand' | HealthStatus;
   className?: string;
 }) {
   const toneClass =
     tone === 'brand'
       ? 'bg-brand text-on-brand'
-      : tone === 'Crítico'
-        ? 'bg-surface-3 text-ink'
-        : 'bg-surface-2 text-ink-2';
+      : tone === 'onBrand'
+        ? 'bg-white/15 text-on-brand'
+        : tone === 'Crítico'
+          ? 'bg-surface-3 text-ink'
+          : 'bg-surface-2 text-ink-2';
 
   return (
     <span

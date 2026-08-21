@@ -2,12 +2,12 @@ import { useMemo } from 'react';
 import { motion } from 'motion/react';
 import {
   ArrowRight,
+  BarChart3,
   CheckCircle2,
   Hand,
   ListChecks,
   Plus,
   Sparkles,
-  Sprout,
 } from 'lucide-react';
 import type { ShellActions } from '../App';
 import { useApp, useQueueStats } from '../state/AppContext';
@@ -19,46 +19,61 @@ import { Avatar, PriorityBadge } from '../components/ui/Badges';
 import { SlaPill } from '../components/domain/SlaPill';
 import { STATUS_SLUG } from '../lib/healthScore';
 import { compareBySla, slaStatus, useClock } from '../lib/sla';
-import { populationDistribution, populationOf } from '../data/population';
-import { int, percent } from '../lib/format';
+import type { QueuePreset } from '../lib/router';
+import { aggregate, bandSlices } from '../data/institution';
+import { decimal, int } from '../lib/format';
 
 /* ==========================================================================
-   Cockpit
+   Cockpit — a tela do atendente
    --------------------------------------------------------------------------
-   Two questions, in this order:
+   Uma pergunta, respondida sem rolar a página: **o que eu faço agora?**
 
-     1. "Como estamos?" — the whole institution, every student the score engine
-        judges. Not the few dozen with an open dossier: the 8.600.
-     2. "Quem precisa de mim agora?" — and here *me* is literal. The four
-        numbers under the title are the attendant's own shift: their queue,
-        their SLA, the unowned cases in their specialty, their closures today.
-        A number nobody on this screen can act on does not belong on the screen
-        they open first.
+   Foi por não respeitar isso que esta tela cresceu demais uma vez. Índices
+   executivos, evolução por faixa, funil de jornada e taxa de estabilização são
+   informações boas — e nenhuma delas muda o que o atendente vai fazer nos
+   próximos dez minutos. Todas moraram aqui por um tempo e empurraram a fila
+   para baixo da dobra, o que é o oposto do trabalho desta tela. Agora vivem no
+   **Dashboard**, em Gestão, onde alguém entra justamente para analisar.
 
-   Every number is a link, and every link lands on exactly the set it counted.
-   A tile reading "3 vencendo o SLA" that opens a list of forty is worse than no
-   tile at all, so the queue grew real working sets (`lib/router.ts`) instead of
-   four buttons pointing at the same default tab.
+   O que sobrou tem uma regra: só entra o que é *meu* ou o que eu posso *pegar*.
+
+     · Quatro números do meu turno. Nenhum deles é da instituição.
+     · Duas pizzas: como está a base (contexto) e onde os meus casos estão
+       parados (acionável).
+     · A lista dos que precisam de mim, ordenada por SLA — o topo é sempre o
+       caso que estoura primeiro.
+
+   Sem barra de filtros: modalidade e coorte estão no header global, e período,
+   curso e período acadêmico são perguntas de análise, não de turno.
+
+   Sem azul preenchido em lugar nenhum aqui. Esta é a tela mais aberta do
+   sistema, e o único azul que ela precisa é o do botão que leva para a fila.
    ========================================================================== */
 
 export function CockpitView({ actions }: { actions: ShellActions }) {
-  const { theme, currentUser, getStudent, modalityFilter, cohortFilter, settings } = useApp();
+  const {
+    theme,
+    currentUser,
+    getStudent,
+    modalityFilter,
+    cohortFilter,
+    settings,
+    scopedCases,
+  } = useApp();
   const stats = useQueueStats();
   const now = useClock();
   const dark = theme === 'dark';
 
-  /* -- Block 1: the whole base ------------------------------------------- */
-
-  /**
-   * Which population the donut describes. The 90-day rule decides it: while
-   * onboarding is segregated, freshmen are on the welcome track and are not
-   * being judged by the Health Score, so counting them here would inflate the
-   * denominator of every percentage on screen. An explicit cohort filter in the
-   * header always wins.
-   */
-  const scope = useMemo(
+  /* -- Pizza 1: a base, como contexto -------------------------------------
+     A regra dos 90 dias decide a população: enquanto o onboarding é segregado,
+     o calouro está numa trilha de boas-vindas e não é julgado pelo Health
+     Score, então contá-lo aqui infla o denominador de toda porcentagem da tela.
+     Um filtro de coorte explícito no header sempre vence. */
+  const baseScope = useMemo(
     () => ({
       modality: modalityFilter,
+      course: 'Todos' as const,
+      period: 0,
       cohort:
         cohortFilter !== 'Todos'
           ? cohortFilter
@@ -69,20 +84,88 @@ export function CockpitView({ actions }: { actions: ShellActions }) {
     [modalityFilter, cohortFilter, settings.segregateOnboarding],
   );
 
-  const distribution = useMemo(() => populationDistribution(scope), [scope]);
-  const evaluated = useMemo(() => populationOf(scope), [scope]);
-  const onboarding = useMemo(
-    () => populationOf({ modality: modalityFilter, cohort: 'Calouro' }),
-    [modalityFilter],
+  const base = useMemo(() => aggregate(baseScope), [baseScope]);
+  const bands = useMemo(() => bandSlices(base), [base]);
+
+  const needAttention = useMemo(
+    () =>
+      bands
+        .filter((b) => b.status === 'Risco' || b.status === 'Crítico')
+        .reduce((sum, b) => sum + b.count, 0),
+    [bands],
   );
 
-  const needAttention = distribution
-    .filter((band) => band.status === 'Risco' || band.status === 'Crítico')
-    .reduce((sum, band) => sum + band.count, 0);
+  /* -- Pizza 2: onde os meus casos estão parados --------------------------
+     Conta os meus mais os sem dono da minha especialidade — as duas pilhas em
+     que eu posso agir agora.
 
-  /* -- Block 2: my shift -------------------------------------------------- */
+     A primeira versão repartia por RADAR, e era degenerada: os casos chegam
+     roteados por especialidade, então uma pessoa de Retenção só recebe evasão e
+     a pizza saía como um anel de uma fatia só. Repartir por SITUAÇÃO sempre tem
+     dispersão e responde uma pergunta melhor — "quantos dos meus ainda não
+     foram contatados, e quantos estão esperando o aluno responder?". */
+  const actionable = useMemo(
+    () => [...stats.mine, ...stats.unownedMine].sort((a, b) => compareBySla(a, b, now)),
+    [stats.mine, stats.unownedMine, now],
+  );
 
-  /** My cases already inside the SLA warning band, or past it. */
+  const situationSlices = useMemo(() => {
+    const buckets: {
+      key: string;
+      label: string;
+      value: number;
+      color: string;
+      /** Para onde a fatia leva. */
+      preset: QueuePreset;
+    }[] = [
+      {
+        key: 'sem-dono',
+        label: 'Sem dono, a pegar',
+        value: actionable.filter((c) => c.assigneeId === null).length,
+        // Âmbar: é a única fatia que pede uma decisão antes de qualquer contato.
+        color: 'var(--warn)',
+        preset: 'sem-dono',
+      },
+      {
+        key: 'primeiro-contato',
+        label: 'Aguardando 1º contato',
+        value: actionable.filter((c) => c.assigneeId === currentUser.id && c.status === 'Pendente')
+          .length,
+        color: dark ? '#c3c9d1' : '#4b5563',
+        preset: 'minha-fila',
+      },
+      {
+        key: 'em-contato',
+        label: 'Em contato',
+        value: actionable.filter((c) => c.assigneeId === currentUser.id && c.status === 'Em Contato')
+          .length,
+        color: dark ? '#8b929c' : '#7b828e',
+        preset: 'minha-fila',
+      },
+      {
+        key: 'aguardando-aluno',
+        label: 'Aguardando o aluno',
+        value: actionable.filter(
+          (c) => c.assigneeId === currentUser.id && c.status === 'Aguardando Retorno',
+        ).length,
+        color: dark ? '#626973' : '#a8aeb8',
+        preset: 'minha-fila',
+      },
+      {
+        key: 'encaminhado',
+        label: 'Encaminhado',
+        value: actionable.filter(
+          (c) => c.assigneeId === currentUser.id && c.status === 'Encaminhado',
+        ).length,
+        color: dark ? '#4a505a' : '#c9ced6',
+        preset: 'minha-fila',
+      },
+    ];
+    return buckets.filter((b) => b.value > 0);
+  }, [actionable, currentUser.id, dark]);
+
+  /* -- Números do turno --------------------------------------------------- */
+
   const myDueSoon = useMemo(
     () =>
       stats.mine.filter((c) => {
@@ -103,17 +186,14 @@ export function CockpitView({ actions }: { actions: ShellActions }) {
     ).length;
   }, [stats.closed, currentUser.id]);
 
-  /* -- Block 3: the work I can actually pick up ---------------------------
-     My open cases plus the unowned ones in my specialty — the two piles an
-     attendant can act on right now. The rest of the team's load is one click
-     away and does not belong in a list titled "precisam de mim". */
-  const actionable = useMemo(
-    () => [...stats.mine, ...stats.unownedMine].sort((a, b) => compareBySla(a, b, now)),
-    [stats.mine, stats.unownedMine, now],
-  );
-  const priorityQueue = useMemo(() => actionable.slice(0, 6), [actionable]);
+  /* Cinco linhas: o suficiente para saber o que vem, curto o bastante para a
+     tela terminar acima da dobra num monitor comum. */
+  const priorityQueue = useMemo(() => actionable.slice(0, 5), [actionable]);
 
   const firstName = currentUser.name.split(' ')[0];
+  const hour = new Date().getHours();
+  const greeting = hour < 12 ? 'Bom dia' : hour < 18 ? 'Boa tarde' : 'Boa noite';
+
   const scopeLabel =
     modalityFilter === 'Todas' && cohortFilter === 'Todos'
       ? 'Base completa'
@@ -130,7 +210,7 @@ export function CockpitView({ actions }: { actions: ShellActions }) {
       initial="initial"
       animate="animate"
       exit="exit"
-      className="space-y-8"
+      className="space-y-6"
     >
       <PageHeader
         eyebrow={
@@ -139,7 +219,7 @@ export function CockpitView({ actions }: { actions: ShellActions }) {
             {currentUser.specialty} · {scopeLabel}
           </>
         }
-        title={`Bom dia, ${firstName}`}
+        title={`${greeting}, ${firstName}`}
         actions={
           <>
             <Button
@@ -161,7 +241,7 @@ export function CockpitView({ actions }: { actions: ShellActions }) {
         }
       />
 
-      {/* ---- My shift. No boxes: whitespace separates them. -------------- */}
+      {/* ---- O meu turno. Sem caixas: o espaço separa. ------------------- */}
       <div className="grid grid-cols-2 gap-x-6 gap-y-7 sm:grid-cols-4 lg:gap-x-12">
         <Metric
           label="na minha fila"
@@ -186,78 +266,115 @@ export function CockpitView({ actions }: { actions: ShellActions }) {
         />
       </div>
 
-      {/* ---- The base + the queue ---------------------------------------- */}
-      <div className="grid gap-6 lg:grid-cols-[340px_minmax(0,1fr)]">
-        <Card>
+      {/* ---- Duas pizzas + a fila ---------------------------------------- */}
+      <div className="grid gap-5 xl:grid-cols-[210px_210px_minmax(0,1fr)]">
+        {/* Contexto: a instituição */}
+        <Card className="flex flex-col">
           <CardHeader title="Como está a base" />
-
-          <div className="mt-5 flex flex-col items-center gap-5">
+          <div className="mt-4 flex flex-1 flex-col items-center gap-3.5">
             <Donut
-              segments={distribution.map((band) => ({
+              segments={bands.map((band) => ({
                 key: band.status,
                 label: band.label,
                 value: band.count,
                 color: band.hex(dark),
               }))}
-              centerValue={evaluated}
+              size={124}
+              thickness={15}
+              centerValue={base.monitored}
               centerLabel="avaliados"
+              centerScale="sm"
               onSegmentClick={(key) => {
-                const band = distribution.find((b) => b.status === key);
+                const band = bands.find((b) => b.status === key);
                 if (band) actions.goto('alunos', STATUS_SLUG[band.status]);
               }}
             />
-
-            <div className="w-full min-w-0 space-y-1">
-              {distribution.map((band) => (
-                <button
-                  key={band.status}
-                  onClick={() => actions.goto('alunos', STATUS_SLUG[band.status])}
-                  className="flex w-full items-center gap-2.5 rounded-md px-1.5 py-1.5 text-left transition-colors hover:bg-surface-2"
-                >
-                  <span
-                    className="h-1.5 w-1.5 shrink-0 rounded-full"
-                    style={{ backgroundColor: band.hex(dark) }}
-                  />
-                  <span className="min-w-0 flex-1 truncate text-[13px] text-ink-2">
-                    {band.label}
-                  </span>
-                  <span className="shrink-0 font-mono text-[13px] font-medium text-ink">
-                    {int(band.count)}
-                  </span>
-                  <span className="w-11 shrink-0 text-right font-mono text-[11px] text-ink-4">
-                    {percent(band.percent, 0)}
-                  </span>
-                </button>
+            <ul className="w-full min-w-0 space-y-px">
+              {bands.map((band) => (
+                <li key={band.status}>
+                  <button
+                    onClick={() => actions.goto('alunos', STATUS_SLUG[band.status])}
+                    title={`Abrir a base filtrada em ${band.label}`}
+                    className="flex w-full items-center gap-2 rounded-md px-1 py-1 text-left transition-colors hover:bg-surface-2"
+                  >
+                    <span
+                      className="h-1.5 w-1.5 shrink-0 rounded-full"
+                      style={{ backgroundColor: band.hex(dark) }}
+                    />
+                    <span className="min-w-0 flex-1 truncate text-[12px] text-ink-2">
+                      {band.label}
+                    </span>
+                    <span className="shrink-0 font-mono text-[11px] text-ink-4">
+                      {decimal(band.percent, 1)}%
+                    </span>
+                  </button>
+                </li>
               ))}
-            </div>
-
-            {/* The verdict in one line, plus the track deliberately kept out
-                of the chart above. */}
-            <div className="w-full space-y-2 border-t border-hairline pt-4">
-              <p className="px-1.5 text-[12.5px] leading-relaxed text-ink-2">
-                <span className="font-mono font-medium text-ink">{int(needAttention)}</span> em risco
-                ou crítico —{' '}
-                <span className="font-mono">
-                  {percent(evaluated > 0 ? (needAttention / evaluated) * 100 : 0, 1)}
-                </span>{' '}
-                da base avaliada.
-              </p>
-              <button
-                onClick={() => actions.goto('onboarding')}
-                className="flex w-full items-center gap-2 rounded-md px-1.5 py-1.5 text-left transition-colors hover:bg-surface-2"
-              >
-                <Sprout className="h-3.5 w-3.5 shrink-0 text-ink-4" />
-                <span className="min-w-0 flex-1 text-[12px] text-ink-3">
-                  <span className="font-mono font-medium text-ink-2">{int(onboarding)}</span>{' '}
-                  calouros na trilha de 90 dias
-                </span>
-                <ArrowRight className="h-3.5 w-3.5 shrink-0 text-ink-4" />
-              </button>
-            </div>
+            </ul>
+            <p className="w-full border-t border-hairline px-1 pt-3 text-[11.5px] leading-relaxed text-ink-4">
+              <span className="font-mono font-medium text-ink-2">{int(needAttention)}</span> em risco
+              ou crítico na instituição.
+            </p>
           </div>
         </Card>
 
-        <Card padded={false}>
+        {/* Acionável: onde os meus estão */}
+        <Card className="flex flex-col">
+          <CardHeader title="Onde meus casos estão" />
+          {situationSlices.length === 0 ? (
+            <p className="flex flex-1 items-center justify-center px-2 py-8 text-center text-[12px] text-ink-4">
+              Nada aberto no seu nome nem sem dono em {currentUser.specialty}.
+            </p>
+          ) : (
+            <div className="mt-4 flex flex-1 flex-col items-center gap-3.5">
+              <Donut
+                segments={situationSlices}
+                size={124}
+                thickness={15}
+                centerValue={actionable.length}
+                centerLabel="casos"
+                centerScale="sm"
+                onSegmentClick={(key) => {
+                  const slice = situationSlices.find((s) => s.key === key);
+                  actions.goto('fila', slice?.preset ?? 'minha-fila');
+                }}
+              />
+              <ul className="w-full min-w-0 space-y-px">
+                {situationSlices.map((slice) => (
+                  <li key={slice.key}>
+                    <button
+                      onClick={() => actions.goto('fila', slice.preset)}
+                      title={`Abrir a fila em ${slice.label.toLowerCase()}`}
+                      className="flex w-full items-center gap-2 rounded-md px-1 py-1 text-left transition-colors hover:bg-surface-2"
+                    >
+                      <span
+                        className="h-1.5 w-1.5 shrink-0 rounded-full"
+                        style={{ backgroundColor: slice.color }}
+                      />
+                      <span className="min-w-0 flex-1 truncate text-[12px] text-ink-2">
+                        {slice.label}
+                      </span>
+                      <span className="shrink-0 font-mono text-[11px] font-medium text-ink">
+                        {slice.value}
+                      </span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+              <p className="w-full border-t border-hairline px-1 pt-3 text-[11.5px] leading-relaxed text-ink-4">
+                <span className="font-mono font-medium text-ink-2">{int(stats.mineCount)}</span> meus
+                e{' '}
+                <span className="font-mono font-medium text-ink-2">
+                  {int(stats.unownedMineCount)}
+                </span>{' '}
+                sem dono em {currentUser.specialty}.
+              </p>
+            </div>
+          )}
+        </Card>
+
+        {/* A fila */}
+        <Card padded={false} className="flex flex-col">
           <div className="p-5 pb-4">
             <CardHeader
               title="Precisam de mim agora"
@@ -267,7 +384,7 @@ export function CockpitView({ actions }: { actions: ShellActions }) {
                   onClick={() => actions.goto('fila', 'minha-fila')}
                   iconRight={<ArrowRight className="h-3.5 w-3.5" />}
                 >
-                  Ver minha fila ({stats.mineCount})
+                  Ver a fila ({stats.mineCount})
                 </LinkButton>
               }
             />
@@ -289,9 +406,10 @@ export function CockpitView({ actions }: { actions: ShellActions }) {
                   </Button>
                 ) : undefined
               }
+              compact
             />
           ) : (
-            <ul className="divide-y divide-hairline border-t border-hairline">
+            <ul className="flex-1 divide-y divide-hairline border-t border-hairline">
               {priorityQueue.map((kase) => {
                 const student = getStudent(kase.studentId);
                 if (!student) return null;
@@ -301,9 +419,9 @@ export function CockpitView({ actions }: { actions: ShellActions }) {
                 return (
                   <li key={kase.id}>
                     <Row tone={sla.state === 'breach' ? 'crit' : 'plain'}>
-                      <div className="flex items-center gap-4 px-5 py-3.5">
+                      <div className="flex items-center gap-4 px-5 py-3">
                         <button
-                          onClick={() => actions.openStudent(student.id)}
+                          onClick={() => actions.openCase(kase.id)}
                           className="group flex min-w-0 flex-1 items-center gap-3 text-left"
                         >
                           <Avatar initials={student.initials} size="sm" tone={student.status} />
@@ -330,6 +448,8 @@ export function CockpitView({ actions }: { actions: ShellActions }) {
                           <SlaPill kase={kase} />
                         </div>
 
+                        {/* Quem decide o verbo é a posse, não o estágio: um caso
+                            pendente que já tem dono não é meu para assumir. */}
                         <div className="flex shrink-0 items-center gap-1.5">
                           <Button
                             size="sm"
@@ -340,24 +460,16 @@ export function CockpitView({ actions }: { actions: ShellActions }) {
                           >
                             <Sparkles className="h-3.5 w-3.5" />
                           </Button>
-                          {kase.status === 'Pendente' ? (
-                            <Button
-                              size="sm"
-                              variant="primary"
-                              icon={<Hand className="h-3.5 w-3.5" />}
-                              onClick={() => actions.openCase(kase.id)}
-                            >
-                              Assumir
-                            </Button>
-                          ) : (
-                            <Button
-                              size="sm"
-                              variant={mine ? 'primary' : 'secondary'}
-                              onClick={() => actions.openCase(kase.id)}
-                            >
-                              {mine ? 'Continuar' : 'Abrir'}
-                            </Button>
-                          )}
+                          <Button
+                            size="sm"
+                            variant={kase.assigneeId === null || mine ? 'primary' : 'secondary'}
+                            icon={
+                              kase.assigneeId === null ? <Hand className="h-3.5 w-3.5" /> : undefined
+                            }
+                            onClick={() => actions.openCase(kase.id)}
+                          >
+                            {kase.assigneeId === null ? 'Assumir' : mine ? 'Continuar' : 'Abrir'}
+                          </Button>
                         </div>
                       </div>
                     </Row>
@@ -367,16 +479,28 @@ export function CockpitView({ actions }: { actions: ShellActions }) {
             </ul>
           )}
 
-          {actionable.length > priorityQueue.length && (
-            <div className="border-t border-hairline px-5 py-3">
+          <div className="flex items-center justify-between gap-3 border-t border-hairline px-5 py-2.5">
+            {actionable.length > priorityQueue.length ? (
               <LinkButton
                 onClick={() => actions.goto('fila', 'minha-fila')}
                 iconRight={<ArrowRight className="h-3.5 w-3.5" />}
               >
                 Mais {int(actionable.length - priorityQueue.length)} na fila
               </LinkButton>
-            </div>
-          )}
+            ) : (
+              <span className="text-[12px] text-ink-4">
+                {int(scopedCases.length)} protocolos no escopo
+              </span>
+            )}
+            <LinkButton
+              onClick={() => actions.goto('dashboard')}
+              icon={<BarChart3 className="h-3.5 w-3.5" />}
+              iconRight={<ArrowRight className="h-3.5 w-3.5" />}
+              title="Índices, evolução e resultado da operação"
+            >
+              Dashboard da operação
+            </LinkButton>
+          </div>
         </Card>
       </div>
     </motion.div>

@@ -27,8 +27,14 @@ import { Button } from '../components/ui/Button';
 import { Segmented } from '../components/ui/Fields';
 import { MeterBar } from '../components/ui/Charts';
 import { Avatar, HealthBadge, ModalityBadge, Pill } from '../components/ui/Badges';
-import { int, percent } from '../lib/format';
+import { decimal, int, percent } from '../lib/format';
 import { TOTAL_ONBOARDING } from '../data/population';
+import {
+  ONBOARDING_AUTO,
+  ONBOARDING_HUMAN,
+  ONBOARDING_PENDING,
+  TOTAL_FRESHMEN,
+} from '../data/institution';
 
 /* ==========================================================================
    Onboarding 90 dias
@@ -101,6 +107,11 @@ export function OnboardingView({ actions }: { actions: ShellActions }) {
   );
 
   const onTrack = inWindow.length - stuck.length;
+
+  /** Quanto da régua fechou sem uma pessoa. Vem do censo, não da amostra. */
+  const automationShare =
+    TOTAL_FRESHMEN > 0 ? ((TOTAL_FRESHMEN - ONBOARDING_HUMAN) / TOTAL_FRESHMEN) * 100 : 0;
+
   const freshmenCases = cases.filter((c) => {
     const s = students.find((x) => x.id === c.studentId);
     return s?.cohort === 'Calouro';
@@ -184,6 +195,48 @@ export function OnboardingView({ actions }: { actions: ShellActions }) {
           </>
         )}
       </Callout>
+
+      {/* ---- A razão de existir do projeto, em uma linha -------------------
+              O único elemento em azul preenchido desta tela, e ele é o que
+              justifica a régua inteira: a régua rodou até o fim, sozinha, para
+              a esmagadora maioria dos ingressantes. Cada ponto que sai desta
+              conta é uma ligação que a equipe teve de fazer. Quando este número
+              cai, é a automação que está falhando — não a equipe. */}
+      <div className="flex flex-wrap items-center justify-between gap-x-8 gap-y-4 rounded-xl bg-brand px-5 py-4 sm:px-6">
+        <div className="flex items-baseline gap-3">
+          <span className="font-mono text-[38px] leading-none font-medium tracking-tight text-on-brand">
+            {decimal(automationShare, 1)}
+            <span className="text-[24px] text-on-brand/60">%</span>
+          </span>
+          <span className="max-w-xs text-[13px] leading-snug text-on-brand/85">
+            da régua de onboarding concluiu <strong className="font-semibold">sem</strong> intervenção
+            humana
+          </span>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-x-7 gap-y-2">
+          {[
+            { label: 'automático', value: ONBOARDING_AUTO },
+            { label: 'pendência na régua', value: ONBOARDING_PENDING },
+            { label: 'intervenção humana', value: ONBOARDING_HUMAN },
+          ].map((item) => (
+            <span key={item.label} className="min-w-0">
+              <span className="block font-mono text-[17px] leading-none font-medium text-on-brand">
+                {int(item.value)}
+              </span>
+              <span className="mt-1 block text-[11px] text-on-brand/70">{item.label}</span>
+            </span>
+          ))}
+          <button
+            onClick={() => actions.goto('dashboard')}
+            className="inline-flex items-center gap-1.5 rounded-full bg-white/15 px-3 py-1.5 text-[12px] font-medium text-on-brand transition-colors hover:bg-white/25"
+            title="Ver o recorte de automação por curso, modalidade e período"
+          >
+            Abrir no Dashboard
+            <ArrowRight className="h-3.5 w-3.5" />
+          </button>
+        </div>
+      </div>
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <StatTile

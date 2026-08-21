@@ -2,6 +2,8 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { motion } from 'motion/react';
 import {
   CheckCircle2,
+  ChevronLeft,
+  ChevronRight,
   Download,
   FilterX,
   Hand,
@@ -126,8 +128,17 @@ export function QueueView({
   actions: ShellActions;
   selectedCaseId: string | null;
 }) {
-  const { scopedCases, getStudent, currentUser, cases, students, specialists, resetFilters, filtersActive } =
-    useApp();
+  const {
+    scopedCases,
+    getStudent,
+    getSpecialist,
+    currentUser,
+    cases,
+    students,
+    specialists,
+    resetFilters,
+    filtersActive,
+  } = useApp();
   const now = useClock();
 
   const initial = stateForPreset(asQueuePreset(selectedCaseId));
@@ -183,7 +194,14 @@ export function QueueView({
       if (kase) {
         setActiveId(selectedCaseId);
         setTab(homeTabFor(kase, currentUser.id));
+      } else {
+        setActiveId(null);
       }
+    } else {
+      /* `#/fila` puro — é onde o botão voltar do navegador aterra depois de um
+         atendimento. Sem este ramo o caso continuava aberto e o "voltar"
+         parecia não fazer nada. */
+      setActiveId(null);
     }
   }
 
@@ -280,20 +298,34 @@ export function QueueView({
   ]);
 
   /**
-   * The selected case is resolved from ALL scoped cases, not just the filtered
-   * list. This matters because taking a case changes its status, which usually
-   * drops it out of the current tab — and blanking the panel the instant an
-   * attendant claims a case is precisely the wrong moment to lose their place.
-   * The case stays on screen; the tab follows it.
+   * O caso aberto, resolvido a partir de TODOS os casos no escopo e não da
+   * lista filtrada. Isso importa porque assumir um caso muda o seu status, o
+   * que normalmente o tira da aba corrente — e apagar a tela no instante em que
+   * o atendente assume o caso é exatamente o pior momento para perder o lugar.
+   *
+   * Sem fallback para `filtered[0]`: quem abre a fila vê a LISTA. Selecionar
+   * sozinho o primeiro caso fazia sentido quando o painel vivia ao lado da
+   * lista; agora que o caso ocupa a tela, abrir a fila já dentro de um
+   * atendimento que ninguém pediu seria simplesmente o destino errado.
    */
-  const active = useMemo(() => {
-    const byId = activeId ? scopedCases.find((c) => c.id === activeId) : undefined;
-    return byId ?? filtered[0];
-  }, [scopedCases, filtered, activeId]);
+  const active = useMemo(
+    () => (activeId ? scopedCases.find((c) => c.id === activeId) : undefined),
+    [scopedCases, activeId],
+  );
 
-  useEffect(() => {
-    if (active && active.id !== activeId) setActiveId(active.id);
-  }, [active, activeId]);
+  /* Anterior/próximo dentro do recorte atual. Em tela cheia a lista sai de
+     vista, e sem isto atender cinco casos seriam dez viagens de ida e volta. */
+  const position = useMemo(() => {
+    if (!active) return null;
+    const index = filtered.findIndex((c) => c.id === active.id);
+    if (index < 0) return null;
+    return {
+      index,
+      total: filtered.length,
+      previous: index > 0 ? filtered[index - 1] : null,
+      next: index < filtered.length - 1 ? filtered[index + 1] : null,
+    };
+  }, [active, filtered]);
 
   // Re-home the tab when the selected case moves *out* of it — claiming an
   // unowned case, closing one — so the list on the left always contains the case
@@ -344,6 +376,99 @@ export function QueueView({
     encerrados: 'Encerrados',
   };
 
+  /** Volta para a lista pela rota, para o botão voltar do navegador funcionar. */
+  const backToList = useCallback(() => {
+    const preset: QueuePreset | null =
+      tab === 'minha-fila'
+        ? 'minha-fila'
+        : tab === 'sem-dono'
+          ? 'sem-dono'
+          : tab === 'equipe'
+            ? 'equipe'
+            : null;
+    actions.goto('fila', preset);
+  }, [actions, tab]);
+
+  /* ======================================================================
+     MODO CASO — a tela inteira para uma pessoa
+     ----------------------------------------------------------------------
+     Antes eram dois lugares: um painel estreito à direita da lista e, ao
+     clicar no nome, o Dossiê 360° — uma página inteira repetindo identidade,
+     sinais, score e timeline. Duas telas para o mesmo aluno significa ler
+     tudo duas vezes e nunca saber qual está certa.
+
+     Agora é um lugar só, com a largura toda. O que o dossiê tinha a mais
+     virou aba aqui dentro.
+     ====================================================================== */
+  if (active) {
+    return (
+      <motion.div
+        key="caso"
+        variants={pageVariants}
+        initial="initial"
+        animate="animate"
+        exit="exit"
+        className="space-y-4"
+      >
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <Button
+            variant="secondary"
+            icon={<ChevronLeft className="h-3.5 w-3.5" />}
+            onClick={backToList}
+          >
+            {tabLabel[tab]} ({counts[tab]})
+          </Button>
+
+          {position && position.total > 1 && (
+            <div className="flex items-center gap-2">
+              <span className="font-mono text-[11.5px] text-ink-4">
+                {position.index + 1} de {position.total}
+              </span>
+              <Button
+                size="sm"
+                variant="ghost"
+                square
+                title="Caso anterior no recorte"
+                disabled={!position.previous}
+                onClick={() => position.previous && actions.openCase(position.previous.id)}
+              >
+                <ChevronLeft className="h-3.5 w-3.5" />
+              </Button>
+              <Button
+                size="sm"
+                variant="ghost"
+                square
+                title="Próximo caso no recorte"
+                disabled={!position.next}
+                onClick={() => position.next && actions.openCase(position.next.id)}
+              >
+                <ChevronRight className="h-3.5 w-3.5" />
+              </Button>
+            </div>
+          )}
+        </div>
+
+        <Card padded={false} className="overflow-hidden">
+          <CaseWorkflow
+            kase={active}
+            actions={{
+              onRegister: (caseId) => {
+                const kase = cases.find((c) => c.id === caseId);
+                if (kase) actions.register({ studentId: kase.studentId, caseId });
+              },
+              onCopilot: (studentId, caseId) => actions.copilot(studentId, caseId),
+              onForward: actions.forward,
+              onClose: actions.closeCase,
+              onReopen: actions.reopen,
+              onFollowUp: (studentId, caseId) => actions.followUp(studentId, caseId),
+            }}
+          />
+        </Card>
+      </motion.div>
+    );
+  }
+
+  /* ---- MODO LISTA ------------------------------------------------------ */
   return (
     <motion.div
       variants={pageVariants}
@@ -582,141 +707,185 @@ export function QueueView({
         )}
       </PageHeader>
 
-      {/* ---- Split pane -------------------------------------------------- */}
-      <div className="grid gap-5 xl:grid-cols-[minmax(340px,400px)_minmax(0,1fr)]">
-        {/* Master list */}
-        <Card padded={false} className="flex h-[calc(100vh-188px)] min-h-[480px] flex-col overflow-hidden">
-          <div className="flex shrink-0 items-center justify-between border-b border-hairline bg-surface-2 px-4 py-2.5">
-            <span className="text-[11px] font-medium text-ink-3">
-              {filtered.length} {filtered.length === 1 ? 'caso' : 'casos'}
-            </span>
-            <span className="font-mono text-[10.5px] text-ink-4">
-              {sort === 'sla'
-                ? 'por SLA'
-                : sort === 'prioridade'
-                  ? 'por prioridade'
-                  : sort === 'score'
-                    ? 'por score'
-                    : 'por abertura'}
-            </span>
-          </div>
+      {/* ---- A lista, em toda a largura ---------------------------------
+              Ela ocupava uma coluna de 380px porque dividia a tela com o painel
+              do caso. Com o caso em tela cheia, a lista herda a largura inteira
+              — e o que era um cartão apertado de duas linhas cabe agora como
+              tabela: aluno, caso, prioridade, score, SLA e responsável, na ordem
+              em que a pergunta "pego qual?" é respondida. */}
+      <Card padded={false} className="overflow-hidden">
+        <div className="flex items-center justify-between gap-3 border-b border-hairline bg-surface-2 px-4 py-2.5">
+          <span className="text-[11.5px] font-medium text-ink-3">
+            {filtered.length} {filtered.length === 1 ? 'caso' : 'casos'}
+            {localFiltersActive && <span className="text-ink-4"> no recorte</span>}
+          </span>
+          <span className="font-mono text-[10.5px] text-ink-4">
+            {sort === 'sla'
+              ? 'ordenado por SLA'
+              : sort === 'prioridade'
+                ? 'ordenado por prioridade'
+                : sort === 'score'
+                  ? 'ordenado por score'
+                  : 'ordenado por abertura'}
+          </span>
+        </div>
 
-          <div className="scroll-slim min-h-0 flex-1 divide-y divide-hairline overflow-y-auto">
-            {filtered.length === 0 ? (
-              <EmptyState
-                icon={
-                  tab === 'minha-fila' ? (
-                    <CheckCircle2 className="h-5 w-5 text-ok" />
-                  ) : (
-                    <Inbox className="h-5 w-5" />
-                  )
-                }
-                title={
-                  localFiltersActive
-                    ? 'Nenhum caso neste recorte'
-                    : tab === 'minha-fila'
-                      ? 'Sua fila está limpa'
-                      : tab === 'sem-dono'
-                        ? 'Nenhum caso sem responsável'
-                        : 'Nenhum caso neste recorte'
-                }
-                message={
-                  localFiltersActive
-                    ? 'O recorte aplicado não retornou casos. Limpe-o para ver a aba inteira.'
-                    : tab === 'minha-fila'
-                      ? 'Nenhum caso atribuído a você em aberto. Assuma um caso sem dono da sua especialidade.'
-                      : tab === 'sem-dono'
-                        ? specialtyScope === 'minha'
-                          ? `Nenhum caso sem dono em ${currentUser.specialty}. Veja todas as especialidades para ajudar outra fila.`
-                          : 'Todos os casos abertos têm responsável.'
-                        : 'Ajuste os filtros no topo ou troque de aba.'
-                }
-                action={
-                  localFiltersActive ? (
-                    <Button size="sm" variant="secondary" onClick={clearLocal}>
-                      Limpar recorte
-                    </Button>
-                  ) : tab === 'sem-dono' && specialtyScope === 'minha' ? (
-                    <Button
-                      size="sm"
-                      variant="secondary"
-                      onClick={() => setSpecialtyScope('todas')}
-                    >
-                      Ver todas as especialidades
-                    </Button>
-                  ) : counts['sem-dono'] > 0 && tab !== 'sem-dono' ? (
-                    <Button size="sm" variant="secondary" onClick={() => changeTab('sem-dono')}>
-                      Ver {counts['sem-dono']} casos sem dono
-                    </Button>
-                  ) : undefined
-                }
-              />
-            ) : (
-              filtered.map((kase) => {
+        {filtered.length === 0 ? (
+          <EmptyState
+            icon={
+              tab === 'minha-fila' ? (
+                <CheckCircle2 className="h-5 w-5 text-ok" />
+              ) : (
+                <Inbox className="h-5 w-5" />
+              )
+            }
+            title={
+              localFiltersActive
+                ? 'Nenhum caso neste recorte'
+                : tab === 'minha-fila'
+                  ? 'Sua fila está limpa'
+                  : tab === 'sem-dono'
+                    ? 'Nenhum caso sem responsável'
+                    : 'Nenhum caso neste recorte'
+            }
+            message={
+              localFiltersActive
+                ? 'O recorte aplicado não retornou casos. Limpe-o para ver a aba inteira.'
+                : tab === 'minha-fila'
+                  ? 'Nenhum caso atribuído a você em aberto. Assuma um caso sem dono da sua especialidade.'
+                  : tab === 'sem-dono'
+                    ? specialtyScope === 'minha'
+                      ? `Nenhum caso sem dono em ${currentUser.specialty}. Veja todas as especialidades para ajudar outra fila.`
+                      : 'Todos os casos abertos têm responsável.'
+                    : 'Ajuste os filtros no topo ou troque de aba.'
+            }
+            action={
+              localFiltersActive ? (
+                <Button size="sm" variant="secondary" onClick={clearLocal}>
+                  Limpar recorte
+                </Button>
+              ) : tab === 'sem-dono' && specialtyScope === 'minha' ? (
+                <Button size="sm" variant="secondary" onClick={() => setSpecialtyScope('todas')}>
+                  Ver todas as especialidades
+                </Button>
+              ) : counts['sem-dono'] > 0 && tab !== 'sem-dono' ? (
+                <Button size="sm" variant="secondary" onClick={() => changeTab('sem-dono')}>
+                  Ver {counts['sem-dono']} casos sem dono
+                </Button>
+              ) : undefined
+            }
+          />
+        ) : (
+          <>
+            {/* Cabeçalho de colunas. Só a partir de xl, onde todas aparecem. */}
+            <div className="hidden items-center gap-4 border-b border-hairline px-4 py-2 text-[10.5px] font-medium tracking-wide text-ink-4 uppercase xl:flex">
+              <span className="min-w-0 flex-[1.1]">Aluno</span>
+              <span className="min-w-0 flex-[1.3]">Caso</span>
+              <span className="w-24 shrink-0">Prioridade</span>
+              <span className="w-12 shrink-0 text-right">Score</span>
+              <span className="w-28 shrink-0">SLA</span>
+              <span className="w-36 shrink-0">Responsável</span>
+              <span className="w-24 shrink-0" />
+            </div>
+
+            <ul className="divide-y divide-hairline">
+              {filtered.map((kase) => {
                 const student = getStudent(kase.studentId);
                 if (!student) return null;
                 const sla = slaStatus(kase, now);
-                const isActive = active?.id === kase.id;
+                const owner = getSpecialist(kase.assigneeId);
+                const mine = kase.assigneeId === currentUser.id;
 
                 return (
-                  <Row
-                    key={kase.id}
-                    onClick={() => setActiveId(kase.id)}
-                    active={isActive}
-                    tone={!isActive && sla.state === 'breach' ? 'crit' : 'plain'}
-                  >
-                    <div className="flex items-center gap-3 px-4 py-3">
-                      <Avatar initials={student.initials} size="sm" tone={student.status} />
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-baseline justify-between gap-2">
-                          <span className="truncate text-[13px] font-semibold text-ink">
-                            {student.name}
+                  <li key={kase.id}>
+                    {/* A linha inteira é clicável por um alvo esticado por baixo
+                        do conteúdo, e não por um <button> em volta de tudo: o
+                        botão de ação vive dentro da linha, e botão dentro de
+                        botão é HTML inválido — o React reclama e o clique
+                        interno passa a depender de stopPropagation para não
+                        disparar os dois. Assim os dois alvos são irmãos. */}
+                    <Row tone={sla.state === 'breach' ? 'crit' : 'plain'} className="group">
+                      <button
+                        onClick={() => actions.openCase(kase.id)}
+                        aria-label={`Abrir o caso de ${student.name}`}
+                        className="absolute inset-0 cursor-pointer transition-colors hover:bg-surface-hover"
+                      />
+                      <div className="pointer-events-none relative flex flex-wrap items-center gap-x-4 gap-y-2 px-4 py-3 xl:flex-nowrap">
+                        <div className="flex min-w-0 flex-[1.1] items-center gap-3">
+                          <Avatar initials={student.initials} size="sm" tone={student.status} />
+                          <div className="min-w-0">
+                            <p className="truncate text-[13.5px] font-semibold text-ink">
+                              {student.name}
+                            </p>
+                            <p className="mt-0.5 truncate text-[11.5px] text-ink-3">
+                              {student.course} · {student.period}º · {student.modality}
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="min-w-0 flex-[1.3]">
+                          <p className="truncate text-[13px] text-ink-2">{kase.title}</p>
+                          <div className="mt-1 flex items-center gap-2">
+                            <RadarBadge radar={kase.radar} />
+                            <span className="truncate font-mono text-[10.5px] text-ink-4">
+                              {kase.protocol}
+                            </span>
+                          </div>
+                        </div>
+
+                        <div className="w-24 shrink-0">
+                          <PriorityBadge priority={kase.priority} />
+                        </div>
+
+                        <div
+                          className="w-12 shrink-0 text-right"
+                          title={`Health Score ${student.healthScore} · ${student.status}`}
+                        >
+                          <span className="font-mono text-[13px] font-medium text-ink">
+                            {student.healthScore}
                           </span>
+                        </div>
+
+                        <div className="w-28 shrink-0">
                           <SlaPill kase={kase} size="xs" />
                         </div>
-                        <div className="mt-0.5 flex items-center gap-2.5">
-                          <span className="min-w-0 flex-1 truncate text-[12px] text-ink-3">
-                            {kase.title}
-                          </span>
-                          <PriorityBadge priority={kase.priority} />
-                          <RadarBadge radar={kase.radar} />
+
+                        <div className="hidden w-36 shrink-0 xl:block">
+                          {owner ? (
+                            <span className="truncate text-[12px] text-ink-3">
+                              {mine ? <span className="font-semibold text-ink">você</span> : owner.name}
+                            </span>
+                          ) : (
+                            <span className="text-[12px] font-semibold text-crit-ink">sem dono</span>
+                          )}
+                        </div>
+
+                        {/* "Assumir" só quando não há dono. Antes o rótulo saía
+                            de `status === 'Pendente'`, e um caso pendente da
+                            Larissa aparecia com um botão azul me convidando a
+                            assumir o caso dela. Quem decide o verbo é a posse,
+                            não o estágio. */}
+                        <div className="pointer-events-auto flex w-24 shrink-0 justify-end">
+                          <Button
+                            size="sm"
+                            variant={kase.assigneeId === null || mine ? 'primary' : 'secondary'}
+                            icon={
+                              kase.assigneeId === null ? <Hand className="h-3.5 w-3.5" /> : undefined
+                            }
+                            onClick={() => actions.openCase(kase.id)}
+                          >
+                            {kase.assigneeId === null ? 'Assumir' : mine ? 'Continuar' : 'Abrir'}
+                          </Button>
                         </div>
                       </div>
-                    </div>
-                  </Row>
+                    </Row>
+                  </li>
                 );
-              })
-            )}
-          </div>
-        </Card>
-
-        {/* Detail */}
-        <Card padded={false} className="flex h-[calc(100vh-188px)] min-h-[480px] flex-col overflow-hidden">
-          {active ? (
-            <CaseWorkflow
-              kase={active}
-              actions={{
-                onRegister: (caseId) => {
-                  const kase = cases.find((c) => c.id === caseId);
-                  if (kase) actions.register({ studentId: kase.studentId, caseId });
-                },
-                onCopilot: (studentId, caseId) => actions.copilot(studentId, caseId),
-                onForward: actions.forward,
-                onClose: actions.closeCase,
-                onReopen: actions.reopen,
-                onFollowUp: (studentId, caseId) => actions.followUp(studentId, caseId),
-                onOpenStudent: actions.openStudent,
-              }}
-            />
-          ) : (
-            <EmptyState
-              icon={<Hand className="h-5 w-5" />}
-              title="Selecione um caso"
-              message="Escolha um protocolo na lista ao lado para ver os sinais, o diagnóstico e as ações disponíveis."
-            />
-          )}
-        </Card>
-      </div>
+              })}
+            </ul>
+          </>
+        )}
+      </Card>
     </motion.div>
   );
 }

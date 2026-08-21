@@ -154,23 +154,37 @@ export function Student360View({
         </div>
       </div>
 
-      {/* ---- Identity + score -------------------------------------------- */}
-      <Card padded={false}>
+      {/* ---- Identity + score --------------------------------------------
+              A faixa azul segue a mesma regra do painel do caso, e é uma regra
+              e não um enfeite: AZUL PREENCHIDO SIGNIFICA "você está olhando uma
+              pessoa". Aparece nas duas únicas telas que tratam de um indivíduo
+              e em nenhuma que trata de um conjunto. Os badges de risco, os
+              pills e os contatos ficam fora dela porque carregam a sua própria
+              semântica de cor. */}
+      <Card padded={false} className="overflow-hidden">
+        <div className="bg-brand px-5 py-4 sm:px-6">
+          <div className="flex items-center gap-4">
+            <Avatar initials={student.initials} size="lg" tone="onBrand" />
+            <div className="min-w-0 flex-1">
+              <h1 className="truncate text-[24px] leading-tight font-semibold text-on-brand">
+                {student.name}
+              </h1>
+              <p className="mt-1 truncate text-[13px] text-on-brand/80">
+                {student.course} · {student.period}º de {student.totalPeriods} períodos ·{' '}
+                {student.shift}
+              </p>
+            </div>
+          </div>
+        </div>
+
         <div className="grid gap-0 lg:grid-cols-[minmax(0,1fr)_320px]">
           <div className="min-w-0 p-5 sm:p-6">
             <div className="flex items-start gap-4">
-              <Avatar initials={student.initials} size="lg" tone={student.status} />
               <div className="min-w-0 flex-1">
                 <div className="flex flex-wrap items-center gap-2">
-                  <h1 className="text-[24px] leading-tight font-semibold text-ink">{student.name}</h1>
                   <HealthBadge status={student.status} solid />
                   <CohortBadge cohort={student.cohort} days={student.journey.daysSinceEnrollment} />
                 </div>
-
-                <p className="mt-1.5 text-[13px] text-ink-2">
-                  <span className="font-semibold text-ink">{student.course}</span> · {student.period}º de{' '}
-                  {student.totalPeriods} períodos · {student.shift}
-                </p>
 
                 <div className="mt-2 flex flex-wrap items-center gap-2">
                   <ModalityBadge modality={student.modality} />

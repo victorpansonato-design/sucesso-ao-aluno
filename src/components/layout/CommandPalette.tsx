@@ -29,6 +29,21 @@ type Result =
   | { type: 'case'; id: string; label: string; sub: string }
   | { type: 'route'; id: RouteName; param?: string; label: string; sub: string };
 
+/** As onze telas, buscáveis por nome. O `sub` também entra na busca. */
+const SCREENS: { id: RouteName; label: string; sub: string }[] = [
+  { id: 'cockpit', label: 'Cockpit', sub: 'O seu turno e quem precisa de você agora' },
+  { id: 'dashboard', label: 'Dashboard', sub: 'Índices, evolução e resultado da operação' },
+  { id: 'fila', label: 'Fila de Atendimento', sub: 'Casos abertos ordenados por SLA' },
+  { id: 'alunos', label: 'Base de Alunos', sub: 'Diretório completo com filtros e exportação' },
+  { id: 'radares', label: 'Radares', sub: 'Os cinco sensores, gatilhos e diretrizes' },
+  { id: 'onboarding', label: 'Onboarding 90 dias', sub: 'Régua de acolhimento dos calouros' },
+  { id: 'jornada', label: 'Jornada por Modalidade', sub: 'Funis de presencial e híbrido' },
+  { id: 'indicadores', label: 'Indicadores', sub: 'Tabelas executivas e exportações em CSV' },
+  { id: 'equipe', label: 'Equipe', sub: 'Carga real e roteamento por especialidade' },
+  { id: 'playbook', label: 'Playbook', sub: 'Protocolos de atendimento por radar' },
+  { id: 'governanca', label: 'Governança', sub: 'Pesos, SLAs, janela de onboarding e LGPD' },
+];
+
 export function CommandPalette({
   open,
   onClose,
@@ -64,13 +79,22 @@ export function CommandPalette({
       // Empty state offers the most-used destinations rather than nothing.
       return [
         { type: 'route', id: 'fila', label: 'Fila de Atendimento', sub: 'Casos abertos ordenados por SLA' },
-        { type: 'route', id: 'cockpit', label: 'Cockpit', sub: 'Saúde da base e quem precisa de atenção' },
+        { type: 'route', id: 'cockpit', label: 'Cockpit', sub: 'O seu turno e quem precisa de você agora' },
+        { type: 'route', id: 'dashboard', label: 'Dashboard', sub: 'Índices, evolução e resultado da operação' },
         { type: 'route', id: 'onboarding', label: 'Onboarding 90 dias', sub: 'Régua de acolhimento dos calouros' },
-        { type: 'route', id: 'indicadores', label: 'Indicadores', sub: 'Métricas executivas e exportações' },
       ];
     }
 
     const out: Result[] = [];
+
+    /* Telas por nome. A paleta buscava aluno, caso e radar mas não tela, então
+       digitar "dashboard" ou "governança" não encontrava nada — e uma paleta de
+       comandos que não acha um destino pelo nome é meio caminho de uma paleta. */
+    for (const screen of SCREENS) {
+      if (searchKey(screen.label).includes(q) || searchKey(screen.sub).includes(q)) {
+        out.push({ type: 'route', id: screen.id, label: screen.label, sub: screen.sub });
+      }
+    }
 
     for (const s of students) {
       const hit =

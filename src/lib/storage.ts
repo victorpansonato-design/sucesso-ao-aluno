@@ -19,6 +19,7 @@ export const KEYS = {
   specialists: `${PREFIX}specialists`,
   settings: `${PREFIX}settings`,
   theme: `${PREFIX}theme`,
+  currentUser: `${PREFIX}currentUser`,
   seededAt: `${PREFIX}seededAt`,
 } as const;
 

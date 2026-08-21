@@ -10,6 +10,7 @@ import {
   LayoutDashboard,
   ListChecks,
   Moon,
+  PieChart,
   Radar as RadarIcon,
   Route,
   SlidersHorizontal,
@@ -21,17 +22,19 @@ import type { RouteName } from '../../lib/router';
 import { useApp, useQueueStats } from '../../state/AppContext';
 import { BrandLockup } from '../brand/AnchietaLogo';
 import { Avatar } from '../ui/Badges';
+import { RoleSwitcher } from './RoleSwitcher';
+import { roleLabel } from '../../lib/routing';
 import { press, spring } from '../../lib/motion';
 
 /* ==========================================================================
    Sidebar
    --------------------------------------------------------------------------
-   Ten destinations is what the app has. Six is what an attendant opens in a
-   day. The other four — indicators, team load, journey by modality, governance
-   — belong to whoever runs the operation, not to whoever works it, and they
-   were making the daily six harder to find.
+   Eleven destinations is what the app has. Six is what an attendant opens in a
+   day. The other five — dashboard, indicators, team load, journey by modality,
+   governance — belong to whoever runs the operation, not to whoever works it,
+   and they were making the daily six harder to find.
 
-   So the daily six are flat and visible, and the management four live behind
+   So the daily six are flat and visible, and the management five live behind
    one collapsed group that remembers nothing: it opens when you are on one of
    its screens and otherwise stays shut. No sub-headings above three items each,
    no "Diretrizes" section holding a single link.
@@ -48,7 +51,14 @@ interface NavItem {
   urgent?: boolean;
 }
 
+/**
+ * Dashboard e Indicadores convivem porque respondem a pedidos diferentes:
+ * Dashboard é para *olhar* (índices, pizzas, evolução, jornada, operação) e
+ * Indicadores é para *levar embora* (tabelas e as exportações em CSV e o
+ * relatório executivo). Fundi-los daria uma tela que rola por dois minutos.
+ */
 const MANAGEMENT: NavItem[] = [
+  { route: 'dashboard', label: 'Dashboard', Icon: PieChart },
   { route: 'indicadores', label: 'Indicadores', Icon: BarChart3 },
   { route: 'equipe', label: 'Equipe', Icon: Users2 },
   { route: 'jornada', label: 'Jornada por Modalidade', Icon: Route },
@@ -205,17 +215,10 @@ export function Sidebar({
 
       {/* Footer: identity, theme, collapse */}
       <div className="shrink-0 space-y-2 p-2.5">
-        {!collapsed && (
-          <div className="flex items-center gap-2.5 rounded-lg bg-surface-2 p-2.5">
+        {!collapsed && <RoleSwitcher />}
+        {collapsed && (
+          <div className="flex justify-center" title={`${currentUser.name} · ${roleLabel(currentUser)}`}>
             <Avatar initials={currentUser.initials} size="sm" tone="brand" />
-            <div className="min-w-0 flex-1">
-              <p className="truncate text-[12.5px] font-semibold text-ink">{currentUser.name}</p>
-              <p className="truncate text-[11px] text-ink-3">{currentUser.specialty}</p>
-            </div>
-            <span
-              className="pulse-dot h-1.5 w-1.5 shrink-0 rounded-full bg-ink-4 text-ink-4"
-              title={currentUser.presence}
-            />
           </div>
         )}
 

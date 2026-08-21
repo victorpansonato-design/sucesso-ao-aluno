@@ -160,6 +160,7 @@ export function Donut({
   thickness = 20,
   centerValue,
   centerLabel,
+  centerScale = 'md',
   activeKey,
   onSegmentClick,
 }: {
@@ -168,6 +169,8 @@ export function Donut({
   thickness?: number;
   centerValue: number;
   centerLabel: string;
+  /** `sm` para os donuts pequenos, onde 30px de número estoura o furo. */
+  centerScale?: 'sm' | 'md';
   activeKey?: string | null;
   onSegmentClick?: (key: string) => void;
 }) {
@@ -217,15 +220,29 @@ export function Donut({
               transition={{ duration: 0.9, ease: emphasis, delay: i * 0.07 }}
               style={{ cursor: onSegmentClick ? 'pointer' : 'default' }}
               onClick={() => onSegmentClick?.(arc.key)}
-            />
+            >
+              {/* Tooltip nativo: a fatia isolada não diz o que é, e o SVG é
+                  girado −90°, o que torna um tooltip próprio caro por nada. */}
+              <title>{`${arc.label}: ${int(arc.value)} (${((arc.value / total) * 100).toFixed(1)}%)`}</title>
+            </motion.circle>
           );
         })}
       </svg>
-      <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
-        <span className="font-mono text-[30px] leading-none font-medium tracking-tight text-ink">
+      <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center px-2 text-center">
+        <span
+          className={[
+            'font-mono leading-none font-medium tracking-tight text-ink',
+            centerScale === 'sm' ? 'text-[21px]' : 'text-[30px]',
+          ].join(' ')}
+        >
           <AnimatedNumber value={centerValue} duration={520} resetOnChange />
         </span>
-        <span className="mt-1 text-[11px] font-medium text-ink-4">
+        <span
+          className={[
+            'font-medium text-ink-4',
+            centerScale === 'sm' ? 'mt-0.5 text-[10px]' : 'mt-1 text-[11px]',
+          ].join(' ')}
+        >
           {centerLabel}
         </span>
       </div>

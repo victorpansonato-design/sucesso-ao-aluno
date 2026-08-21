@@ -227,8 +227,12 @@ export const SCORE_BANDS: {
     hex: (d) => (d ? '#e0b341' : '#ca8a04'),
   },
   {
+    // O status interno segue sendo `Risco` — é a chave do modelo, do slug de
+    // rota e do badge compacto de tabela. O rótulo é "Alto risco" porque é
+    // assim que a diretoria nomeia a faixa, e é o que aparece em gráfico e
+    // legenda, onde há espaço para as duas palavras.
     status: 'Risco',
-    label: 'Risco',
+    label: 'Alto risco',
     range: [41, 60],
     token: 'risk',
     hex: (d) => (d ? '#f0844a' : '#ea580c'),

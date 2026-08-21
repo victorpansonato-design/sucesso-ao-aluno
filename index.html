@@ -24,7 +24,12 @@
           // quotes included. Comparing the raw string against 'dark' silently
           // never matched, which is why the pre-paint pass used to disagree
           // with the app and flash the wrong palette.
-          var stored = localStorage.getItem('csa.v3.theme');
+          // A chave carrega o prefixo de schema de lib/storage.ts. Ela estava
+          // presa em v3 depois de um bump para v4: o passe pré-pintura lia uma
+          // chave que não existia mais, caía no padrão claro e o app trocava a
+          // paleta no primeiro render — exatamente o flash que este bloco existe
+          // para evitar. Se SCHEMA subir de novo, esta linha sobe com ele.
+          var stored = localStorage.getItem('csa.v4.theme');
           // Light is the default. Dark is opt-in, never inherited from the OS.
           var theme = stored === 'dark' || stored === '"dark"' ? 'dark' : 'light';
           document.documentElement.classList.toggle('dark', theme === 'dark');

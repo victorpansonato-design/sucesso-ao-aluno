@@ -1,81 +1,49 @@
-import type { Cohort, HealthStatus, Modality } from '../types';
-import { SCORE_BANDS } from '../lib/healthScore';
+import type { Cohort, Modality } from '../types';
+import { aggregate, bandSlices } from './institution';
 
 /* ==========================================================================
-   Censo institucional
+   Censo institucional — fachada por modalidade e coorte
    --------------------------------------------------------------------------
-   The app ships a curated sample of students — a few dozen records rich enough
-   to carry a real dossier, a real timeline and a real case. That sample is what
-   the queue, the dossiers and the radars work on.
+   Este arquivo mantinha a sua própria tabela de headcount. Duas tabelas de
+   população significam duas verdades: o Cockpit passou a ler o censo por
+   célula (curso × modalidade × período × coorte) e teria começado a discordar
+   da Jornada, do Onboarding e da Base de Alunos — que continuam lendo daqui.
 
-   It is *not* what the operation looks like. An attendant opening the cockpit
-   needs to know how the whole institution is doing, and "54 alunos" is not that
-   number. So the aggregate view reads this census instead: the real headcount,
-   broken down by the two segmentations that matter and by Health Score band.
-
-   Why a table of absolute counts rather than percentages applied to a total:
-   every filter combination (modality × cohort) must add up exactly. Percentages
-   drift on rounding and the donut ends up showing 8.599.
+   Agora a tabela é uma só (`data/institution.ts`) e este módulo é apenas o
+   recorte de duas dimensões que as outras telas pedem. A assinatura antiga foi
+   preservada de propósito: nenhuma view precisou mudar para passar a ver o
+   mesmo número que o Cockpit.
    ========================================================================== */
-
-/** Counts per modality → cohort → Health Score band. Authored, not derived. */
-const CENSUS: Record<'Presencial' | 'Híbrido', Record<Cohort, Record<HealthStatus, number>>> = {
-  Presencial: {
-    // 7.621 em avaliação contínua
-    Veterano: { 'Estável': 4867, 'Atenção': 1694, 'Risco': 733, 'Crítico': 327 },
-    // 1.061 dentro dos primeiros 90 dias
-    Calouro: { 'Estável': 603, 'Atenção': 287, 'Risco': 124, 'Crítico': 47 },
-  },
-  'Híbrido': {
-    // 954 em avaliação contínua
-    Veterano: { 'Estável': 547, 'Atenção': 241, 'Risco': 113, 'Crítico': 53 },
-    // 139 dentro dos primeiros 90 dias
-    Calouro: { 'Estável': 71, 'Atenção': 43, 'Risco': 16, 'Crítico': 9 },
-  },
-};
-
-const ACTIVE = ['Presencial', 'Híbrido'] as const satisfies readonly Modality[];
 
 export type PopulationScope = {
   modality: 'Todas' | Modality;
-  /** `'Todos'` sums both tracks; the cockpit narrows it to `'Veterano'`. */
+  /** `'Todos'` soma as duas trilhas; o Cockpit costuma pedir `'Veterano'`. */
   cohort: 'Todos' | Cohort;
 };
 
-function cellsFor({ modality, cohort }: PopulationScope): Record<HealthStatus, number>[] {
-  const modalities = ACTIVE.filter((m) => modality === 'Todas' || m === modality);
-  const cohorts: Cohort[] =
-    cohort === 'Todos' ? ['Veterano', 'Calouro'] : [cohort];
-  return modalities.flatMap((m) => cohorts.map((c) => CENSUS[m][c]));
+function scopeOf({ modality, cohort }: PopulationScope) {
+  return { modality, course: 'Todos' as const, period: 0, cohort };
 }
 
-/** Headcount in a scope. */
+/** Headcount monitorado no escopo. */
 export function populationOf(scope: PopulationScope): number {
-  return cellsFor(scope).reduce(
-    (sum, cell) => sum + SCORE_BANDS.reduce((s, band) => s + cell[band.status], 0),
-    0,
-  );
+  return aggregate(scopeOf(scope)).monitored;
 }
 
 /**
- * The distribution the cockpit donut draws: same shape `scoreDistribution`
- * returns for the sample, so the chart component does not care which source
- * it was handed.
+ * A distribuição por faixa de Health Score. Devolve a mesma forma que
+ * `scoreDistribution` produz para a amostra, então o donut não precisa saber de
+ * qual fonte veio.
  */
 export function populationDistribution(scope: PopulationScope) {
-  const cells = cellsFor(scope);
-  const total = populationOf(scope);
-  return SCORE_BANDS.map((band) => {
-    const count = cells.reduce((sum, cell) => sum + cell[band.status], 0);
-    return { ...band, count, percent: total > 0 ? (count / total) * 100 : 0 };
-  });
+  return bandSlices(aggregate(scopeOf(scope)));
 }
 
-/** Everyone enrolled, both tracks, every modality offered. */
+/** Todo mundo matriculado, as duas trilhas, todas as modalidades ofertadas. */
 export const TOTAL_ENROLLED = populationOf({ modality: 'Todas', cohort: 'Todos' });
 
-/** Past the 90-day window — the population the Health Score actually judges. */
+/** Fora da janela de 90 dias — a população que o Health Score julga de fato. */
 export const TOTAL_EVALUATED = populationOf({ modality: 'Todas', cohort: 'Veterano' });
 
-/** Inside the 90-day window — the onboarding track, deliberately kept apart. */
+/** Dentro da janela de 90 dias — a trilha de onboarding, mantida à parte. */
 export const TOTAL_ONBOARDING = populationOf({ modality: 'Todas', cohort: 'Calouro' });

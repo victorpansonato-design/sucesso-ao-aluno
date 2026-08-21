@@ -49,11 +49,11 @@ export const SPECIALISTS: Specialist[] = [
     presence: 'Disponível',
   },
   {
-    id: 'spec-carlos',
-    name: 'Carlos Eduardo Paiva',
-    initials: 'CP',
-    role: 'Especialista de Sucesso Acadêmico',
-    email: 'carlos.paiva@anchieta.br',
+    id: 'spec-victor',
+    name: 'Victor Capitani',
+    initials: 'VC',
+    role: 'Especialista Acadêmico · Presencial',
+    email: 'victor.capitani@anchieta.br',
     modality: 'Presencial',
     specialty: 'Acadêmico',
     capacity: 18,
@@ -82,9 +82,9 @@ export const SPECIALISTS: Specialist[] = [
     id: 'spec-rodrigo',
     name: 'Rodrigo Martins',
     initials: 'RM',
-    role: 'Especialista Financeiro · Mediação e Acordos',
+    role: 'Especialista Financeiro · Presencial',
     email: 'rodrigo.martins@anchieta.br',
-    modality: 'Todas',
+    modality: 'Presencial',
     specialty: 'Financeiro',
     capacity: 22,
     resolvedThisCycle: 61,
@@ -138,9 +138,96 @@ export const SPECIALISTS: Specialist[] = [
     csat: 4.9,
     presence: 'Disponível',
   },
+
+  /* -- A matriz completa: cada modalidade tem as suas quatro especialidades --
+     Um aluno presencial com queda de nota e um híbrido com queda de nota não
+     têm o mesmo problema, e é por isso que a mesma especialidade existe duas
+     vezes. O roteamento (lib/routing.ts) precisa de alguém em cada célula:
+     sem o par Híbrido·Acadêmico, um caso desses cai numa fila de ninguém. */
+
+  {
+    id: 'spec-priscila',
+    name: 'Priscila Andrade',
+    initials: 'PA',
+    role: 'Especialista de Engajamento · Presencial',
+    email: 'priscila.andrade@anchieta.br',
+    modality: 'Presencial',
+    specialty: 'Engajamento',
+    capacity: 18,
+    resolvedThisCycle: 39,
+    avgResponseHours: 3.8,
+    slaAdherence: 95.4,
+    csat: 4.6,
+    presence: 'Disponível',
+  },
+  {
+    id: 'spec-camila',
+    name: 'Camila Ferraz',
+    initials: 'CF',
+    role: 'Especialista de Retenção · Presencial',
+    email: 'camila.ferraz@anchieta.br',
+    modality: 'Presencial',
+    specialty: 'Retenção',
+    capacity: 12,
+    resolvedThisCycle: 26,
+    avgResponseHours: 1.9,
+    slaAdherence: 96.6,
+    csat: 4.7,
+    presence: 'Em atendimento',
+  },
+  {
+    id: 'spec-carlos',
+    name: 'Carlos Eduardo Paiva',
+    initials: 'CP',
+    role: 'Especialista Acadêmico · Híbrido',
+    email: 'carlos.paiva@anchieta.br',
+    modality: 'Híbrido',
+    specialty: 'Acadêmico',
+    capacity: 18,
+    resolvedThisCycle: 44,
+    avgResponseHours: 4.1,
+    slaAdherence: 94.8,
+    csat: 4.6,
+    presence: 'Em atendimento',
+  },
+  {
+    id: 'spec-anderson',
+    name: 'Anderson Yuki',
+    initials: 'AY',
+    role: 'Especialista Financeiro · Híbrido',
+    email: 'anderson.yuki@anchieta.br',
+    modality: 'Híbrido',
+    specialty: 'Financeiro',
+    capacity: 20,
+    resolvedThisCycle: 48,
+    avgResponseHours: 5.6,
+    slaAdherence: 90.2,
+    csat: 4.3,
+    presence: 'Disponível',
+  },
+  {
+    id: 'spec-diego',
+    name: 'Diego Sampaio',
+    initials: 'DS',
+    role: 'Especialista de Retenção · Híbrido',
+    email: 'diego.sampaio@anchieta.br',
+    modality: 'Híbrido',
+    specialty: 'Retenção',
+    capacity: 12,
+    resolvedThisCycle: 22,
+    avgResponseHours: 2.2,
+    slaAdherence: 95.1,
+    csat: 4.6,
+    presence: 'Disponível',
+  },
 ];
 
-export const CURRENT_USER_ID = 'spec-mariana';
+/**
+ * Quem está logado. Trocável em tempo de execução pelo seletor de função da
+ * sidebar — e trocar de função troca a fila, os números do turno e o pool de
+ * casos sem dono, porque são operações diferentes e não visualizações da mesma.
+ */
+export const CURRENT_USER_ID = 'spec-victor';
 
 /* -- Builders ------------------------------------------------------------ */
 
@@ -301,12 +388,18 @@ function makeStudent(spec: StudentSpec): Student {
   };
 }
 
-/* -- Flagship record: Victor Capitani ------------------------------------ */
+/* -- Flagship record: um aluno saudável -----------------------------------
+   O contraponto necessário. Uma base de demonstração só com aluno em risco faz
+   parecer que o sistema só sabe apontar problema; este registro existe para
+   mostrar como um aluno estável é lido pelo mesmo motor.
+
+   (Chamava-se Victor Capitani, que agora é o nome do especialista logado — duas
+   pessoas com o mesmo nome na mesma tela é confusão garantida.) */
 
 const victor = makeStudent({
   id: 'st-victor',
   ra: '2607454',
-  name: 'Victor Capitani',
+  name: 'Eduardo Nunes Pacheco',
   cpf: '458.***.***-12',
   phone: '(11) 98765-4321',
   course: 'Bacharelado em Ciências Contábeis',
@@ -1411,12 +1504,40 @@ export const CASES: Case[] = [
     priority: 'Alto',
     status: 'Pendente',
     specialty: 'Acadêmico',
-    assigneeId: 'spec-carlos',
+    assigneeId: 'spec-victor',
     openedMinutesAgo: 640,
     diagnosis:
       'Dificuldade conceitual concentrada em um único eixo, com presença preservada em 84%. Esse é o cenário de maior taxa de resposta a monitoria: o aluno está tentando e não está conseguindo.',
     recommendedAction:
       'Encaminhar para monitoria do eixo de dados, ativar plantão de dúvidas e montar plano de estudos com a coordenação antes do fechamento do bimestre.',
+  }),
+
+  /* Sem dono, Acadêmico, aluno presencial. Existe para que o Cockpit tenha o
+     que mostrar em "sem dono · Acadêmico": o radar disparou, o sistema roteou
+     para a célula Presencial·Acadêmico e ninguém assumiu ainda. Sem um caso
+     nesse estado, o tile fica em zero e o fluxo de assumir um caso não aparece
+     em nenhuma tela. */
+  makeCase({
+    id: 'case-0894',
+    protocol: 'CSA-2026-0894',
+    studentId: 'st-rafael',
+    title: 'Dependência acumulada com risco de reprovação em Cálculo III',
+    radar: 'academico',
+    signals: [
+      'Cálculo III: 4,8 na média parcial',
+      '1 dependência acumulada de Cálculo II',
+      '5 faltas de um limite de 15 em Cálculo III',
+      'Frequência global de 79% — acima do mínimo',
+    ],
+    priority: 'Alto',
+    status: 'Pendente',
+    specialty: 'Acadêmico',
+    assigneeId: null,
+    openedMinutesAgo: 210,
+    diagnosis:
+      'Reprovação anterior na cadeia de cálculo se repetindo no semestre seguinte. O aluno não está ausente — está travado na mesma cadeira, e o histórico mostra que sem apoio dirigido ela reprova de novo.',
+    recommendedAction:
+      'Assumir e agendar monitoria dirigida de Cálculo III antes da segunda avaliação, com a coordenação de Engenharia ciente da dependência de Cálculo II.',
   }),
 
   makeCase({
@@ -1457,7 +1578,7 @@ export const CASES: Case[] = [
     priority: 'Alto',
     status: 'Em Contato',
     specialty: 'Acadêmico',
-    assigneeId: 'spec-carlos',
+    assigneeId: 'spec-victor',
     openedMinutesAgo: 900,
     firstContactMinutesAgo: 420,
     diagnosis:
@@ -1622,7 +1743,7 @@ export const CASES: Case[] = [
     priority: 'Médio',
     status: 'Acordo Firmado',
     specialty: 'Acadêmico',
-    assigneeId: 'spec-carlos',
+    assigneeId: 'spec-victor',
     openedMinutesAgo: 7200,
     firstContactMinutesAgo: 7000,
     closedMinutesAgo: 5700,
@@ -1737,7 +1858,7 @@ export const CASES: Case[] = [
     priority: 'Baixo',
     status: 'Cancelado',
     specialty: 'Acadêmico',
-    assigneeId: 'spec-carlos',
+    assigneeId: 'spec-victor',
     openedMinutesAgo: 8600,
     closedMinutesAgo: 8100,
     closingReason: 'Alerta improcedente — aluno já regularizado',
@@ -1783,7 +1904,7 @@ export const INTERACTIONS: Interaction[] = [
       'Aluno entendeu a gravidade e concorda com a transferência. Depende de aprovação da coordenação do curso.',
     nextStep: 'Levar o pedido de transferência de turma à coordenação de Ciência da Computação.',
     nextStepDate: isoPlusDays(1, BOOT),
-    specialistId: 'spec-carlos',
+    specialistId: 'spec-victor',
     specialistName: 'Carlos Eduardo Paiva',
     at: isoMinusMinutes(400, BOOT),
     timestamp: BOOT - 400 * 60_000,
@@ -1842,7 +1963,7 @@ export const INTERACTIONS: Interaction[] = [
     result: 'Aluno matriculado em Hidrologia e ciente do cronograma até a formatura.',
     nextStep: 'Verificar desempenho em Hidrologia no fechamento do primeiro bimestre.',
     nextStepDate: isoPlusDays(21, BOOT),
-    specialistId: 'spec-carlos',
+    specialistId: 'spec-victor',
     specialistName: 'Carlos Eduardo Paiva',
     at: isoMinusMinutes(5700, BOOT),
     timestamp: BOOT - 5700 * 60_000,
@@ -1906,7 +2027,7 @@ export const FOLLOW_UPS: FollowUp[] = [
     title: 'Levar transferência de turma à coordenação',
     dueDate: isoPlusDays(1, BOOT),
     notes: 'Turma de sábado de Cálculo II. Verificar vaga disponível.',
-    ownerId: 'spec-carlos',
+    ownerId: 'spec-victor',
     ownerName: 'Carlos Eduardo Paiva',
     status: 'Agendado',
     createdAt: isoMinusMinutes(400, BOOT),

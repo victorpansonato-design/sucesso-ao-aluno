@@ -46,11 +46,19 @@ export function Header({
   onOpenCase,
   onOpenStudent,
   onCreateCase,
+  hideScopeControls = false,
 }: {
   onOpenPalette: () => void;
   onOpenCase: (caseId: string) => void;
   onOpenStudent: (studentId: string) => void;
   onCreateCase: () => void;
+  /**
+   * O Cockpit tem a sua própria barra com os cinco recortes, incluindo estes
+   * dois. Dois controles ligados no mesmo estado não se contradizem, mas dois
+   * controles idênticos na mesma tela fazem o usuário procurar a diferença
+   * entre eles — então aqui eles saem de cena.
+   */
+  hideScopeControls?: boolean;
 }) {
   const {
     modalityFilter,
@@ -69,6 +77,9 @@ export function Header({
 
   const [bellOpen, setBellOpen] = useState(false);
   const bellRef = useRef<HTMLDivElement>(null);
+
+  /** Os dois recortes que valem para todas as telas. Ver a nota da faixa. */
+  const scopeStripActive = modalityFilter !== 'Todas' || cohortFilter !== 'Todos';
 
   useEffect(() => {
     if (!bellOpen) return;
@@ -105,32 +116,36 @@ export function Header({
 
         <div className="ml-auto flex items-center gap-2">
           {/* Modality — drives the Health Score weight profile */}
-          <div className="hidden xl:block">
-            <Segmented<'Todas' | Modality>
-              layoutId="header-modality"
-              value={modalityFilter}
-              onChange={setModalityFilter}
-              options={[
-                { value: 'Todas', label: 'Todas' },
-                { value: 'Presencial', label: 'Presencial', icon: <School className="h-3 w-3" /> },
-                { value: 'Híbrido', label: 'Híbrido', icon: <Layers className="h-3 w-3" /> },
-              ]}
-            />
-          </div>
+          {!hideScopeControls && (
+            <div className="hidden xl:block">
+              <Segmented<'Todas' | Modality>
+                layoutId="header-modality"
+                value={modalityFilter}
+                onChange={setModalityFilter}
+                options={[
+                  { value: 'Todas', label: 'Todas' },
+                  { value: 'Presencial', label: 'Presencial', icon: <School className="h-3 w-3" /> },
+                  { value: 'Híbrido', label: 'Híbrido', icon: <Layers className="h-3 w-3" /> },
+                ]}
+              />
+            </div>
+          )}
 
           {/* Cohort — the 90-day rule, made operational */}
-          <div className="hidden lg:block">
-            <Segmented<'Todos' | Cohort>
-              layoutId="header-cohort"
-              value={cohortFilter}
-              onChange={setCohortFilter}
-              options={[
-                { value: 'Todos', label: 'Todos' },
-                { value: 'Veterano', label: 'Veteranos', icon: <Users className="h-3 w-3" /> },
-                { value: 'Calouro', label: 'Calouros', icon: <Sparkles className="h-3 w-3" /> },
-              ]}
-            />
-          </div>
+          {!hideScopeControls && (
+            <div className="hidden lg:block">
+              <Segmented<'Todos' | Cohort>
+                layoutId="header-cohort"
+                value={cohortFilter}
+                onChange={setCohortFilter}
+                options={[
+                  { value: 'Todos', label: 'Todos' },
+                  { value: 'Veterano', label: 'Veteranos', icon: <Users className="h-3 w-3" /> },
+                  { value: 'Calouro', label: 'Calouros', icon: <Sparkles className="h-3 w-3" /> },
+                ]}
+              />
+            </div>
+          )}
 
           {/* Cycle. Campus is not here on purpose: the institution has one, so
               offering the choice was a question with a single possible answer. */}
@@ -275,8 +290,14 @@ export function Header({
       </div>
 
       {/* Scope strip — states the active scope in words, so no chart is read
-          out of context after a filter change. */}
-      {filtersActive && (
+          out of context after a filter change.
+
+          Only modality and cohort appear here, and that is on purpose: those
+          are the two filters that re-scope every screen. Course and academic
+          period currently narrow the census readings only, so naming them in a
+          strip that sits above the queue would claim a filter the queue is not
+          applying. The cockpit states its own full scope in its header. */}
+      {scopeStripActive && !hideScopeControls && (
         <div className="flex items-center gap-2 border-t border-hairline bg-brand-soft px-4 py-1.5 sm:px-6">
           <span className="text-[11px] font-medium text-brand-text">
             Escopo ativo

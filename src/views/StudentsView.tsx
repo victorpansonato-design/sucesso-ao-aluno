@@ -3,6 +3,7 @@ import { motion } from 'motion/react';
 import {
   ArrowDown,
   ArrowUp,
+  CheckCircle2,
   ChevronLeft,
   ChevronRight,
   Download,
@@ -29,7 +30,8 @@ import { Sparkline } from '../components/ui/Charts';
 import { COURSE_NAMES } from '../data/catalog';
 import { populationDistribution, populationOf } from '../data/population';
 import type { PopulationScope } from '../data/population';
-import { scoreDistribution, statusFromSlug } from '../lib/healthScore';
+import { SCORE_BANDS, scoreDistribution, statusFromSlug } from '../lib/healthScore';
+import { isOpen } from '../lib/caseFlow';
 import { accessDropPercent } from '../lib/radars';
 import { exportStudents } from '../lib/exporters';
 import { decimal, int, percent, searchKey } from '../lib/format';
@@ -47,6 +49,11 @@ import { decimal, int, percent, searchKey } from '../lib/format';
 type SortKey = 'score' | 'nome' | 'frequencia' | 'ava' | 'media' | 'periodo';
 const PAGE_SIZE = 12;
 
+/** Hex da faixa de Health Score de um aluno, no tema corrente. */
+function bandHexOf(status: HealthStatus, dark: boolean): string {
+  return (SCORE_BANDS.find((b) => b.status === status) ?? SCORE_BANDS[0]).hex(dark);
+}
+
 export function StudentsView({
   actions,
   bandParam,
@@ -55,8 +62,19 @@ export function StudentsView({
   /** Health Score band slug from the route, sent by the cockpit donut. */
   bandParam?: string | null;
 }) {
-  const { scopedStudents, radarsOf, resetFilters, filtersActive, students, modalityFilter, cohortFilter, settings } =
-    useApp();
+  const {
+    scopedStudents,
+    radarsOf,
+    resetFilters,
+    filtersActive,
+    students,
+    cases,
+    modalityFilter,
+    cohortFilter,
+    settings,
+    theme,
+  } = useApp();
+  const dark = theme === 'dark';
 
   const [query, setQuery] = useState('');
   const [status, setStatus] = useState<HealthStatus | 'todos'>(
@@ -67,14 +85,55 @@ export function StudentsView({
   const [sort, setSort] = useState<SortKey>('score');
   const [asc, setAsc] = useState(true);
   const [page, setPage] = useState(0);
+  /** Recorte "já resolvido", ligado pelo contador de resolvidos. */
+  const [resolvedOnly, setResolvedOnly] = useState(false);
 
   const distribution = useMemo(() => scoreDistribution(scopedStudents), [scopedStudents]);
 
+  /** População monitorada no mesmo escopo global, direto do censo. */
+  const monitoredInScope = useMemo(
+    () => populationOf({ modality: modalityFilter, cohort: cohortFilter }),
+    [modalityFilter, cohortFilter],
+  );
+
+  /**
+   * Resolvido = já teve caso encerrado e não tem nada em aberto agora.
+   *
+   * As duas condições importam. Só "tem caso encerrado" contaria como resolvido
+   * quem fechou um caso em março e abriu outro ontem; só "não tem caso aberto"
+   * contaria quem nunca precisou de ninguém, que é a maior parte da base e não
+   * é um resultado da equipe.
+   */
+  const resolvedIds = useMemo(() => {
+    const ids = new Set<string>();
+    for (const student of scopedStudents) {
+      const own = cases.filter((c) => c.studentId === student.id);
+      if (own.length === 0) continue;
+      if (own.some((c) => isOpen(c.status))) continue;
+      if (own.some((c) => c.status === 'Acordo Firmado')) ids.add(student.id);
+    }
+    return ids;
+  }, [scopedStudents, cases]);
+
+  const resolved = useMemo(
+    () => ({
+      count: resolvedIds.size,
+      percent: scopedStudents.length > 0 ? (resolvedIds.size / scopedStudents.length) * 100 : 0,
+    }),
+    [resolvedIds, scopedStudents.length],
+  );
+
+  /** Verde da rampa de risco: aqui ele significa "deu certo". */
+  const resolvedAccent = SCORE_BANDS[0].hex(dark);
+
   /**
    * The same band, counted across the whole institution. The cockpit donut
-   * describes 8.600 students; this table lists the ones with an open dossier in
-   * the Centro. Those are different numbers on purpose, and a filtered list
-   * that does not explain the gap just looks broken.
+   * describes the full monitored population; this table lists the ones with an
+   * open dossier in the Centro. Those are different numbers on purpose, and a
+   * filtered list that does not explain the gap just looks broken.
+   *
+   * The census now comes from `data/institution.ts`, the same cell table the
+   * cockpit reads, so the two screens cannot drift apart.
    */
   const census = useMemo(() => {
     if (status === 'todos') return null;
@@ -90,6 +149,7 @@ export function StudentsView({
   const filtered = useMemo(() => {
     const list = scopedStudents.filter((s) => {
       if (status !== 'todos' && s.status !== status) return false;
+      if (resolvedOnly && !resolvedIds.has(s.id)) return false;
       if (course !== 'todos' && s.course !== course) return false;
       if (scoreBand !== 'todos') {
         const [min, max] = scoreBand.split('-').map(Number);
@@ -131,13 +191,18 @@ export function StudentsView({
       if (typeof va === 'string' && typeof vb === 'string') return va.localeCompare(vb, 'pt-BR') * dir;
       return ((va as number) - (vb as number)) * dir;
     });
-  }, [scopedStudents, status, course, scoreBand, query, sort, asc]);
+  }, [scopedStudents, status, resolvedOnly, resolvedIds, course, scoreBand, query, sort, asc]);
 
   const pageCount = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const safePage = Math.min(page, pageCount - 1);
   const rows = filtered.slice(safePage * PAGE_SIZE, safePage * PAGE_SIZE + PAGE_SIZE);
 
-  const localFilters = status !== 'todos' || course !== 'todos' || scoreBand !== 'todos' || query.trim() !== '';
+  const localFilters =
+    status !== 'todos' ||
+    resolvedOnly ||
+    course !== 'todos' ||
+    scoreBand !== 'todos' ||
+    query.trim() !== '';
 
   const toggleSort = (key: SortKey) => {
     if (sort === key) setAsc((v) => !v);
@@ -200,25 +265,62 @@ export function StudentsView({
       )}
 
       {/* Distribution strip — clickable score bands */}
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-3 xl:grid-cols-6">
+        {/* O Cockpit manda para cá dizendo "18.426 monitorados". Chegar numa
+            tabela de algumas dezenas sem uma palavra sobre a diferença faz o
+            indicador anterior parecer mentira, então a lacuna é nomeada aqui
+            mesmo: monitorar é automático, dossiê é o que a equipe abriu. */}
         <StatTile
           label="Dossiês abertos"
           value={int(scopedStudents.length)}
           detail={`de ${int(students.length)}`}
           icon={<Users className="h-3.5 w-3.5" />}
           footer={
-            <span>{filtersActive ? 'filtros globais ativos' : 'acompanhamento do Centro'}</span>
+            <span>
+              {filtersActive ? 'filtros globais ativos' : 'acompanhamento do Centro'} ·{' '}
+              <span className="font-mono">{int(monitoredInScope)}</span> monitorados
+            </span>
           }
         />
+
+        {/* Resolvidos. Uma base que só mostra quem está em risco conta metade da
+            história — e é a metade que desanima. O contador é clicável porque um
+            número que não filtra a tabela ao lado é decoração. */}
+        <StatTile
+          label="Resolvidos"
+          value={int(resolved.count)}
+          detail={percent(resolved.percent, 1)}
+          icon={<CheckCircle2 className="h-3.5 w-3.5" />}
+          accent={resolvedAccent}
+          onClick={() => {
+            setResolvedOnly((v) => !v);
+            setStatus('todos');
+            setScoreBand('todos');
+            setPage(0);
+          }}
+          footer={
+            <>
+              <span>caso encerrado, sem nada em aberto</span>
+              {resolvedOnly && (
+                <span className="font-mono font-semibold text-brand-text">filtrado</span>
+              )}
+            </>
+          }
+        />
+
         {distribution.map((band) => (
           <StatTile
             key={band.status}
             label={band.label}
             value={int(band.count)}
             detail={percent(band.percent, 1)}
-            accent={band.hex(false)}
+            /* `hex(false)` fixava a paleta clara: no tema escuro os acentos
+               vinham nos tons de luz e só o vermelho sobrevivia ao contraste.
+               O tema tem de entrar na conta. */
+            accent={band.hex(dark)}
             onClick={() => {
               setStatus(band.status);
+              setResolvedOnly(false);
               setScoreBand('todos');
               setPage(0);
             }}
@@ -431,14 +533,26 @@ export function StudentsView({
                       </span>
 
                       <span
-                        className="hidden w-[86px] items-center justify-end gap-1.5 sm:flex"
-                        title="Acessos ao AVA nas últimas 8 semanas"
+                        className="hidden w-21.5 items-center justify-end gap-1.5 sm:flex"
+                        title={
+                          drop > 0
+                            ? `Acessos ao AVA nas últimas 8 semanas · queda de ${drop}% vs. o ciclo anterior`
+                            : 'Acessos ao AVA nas últimas 8 semanas'
+                        }
                       >
+                        {/* A cor sai da FAIXA do aluno, não de um limiar solto.
+                            Era `drop >= 40 ? crit : ink-4`: dois estados, e o
+                            verde, o amarelo e o laranja da escala nunca
+                            apareciam — a coluna toda ficava cinza com uns
+                            riscos vermelhos, como se a rampa de risco não
+                            existisse. Agora o mini gráfico usa exatamente o
+                            mesmo verde → amarelo → laranja → vermelho do donut
+                            e do badge ao lado. */}
                         <Sparkline
                           data={s.engagement.accessTrend}
                           width={48}
                           height={16}
-                          color={drop >= 40 ? 'var(--crit)' : 'var(--ink-4)'}
+                          color={bandHexOf(s.status, dark)}
                         />
                         <span
                           className={[

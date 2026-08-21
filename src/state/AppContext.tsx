@@ -36,10 +36,13 @@ import {
   SPECIALISTS,
   STUDENTS,
 } from '../data/seed';
+import { coursesFor, periodsFor } from '../data/institution';
+import type { CockpitPeriod } from '../lib/cockpit';
 import { KEYS, load, pruneOldSchemas, resetAll, save } from '../lib/storage';
 import { computeScore, scoreContextFor } from '../lib/healthScore';
 import { CLOSING_SCORE_EFFECT, canTransition, isOpen, isTerminal } from '../lib/caseFlow';
 import { RADARS, activeRadars } from '../lib/radars';
+import { serves } from '../lib/routing';
 import { addBusinessHours } from '../lib/sla';
 import { nowIso } from '../lib/format';
 
@@ -71,6 +74,24 @@ export interface CohortFilter {
   value: 'Todos' | Cohort;
 }
 
+/**
+ * Escopo global de leitura. Modalidade e coorte já eram globais; período,
+ * curso e período acadêmico entraram com o Cockpit.
+ *
+ * Uma distinção que vale registrar: `modalityFilter` e `cohortFilter` recortam
+ * TAMBÉM a amostra de alunos (`scopedStudents`), porque a fila e os dossiês
+ * existem nas duas dimensões. `courseFilter` e `academicPeriod` recortam por
+ * enquanto apenas as leituras do censo — a Base de Alunos tem o seu próprio
+ * seletor de curso, e sobrepor os dois faria dois controles disputarem a mesma
+ * tabela. Unificar isso é uma mudança na Base, não no Cockpit.
+ */
+export type ScopeSnapshot = {
+  modality: 'Todas' | Modality;
+  course: 'Todos' | string;
+  period: number;
+  cohort: 'Todos' | Cohort;
+};
+
 interface AppState {
   /* Data */
   students: Student[];
@@ -81,16 +102,28 @@ interface AppState {
   notifications: AppNotification[];
   settings: GovernanceSettings;
   currentUser: Specialist;
+  /** Troca a função em operação. Muda a fila, o pool sem dono e os números. */
+  setCurrentUser: (specialistId: string) => void;
 
   /* Global filters — every view reads these */
   modalityFilter: 'Todas' | Modality;
   setModalityFilter: (v: 'Todas' | Modality) => void;
   cohortFilter: 'Todos' | Cohort;
   setCohortFilter: (v: 'Todos' | Cohort) => void;
+  courseFilter: 'Todos' | string;
+  setCourseFilter: (v: 'Todos' | string) => void;
+  /** Período acadêmico. `0` = todos. */
+  academicPeriod: number;
+  setAcademicPeriod: (v: number) => void;
+  /** Janela temporal das leituras de fluxo (intervenções, desfechos, séries). */
+  period: CockpitPeriod;
+  setPeriod: (v: CockpitPeriod) => void;
   semester: string;
   setSemester: (v: string) => void;
   resetFilters: () => void;
   filtersActive: boolean;
+  /** O escopo montado, pronto para as funções do censo. */
+  censusScope: ScopeSnapshot;
 
   /* Derived selectors */
   scopedStudents: Student[];
@@ -239,10 +272,34 @@ export function AppProvider({ children }: { children: ReactNode }) {
     load(KEYS.notifications, NOTIFICATIONS),
   );
 
-  const currentUser = useMemo(
-    () => specialists.find((s) => s.id === CURRENT_USER_ID) ?? specialists[0],
-    [specialists],
+  /**
+   * Quem está logado, e trocável em tempo de execução.
+   *
+   * Trocar de função não é trocar de tema: cada especialista tem uma fila
+   * própria, um pool de casos sem dono próprio (especialidade × modalidade) e
+   * números de turno próprios. Todos os três já derivam de `currentUser`, então
+   * a troca se propaga sozinha para o Cockpit, a fila e a sidebar — o seletor
+   * não precisa avisar ninguém.
+   *
+   * Persistido junto com o resto do estado local, porque abrir o sistema e ser
+   * jogado de volta para outra função a cada refresh seria pior que não ter
+   * seletor.
+   */
+  const [currentUserId, setCurrentUserId] = useState<string>(() =>
+    load(KEYS.currentUser, CURRENT_USER_ID),
   );
+
+  useEffect(() => save(KEYS.currentUser, currentUserId), [currentUserId]);
+
+  const currentUser = useMemo(
+    () =>
+      specialists.find((s) => s.id === currentUserId) ??
+      specialists.find((s) => s.id === CURRENT_USER_ID) ??
+      specialists[0],
+    [specialists, currentUserId],
+  );
+
+  const setCurrentUser = useCallback((id: string) => setCurrentUserId(id), []);
 
   /* -- Persistence ------------------------------------------------------ */
 
@@ -305,16 +362,62 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   /* -- Global filters --------------------------------------------------- */
 
-  const [modalityFilter, setModalityFilter] = useState<'Todas' | Modality>('Todas');
+  const [modalityFilter, setModalityFilterRaw] = useState<'Todas' | Modality>('Todas');
   const [cohortFilter, setCohortFilter] = useState<'Todos' | Cohort>('Todos');
+  const [courseFilter, setCourseFilter] = useState<'Todos' | string>('Todos');
+  const [academicPeriod, setAcademicPeriodRaw] = useState<number>(0);
+  const [period, setPeriod] = useState<CockpitPeriod>('hoje');
   const [semester, setSemester] = useState<string>('2026/2');
 
+  /**
+   * Trocar a modalidade pode invalidar o curso escolhido — Logística só existe
+   * no híbrido, e deixar o filtro apontando para ele zeraria a tela sem
+   * explicação. O curso incompatível é solto, e o período acadêmico segue o
+   * curso pelo mesmo motivo.
+   */
+  const setModalityFilter = useCallback(
+    (next: 'Todas' | Modality) => {
+      setModalityFilterRaw(next);
+      setCourseFilter((course) => {
+        if (course === 'Todos') return course;
+        return coursesFor(next).includes(course) ? course : 'Todos';
+      });
+      setAcademicPeriodRaw((p) => p);
+    },
+    [],
+  );
+
+  const setAcademicPeriod = useCallback((next: number) => setAcademicPeriodRaw(next), []);
+
+  useEffect(() => {
+    // O curso escolhido pode ter menos períodos que o anterior.
+    if (academicPeriod === 0) return;
+    if (!periodsFor(modalityFilter, courseFilter).includes(academicPeriod)) setAcademicPeriodRaw(0);
+  }, [modalityFilter, courseFilter, academicPeriod]);
+
   const resetFilters = useCallback(() => {
-    setModalityFilter('Todas');
+    setModalityFilterRaw('Todas');
     setCohortFilter('Todos');
+    setCourseFilter('Todos');
+    setAcademicPeriodRaw(0);
+    setPeriod('hoje');
   }, []);
 
-  const filtersActive = modalityFilter !== 'Todas' || cohortFilter !== 'Todos';
+  const filtersActive =
+    modalityFilter !== 'Todas' ||
+    cohortFilter !== 'Todos' ||
+    courseFilter !== 'Todos' ||
+    academicPeriod !== 0;
+
+  const censusScope = useMemo<ScopeSnapshot>(
+    () => ({
+      modality: modalityFilter,
+      course: courseFilter,
+      period: academicPeriod,
+      cohort: cohortFilter,
+    }),
+    [modalityFilter, courseFilter, academicPeriod, cohortFilter],
+  );
 
   const scopedStudents = useMemo(
     () =>
@@ -1048,15 +1151,23 @@ export function AppProvider({ children }: { children: ReactNode }) {
     notifications,
     settings,
     currentUser,
+    setCurrentUser,
 
     modalityFilter,
     setModalityFilter,
     cohortFilter,
     setCohortFilter,
+    courseFilter,
+    setCourseFilter,
+    academicPeriod,
+    setAcademicPeriod,
+    period,
+    setPeriod,
     semester,
     setSemester,
     resetFilters,
     filtersActive,
+    censusScope,
 
     scopedStudents,
     scopedCases,
@@ -1111,16 +1222,17 @@ export function useApp(): AppState {
 
 /** Convenience: derived queue metrics used by the sidebar and the cockpit. */
 export function useQueueStats() {
-  const { scopedCases, cases, currentUser, settings, scopedStudents } = useApp();
+  const { scopedCases, cases, currentUser, settings, scopedStudents, getStudent } = useApp();
 
   return useMemo(() => {
     const open = scopedCases.filter((c) => isOpen(c.status));
     const mine = open.filter((c) => c.assigneeId === currentUser.id);
     /* Unowned cases split two ways. The whole pool is a management number; the
-       slice matching the attendant's specialty is the only one they can act on,
-       so it is the one the cockpit shows. */
+       slice this attendant can actually take is the one the cockpit shows — and
+       "can take" means specialty AND modality, because the team has Acadêmico
+       twice on purpose (`lib/routing.ts`). */
     const unowned = open.filter((c) => c.assigneeId === null);
-    const unownedMine = unowned.filter((c) => c.specialty === currentUser.specialty);
+    const unownedMine = unowned.filter((c) => serves(currentUser, c, getStudent(c.studentId)));
     return {
       open,
       openCount: open.length,
@@ -1138,5 +1250,5 @@ export function useQueueStats() {
       onboarding: scopedStudents.filter((s) => s.cohort === 'Calouro').length,
       segregated: settings.segregateOnboarding,
     };
-  }, [scopedCases, cases, currentUser.id, currentUser.specialty, settings.segregateOnboarding, scopedStudents]);
+  }, [scopedCases, cases, currentUser, settings.segregateOnboarding, scopedStudents, getStudent]);
 }

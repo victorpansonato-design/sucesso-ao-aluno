@@ -45,6 +45,51 @@ Os perfis são explícitos e editáveis em **Governança**, e editá-los reclass
 | Situação financeira | 20% | 20% | 20% |
 | Relacionamento | 10% | 10% | 10% |
 
+### Cockpit é do atendente; Dashboard é da gestão
+São públicos com horizontes diferentes. O atendente abre o Cockpit para saber o
+que fazer nos próximos dez minutos — quatro números do turno, duas pizzas e a
+fila, tudo acima da dobra. A coordenação abre o **Dashboard** para saber se o mês
+está funcionando, e lá o scroll é bem-vindo porque quem entra veio analisar.
+Empilhar os dois na mesma tela foi tentado e deixou a fila abaixo da dobra
+justamente para quem tem menos tempo.
+
+### Um caso, um lugar
+A fila abre o caso em **tela cheia**. Não existe mais um painel estreito ao lado
+da lista *e* um dossiê 360° em outra rota mostrando a mesma identidade, os mesmos
+sinais, o mesmo score e a mesma linha do tempo: o atendente lia tudo duas vezes e
+não sabia qual dos dois estava atualizado. O que o dossiê tinha a mais virou aba
+dentro do caso, e a lista ganhou a largura inteira — o que era um cartão de duas
+linhas hoje é uma tabela com aluno, caso, prioridade, score, SLA e responsável.
+
+### A equipe é uma matriz, não uma lista
+Cada especialidade existe em Presencial **e** em Híbrido, mais a camada
+transversal de Retenção, Onboarding e Experiência. Uma queda de nota no
+presencial se resolve com monitoria e coordenação de curso; a mesma queda no
+híbrido quase sempre é ritmo perdido entre dois encontros, e se resolve no AVA.
+Por isso `src/lib/routing.ts` exige especialidade **e** modalidade para dizer que
+um caso é seu, e por isso o seletor de função na sidebar troca a operação inteira
+— fila, pool sem dono e números do turno — e não apenas um rótulo.
+
+### Uma tabela de censo, não uma constante por componente
+Os agregados institucionais vivem em `src/data/institution.ts`, como uma tabela de **células**
+— curso × modalidade × período acadêmico × coorte — e não como totais soltos por tela. O motivo é
+o requisito mais fácil de quebrar num painel: qualquer combinação de filtro tem de **fechar**.
+Como todo agregado é a soma de inteiros de células, filtrar é somar um subconjunto, e a conta
+nunca derrapa no arredondamento. Só seis números são escritos à mão (monitorados, ingressantes,
+em atenção, alto risco, retenção e a pendência da régua); tudo o mais é derivado deles pelo
+método do maior resto, com difusão de erro onde os totais são pequenos.
+
+Nada usa `Math.random`. A mesma célula produz o mesmo valor em todo render, em toda sessão — o
+que também é o que permite comparar período com período sem inventar o passado duas vezes.
+`src/data/population.ts` virou uma fachada de duas dimensões sobre essa tabela, então Cockpit,
+Jornada, Onboarding e Base de Alunos não conseguem mais discordar entre si.
+
+### O ponto de hoje é o censo, não uma aproximação dele
+As séries históricas (`src/lib/cockpit.ts`) são funções determinísticas do escopo e da data, e
+toda curva **termina exatamente** no número que o indicador ao lado mostra. Um gráfico cujo
+último ponto discorda do KPI vizinho destrói a confiança na tela inteira, e é o erro mais comum
+em painel mockado.
+
 ### Regra dos 90 dias
 Calouro em adaptação e aluno em evasão não são o mesmo problema. Alunos dentro da janela de
 onboarding ficam **fora do Radar de Evasão** e são acompanhados por uma régua própria com marcos
@@ -83,14 +128,15 @@ hipóteses de causa-raiz e uma lista de **o que não fazer**. Geração determin
 
 | Rota | Tela | Para quê |
 |---|---|---|
-| `#/cockpit` | Cockpit | Quem precisa de atenção agora, saúde da base, matriz de radares |
-| `#/fila` | Fila de Atendimento | Workspace do especialista: lista + workflow completo do caso |
+| `#/cockpit` | Cockpit | O turno do atendente, sem rolar a página: 4 números seus, duas pizzas e quem precisa de você agora |
+| `#/dashboard` | Dashboard (Gestão) | Índices executivos, evolução por nível de atenção, quatro pizzas, jornada, operação e automação × humano |
+| `#/fila` | Fila de Atendimento | Lista em largura cheia; clicar abre o caso em tela cheia com anterior/próximo |
 | `#/alunos` | Base de Alunos | Diretório com ordenação, filtros compostos, paginação e export |
-| `#/alunos/:id` | Dossiê 360° | Identidade, score explicável, alertas, linha do tempo unificada |
+| `#/alunos/:id` | Dossiê 360° | Identidade, score explicável, alertas, linha do tempo (aberto pela Base) |
 | `#/radares/:radar` | Radares | Definição, gatilhos, diretriz e precisão medida de cada radar |
 | `#/onboarding` | Onboarding 90 dias | Régua de acolhimento com funil de marcos |
 | `#/jornada` | Jornada por Modalidade | Funis e perfis de peso de Presencial / Híbrido / EaD |
-| `#/indicadores` | Indicadores | Base, operação, intervenção, retenção, precisão + exportações |
+| `#/indicadores` | Indicadores | Tabelas executivas e as exportações em CSV / relatório |
 | `#/equipe` | Equipe | Estrutura matricial, carga real e roteamento por fila |
 | `#/playbook` | Playbook | Protocolos por radar com roteiro e "não fazer" |
 | `#/governanca` | Governança | Pesos, SLAs, janela de onboarding, freio, LGPD |
@@ -117,7 +163,7 @@ fixa preenchida no encerramento de cada caso. `Imprimir / PDF` gera a versão ex
 - **Motion** para as microinterações (spring em layout, ease-out em entradas, saídas sempre
   mais rápidas que entradas)
 - **lucide-react** para ícones
-- Estado local persistido com versionamento de schema (`csa.v3.*`), sem back-end
+- Estado local persistido com versionamento de schema (`csa.v4.*`), sem back-end
 
 Nenhuma dependência de rede em tempo de execução. Todo o estado vive no navegador.
 
@@ -142,6 +188,8 @@ src/
   types.ts                  contrato de domínio
   lib/
     healthScore.ts          motor de score explicável e parametrizado
+    cockpit.ts              séries, intervenções, desfechos e comparação de período
+    routing.ts              especialidade × modalidade → de quem é o caso
     radars.ts               os 5 radares: propósito, gatilhos e detecção real
     sla.ts                  SLA em horas úteis + clock compartilhado
     caseFlow.ts             máquina de estados do caso
@@ -152,15 +200,19 @@ src/
     format.ts               formatação pt-BR
   data/
     catalog.ts              cursos, campi, modalidades
+    institution.ts          censo por célula — única fonte dos agregados
+    population.ts           fachada modalidade × coorte sobre o censo
     seed.ts                 base fictícia de 54 alunos e 17 casos
   state/AppContext.tsx      store único; toda mutação é transacional
   components/
-    ui/                     primitivos do design system
+    ui/                     primitivos do design system (inclui Plot: linha,
+                            coluna empilhada e barra ranqueada)
+    cockpit/                os painéis das cinco linhas do Cockpit
     domain/                 SLA, composição de score, timeline, workflow
-    layout/                 sidebar, header, command palette, toaster
+    layout/                 sidebar, header, command palette, seletor de função
     modals/                 interação, copiloto, encerramento, etc.
     brand/                  wordmark Grupo Anchieta
-  views/                    as 11 telas
+  views/                    as 12 telas
 ```
 
 ---
