@@ -1,5 +1,6 @@
 import type {
   AcademicCalendar,
+  CalendarEntry,
   CalendarEvent,
   EventRelevance,
   PushCategory,
@@ -7,39 +8,46 @@ import type {
 import { parseDateLabel } from '../lib/calendarDates';
 
 /* ==========================================================================
-   Calendários acadêmicos 2026/2 — digitalização dos PDFs oficiais
+   Calendários acadêmicos 2026/2 — o que a instituição publica
    --------------------------------------------------------------------------
-   Os dezenove PDFs entregues pela coordenação são nove calendários distintos:
-   o mesmo arquivo foi exportado várias vezes com nomes diferentes
-   ("Veteranos (5)", "Ingressantes … (8)"), e o que identifica cada um não é o
-   nome do arquivo e sim o título impresso no cabeçalho. A conferência foi por
-   hash do conteúdo, não por nome.
+   Fonte: anchieta.br/calendario-academico-segundo-semestre e a página de
+   híbridos ligada a partir dela. Os PDFs foram baixados do S3 da instituição e
+   conferidos linha a linha contra a transcrição que está aqui.
 
-   Cada linha aqui é uma linha do PDF, transcrita como está impressa —
-   inclusive quando o PDF se contradiz. Onde a data impressa não fecha com o
-   dia da semana da própria grade, a linha entra igual e ganha um `note`, que a
-   tela mostra como divergência a validar. Corrigir em silêncio seria pior:
-   quem confere o calendário confere contra o PDF, não contra o nosso palpite.
+   DUAS COISAS DIFERENTES, E É IMPORTANTE NÃO CONFUNDIR:
+
+     CALENDARS  são os onze PDFs. É o documento.
+     ENTRIES    são as trinta e três linhas do site: curso × público × PDF.
+
+   Vários cursos compartilham o mesmo arquivo (seis usam o quinzenal de
+   veteranos). Ainda assim cada linha existe por conta própria, porque é assim
+   que o site publica e é assim que a coordenação fala: ninguém pede "o PDF dos
+   quinzenais", pede "o calendário de Fonoaudiologia veterano". Quando a
+   instituição desmembrar um desses arquivos no semestre que vem, a mudança cai
+   numa linha só.
+
+   TRANSCRIÇÃO
+   Cada linha é uma linha do PDF, como está impressa, inclusive quando o PDF se
+   contradiz. Onde a data não fecha com o dia da semana da própria grade, a
+   linha entra igual e ganha um `note`, que a tela mostra como divergência a
+   validar. Corrigir em silêncio seria pior: quem confere confere contra o
+   arquivo, não contra o nosso palpite.
 
    O QUE VIRA PUSH
-   `relevance` é a única coisa aqui que não vem do PDF — é juízo operacional:
+   `relevance` é a única coisa aqui que não vem do PDF, é juízo operacional:
      alta   → o aluno perde nota, dinheiro ou prazo se não souber. Vira push.
      média  → ajuda e evita ligação no suporte. Vira push.
-     baixa  → só interessa a monitor e secretaria (relatórios de monitoria,
-              lançamento de nota pelo docente). Fica registrado, não vira push.
-
-   A LISTA DE CURSOS de cada calendário é a parte editável por padrão: a
-   instituição não publica em lugar nenhum qual turma é quinzenal e qual é
-   semanal às terças. A semente abaixo é a leitura mais provável e está marcada
-   para validação no PUSH_CATALOGO.md.
+     baixa  → só interessa a monitor e secretaria. Fica registrado, não vira push.
    ========================================================================== */
+
+const S3 = 'https://anchieta-ead.s3-sa-east-1.amazonaws.com/2026_258_calendario_2026_2sem';
 
 /* -- Textos que se repetem em quase todo calendário ----------------------- */
 
 const SUB48 =
   'O aluno tem 48 horas, a partir da data da prova perdida, para solicitar substitutiva por meio da secretaria virtual, anexando o documento comprobatório, conforme legislação e os Critérios de Rendimento Acadêmico disponível no Mural do App Grupo Anchieta.';
 
-const HORARIO_PROVA = 'Horário de início — Diurno: 07h30 · Noturno: 19h30.';
+const HORARIO_PROVA = 'Horário de início. Diurno: 07h30. Noturno: 19h30.';
 
 const TRES_TENTATIVAS =
   'Como há três tentativas para a realização da prova, não haverá substitutiva ou recuperação.';
@@ -56,17 +64,13 @@ const EXTENSIONISTA_APP =
 const AVA_ATENTO =
   'Acompanhe os prazos de entrega das atividades e as aulas ao vivo (Conteúdo Ponto a Ponto) diretamente pelo AVA.';
 
+const NOTA_27_10 =
+  'Transcrito como está impresso. Pela sequência do calendário, a 1ª híbrida do segundo bimestre começou em 29/09, então esta deveria ser a 2ª do SEGUNDO bimestre.';
+
 /* -- Forma compacta de uma linha do PDF -----------------------------------
    [rótulo de data, título, categoria, relevância, detalhe?, divergência?] */
 
-type Raw = readonly [
-  string,
-  string,
-  PushCategory,
-  EventRelevance,
-  string?,
-  string?,
-];
+type Raw = readonly [string, string, PushCategory, EventRelevance, string?, string?];
 
 function build(calendarId: string, rows: readonly Raw[]): CalendarEvent[] {
   return rows
@@ -91,16 +95,19 @@ function build(calendarId: string, rows: readonly Raw[]): CalendarEvent[] {
     );
 }
 
-/* -- Blocos comuns a todos os calendários ---------------------------------
-   Abertura de semestre e fechamento institucional são idênticos nos nove PDFs.
-   Repetir as linhas nove vezes convidava a divergência silenciosa: alguém
-   corrige "Atividades Complementares" num calendário e esquece dos outros
-   oito. Só o que realmente muda entre calendários fica escrito por extenso. */
+/* -- Blocos comuns --------------------------------------------------------
+   Abertura e fechamento institucional são idênticos nos onze PDFs. Repetir as
+   linhas onze vezes convidava a divergência silenciosa: alguém corrige
+   "Atividades Complementares" num calendário e esquece dos outros dez.
+
+   Tudo o que entra num bloco compartilhado foi verificado por busca literal nos
+   onze arquivos. O que não passou nessa verificação saiu do bloco e voltou a
+   ser declarado calendário a calendário. */
 
 const ABERTURA: readonly Raw[] = [
   ['01/07 a 21/08', 'Período de inscrição em DP (Dependência) e Adaptação.', 'prazo', 'alta'],
-  ['01/07 a 07/12', 'Período de inscrição e realização para calouros e veteranos — Optativa de Libras e Bagagem de Português, Matemática, Inglês e Excel.', 'programa', 'media'],
-  ['09/07', 'Feriado Estadual — Revolução Constitucionalista de 1932.', 'feriado', 'alta'],
+  ['01/07 a 07/12', 'Período de inscrição e realização para calouros e veteranos - Optativa de Libras e Bagagem de Português, Matemática, Inglês e Excel.', 'programa', 'media'],
+  ['09/07', 'Feriado Estadual – Revolução Constitucionalista de 1932.', 'feriado', 'alta'],
 ];
 
 const FECHAMENTO: readonly Raw[] = [
@@ -108,45 +115,46 @@ const FECHAMENTO: readonly Raw[] = [
   ['07/12', 'Último dia para realizar atividades do programa Bagagem.', 'prazo', 'alta'],
   ['07 a 11/12', 'Período para entrega do relatório final de Monitoria do primeiro semestre.', 'programa', 'baixa'],
   ['23/12', 'Fim do semestre letivo.', 'prazo', 'alta'],
-  ['25/12', 'Feriado — Natal.', 'feriado', 'media'],
+  ['25/12', 'Feriado – Natal.', 'feriado', 'media'],
 ];
 
-/** Feriados do segundo semestre — iguais nos nove calendários. */
 const FERIADOS: readonly Raw[] = [
-  ['15/08', 'Feriado Municipal — Dia da Padroeira de Jundiaí.', 'feriado', 'alta'],
-  ['07/09', 'Feriado — Dia da Independência do Brasil.', 'feriado', 'alta'],
-  ['12 e 13/10', 'Feriado e Recesso — Nossa Senhora Aparecida e Dia do Professor.', 'feriado', 'alta'],
-  ['02/11', 'Feriado — Dia de Finados.', 'feriado', 'alta'],
-  ['20 e 21/11', 'Feriado e Recesso — Dia Nacional de Zumbi e da Consciência Negra.', 'feriado', 'alta'],
+  ['15/08', 'Feriado Municipal – Dia da Padroeira de Jundiaí.', 'feriado', 'alta'],
+  ['07/09', 'Feriado – Dia da Independência do Brasil.', 'feriado', 'alta'],
+  ['12 e 13/10', 'Feriado e Recesso – Nossa Senhora Aparecida e Dia do Professor.', 'feriado', 'alta'],
+  ['02/11', 'Feriado – Dia de Finados.', 'feriado', 'alta'],
+  ['20 e 21/11', 'Feriado e Recesso – Dia Nacional de Zumbi e da Consciência Negra.', 'feriado', 'alta'],
 ];
-
-/**
- * O mesmo evento de Prática Extensionista é transmitido duas vezes, de manhã e
- * à noite. Os dois horários estão separados porque a sessão das 19h NÃO consta
- * do calendário das sextas e sábados (exceto Direito) — e um bloco compartilhado
- * que a incluísse mandaria aquele curso para uma transmissão que ele não tem.
- */
-const EVENTO_PRATICA_MANHA: Raw = ['29/08', 'Evento on-line: Prática Extensionista — Tudo o que você precisa saber.', 'evento', 'media', `${YT_EVENTOS} Horário: 09h (horário de Brasília).`];
-
-const EVENTO_PRATICA_NOITE: Raw = ['03/09', 'Evento on-line: Prática Extensionista — Tudo o que você precisa saber.', 'evento', 'media', `${YT_EVENTOS} Horário: 19h (horário de Brasília).`];
-
-const EVENTOS_PRATICA: readonly Raw[] = [EVENTO_PRATICA_MANHA, EVENTO_PRATICA_NOITE];
 
 const MONITORIA_EVENTO: Raw = ['03/08', 'Evento on-line: O que é monitoria?', 'evento', 'media', `${YT_EVENTOS} Horário: 19h30.`];
 
 const ELEICAO: Raw = ['04 a 31/08', 'Período para eleição dos representantes e vice-representantes de classe.', 'prazo', 'media'];
 
-const EXTENSIONISTA_INICIO: Raw = ['25/08', 'Início da Prática Extensionista e Eletiva via sistema, disponíveis no App Grupo Anchieta.', 'programa', 'alta', EXTENSIONISTA_APP];
+const EXTENSIONISTA_INICIO: Raw = ['25/08', 'Início da Prática Extensionista e Eletiva via sistema disponíveis no App Grupo Anchieta.', 'programa', 'alta', EXTENSIONISTA_APP];
 
 const EXTENSIONISTA_FIM: Raw = ['23/11', 'Último dia para submeter os relatórios de Prática Extensionista via sistema.', 'prazo', 'alta'];
 
 const DIGITAIS_ESPECIAIS: Raw = ['06/10', 'Início das Disciplinas Digitais Especiais e Estudo Dirigido.', 'aula', 'alta'];
 
+/**
+ * O evento de Prática Extensionista é transmitido em duas sessões, de manhã e à
+ * noite. Estão separados porque a sessão das 19h NÃO consta do calendário das
+ * sextas e sábados (exceto Direito): um bloco compartilhado que a incluísse
+ * mandaria aquele curso para uma transmissão que ele não tem.
+ */
+const EVENTO_PRATICA_MANHA: Raw = ['29/08', 'Evento on-line: Prática Extensionista – Tudo o que você precisa saber.', 'evento', 'media', `${YT_EVENTOS} Horário: 09h (horário de Brasília).`];
+
+const EVENTO_PRATICA_NOITE: Raw = ['03/09', 'Evento on-line: Prática Extensionista – Tudo o que você precisa saber.', 'evento', 'media', `${YT_EVENTOS} Horário: 19h (horário de Brasília).`];
+
+const AMBIENTACAO_MANHA: Raw = ['01/08', 'Evento on-line para Ingressantes: Ambientação - Ambiente Virtual de Aprendizagem (AVA) e Biblioteca Virtual.', 'evento', 'alta', `${YT_TV} Horário: 10h (horário de Brasília).`];
+
+const AMBIENTACAO_NOITE: Raw = ['04/08', 'Evento on-line para Ingressantes: Ambientação - Ambiente Virtual de Aprendizagem (AVA) e Biblioteca Virtual.', 'evento', 'alta', `${YT_TV} Horário: 19h30 (horário de Brasília).`];
+
 /* ==========================================================================
-   01 · CURSOS PRESENCIAL DE DIREITO
+   PRESENCIAL · Direito
    ========================================================================== */
 
-const R01: readonly Raw[] = [
+const R_PRES_DIREITO: readonly Raw[] = [
   ...ABERTURA,
   ['20/07 a 10/08', 'Período de inscrição para Monitoria.', 'programa', 'media'],
   MONITORIA_EVENTO,
@@ -159,7 +167,8 @@ const R01: readonly Raw[] = [
   ['17/08', 'Início da Monitoria do segundo semestre.', 'programa', 'media'],
   EXTENSIONISTA_INICIO,
   ['25/08', 'Início das disciplinas digitais regulares.', 'aula', 'alta'],
-  ...EVENTOS_PRATICA,
+  EVENTO_PRATICA_MANHA,
+  EVENTO_PRATICA_NOITE,
   ['28/09 a 03/10', 'Período de aplicação da P1.', 'prova', 'alta', `${HORARIO_PROVA} ${SUB48}`],
   ['28/09 a 02/10', 'Período de entrega do relatório parcial de Monitoria.', 'programa', 'baixa'],
   ['05 a 09/10', 'Semana Jurídica.', 'evento', 'alta'],
@@ -182,13 +191,13 @@ const R01: readonly Raw[] = [
 ];
 
 /* ==========================================================================
-   02 · CURSOS PRESENCIAL (EXCETO DIREITO)
+   PRESENCIAL · Diurno e noturno (exceto Direito)
    ========================================================================== */
 
-const R02: readonly Raw[] = [
+const R_PRES_GERAL: readonly Raw[] = [
   ...ABERTURA,
   ['20/07 a 10/08', 'Período de inscrição para Monitoria.', 'programa', 'media'],
-  ['01/08', 'Evento on-line para Ingressantes: Ambientação — Ambiente Virtual de Aprendizagem (AVA) e Biblioteca Virtual.', 'evento', 'alta', `${YT_TV} Horário: 10h (horário de Brasília).`],
+  AMBIENTACAO_MANHA,
   MONITORIA_EVENTO,
   ['04/08', 'Início das aulas para Calouros.', 'aula', 'alta', APP_HORARIOS],
   ELEICAO,
@@ -201,7 +210,8 @@ const R02: readonly Raw[] = [
   EXTENSIONISTA_INICIO,
   ['25/08', 'Início das disciplinas digitais regulares.', 'aula', 'alta'],
   ['25/08', 'Início, no AVA, do bloco 1 das atividades on-line das disciplinas presenciais com carga horária EaD.', 'aula', 'alta'],
-  ...EVENTOS_PRATICA,
+  EVENTO_PRATICA_MANHA,
+  EVENTO_PRATICA_NOITE,
   ['28/09 a 09/10', 'Período de aplicação da P1.', 'prova', 'alta', `${HORARIO_PROVA} ${SUB48}`],
   ['28/09 a 02/10', 'Período de entrega do relatório parcial de Monitoria.', 'programa', 'baixa'],
   DIGITAIS_ESPECIAIS,
@@ -223,12 +233,7 @@ const R02: readonly Raw[] = [
   ...FECHAMENTO,
 ];
 
-/* -- Blocos comuns aos calendários híbridos ------------------------------
-   Os sete calendários semanais e quinzenais compartilham toda a espinha do
-   bimestre: monitoria, provas on-line das digitais regulares, substitutivas e
-   recuperações caem nas mesmas datas. O que muda de verdade entre eles é o
-   ritmo dos encontros presenciais e das provas híbridas — e é só isso que fica
-   escrito por extenso em cada um. */
+/* -- Espinha comum dos semipresenciais ----------------------------------- */
 
 const HIBRIDO_ABERTURA: readonly Raw[] = [
   ...ABERTURA,
@@ -263,22 +268,22 @@ const HIBRIDO_FECHAMENTO: readonly Raw[] = [
 ];
 
 /* ==========================================================================
-   03 · CURSOS SEMANAIS (INGRESSANTES E VETERANOS) — TERÇAS E QUINTAS
+   SEMIPRESENCIAL · Bissemanais (terças e quintas)
    ========================================================================== */
 
-const R03: readonly Raw[] = [
+const R_BISSEMANAL: readonly Raw[] = [
   ...HIBRIDO_ABERTURA,
   DIGITAL_2BIM,
   EXTENSIONISTA_INICIO,
   EVENTO_PRATICA_NOITE,
   ['04/08', 'Início, no AVA, das disciplinas híbridas 1 e 2 do primeiro bimestre.', 'aula', 'alta', AVA_ATENTO],
-  ['04/08', 'Evento on-line para Ingressantes: Ambientação — Ambiente Virtual de Aprendizagem (AVA) e Biblioteca Virtual.', 'evento', 'alta', `${YT_TV} Horário: 19h30 (horário de Brasília).`],
+  AMBIENTACAO_NOITE,
   ['04, 11, 18 e 25/08', 'Encontros presenciais da disciplina híbrida 1 do primeiro bimestre.', 'aula', 'alta'],
   ['06, 13, 20 e 27/08', 'Encontros presenciais da disciplina híbrida 2 do primeiro bimestre.', 'aula', 'alta'],
   ['25/08', 'Prova 1 (P1) da disciplina híbrida 1 do primeiro bimestre.', 'prova', 'alta', SUB48],
   ['27/08', 'Prova 1 (P1) da disciplina híbrida 2 do primeiro bimestre.', 'prova', 'alta', SUB48],
   ['01, 08, 15 e 22/09', 'Encontros presenciais da disciplina híbrida 1 do primeiro bimestre.', 'aula', 'alta'],
-  ['01, 10, 17 e 24/09', 'Encontros presenciais da disciplina híbrida 2 do primeiro bimestre.', 'aula', 'alta', undefined, 'O PDF imprime «01, 10, 17 e 24/09», mas a híbrida 2 se encontra às quintas — 01/09 é terça. Provável erro de digitação de 03/09 na origem.'],
+  ['01, 10, 17 e 24/09', 'Encontros presenciais da disciplina híbrida 2 do primeiro bimestre.', 'aula', 'alta', undefined, 'O PDF imprime «01, 10, 17 e 24/09», mas a híbrida 2 se encontra às quintas e 01/09 é terça. Provável erro de digitação de 03/09 na origem.'],
   ['22/09', 'Prova 2 (P2) da disciplina híbrida 1 do primeiro bimestre.', 'prova', 'alta', SUB48],
   ['24/09', 'Prova 2 (P2) da disciplina híbrida 2 do primeiro bimestre.', 'prova', 'alta', SUB48],
   ['29/09', 'Início, no AVA, das disciplinas híbridas 1 e 2 do segundo bimestre.', 'aula', 'alta', AVA_ATENTO],
@@ -300,141 +305,141 @@ const R03: readonly Raw[] = [
 ];
 
 /* ==========================================================================
-   04 · CURSOS QUINZENAIS ÀS SEXTAS E SÁBADOS — (ADS) VETERANOS
+   SEMIPRESENCIAL · Quinzenal às sextas e sábados (ADS) veteranos
    ========================================================================== */
 
-const R04: readonly Raw[] = [
+const R_ADS: readonly Raw[] = [
   ...HIBRIDO_ABERTURA,
   DIGITAL_2BIM,
   EXTENSIONISTA_INICIO,
   EVENTO_PRATICA_NOITE,
   ['31/07', 'Liberação, no AVA, do e-book da 1ª disciplina híbrida do primeiro bimestre.', 'aula', 'media'],
   ['04/08', 'Início, no AVA, da 1ª disciplina híbrida do primeiro bimestre.', 'aula', 'alta', AVA_ATENTO],
-  ['07 e 08/08', 'Primeiro encontro presencial da 1ª disciplina híbrida — Atividades Avaliativas e Prova 1 (P1) do primeiro bimestre.', 'prova', 'alta', SUB48],
-  ['21 e 22/08', 'Segundo encontro presencial da 1ª disciplina híbrida — Atividades Avaliativas e Prova 2 (P2) do primeiro bimestre.', 'prova', 'alta', SUB48],
+  ['07 e 08/08', 'Primeiro encontro presencial da 1ª disciplina híbrida – Atividades Avaliativas e Prova 1 (P1) do primeiro bimestre.', 'prova', 'alta', SUB48],
+  ['21 e 22/08', 'Segundo encontro presencial da 1ª disciplina híbrida – Atividades Avaliativas e Prova 2 (P2) do primeiro bimestre.', 'prova', 'alta', SUB48],
   ['25/08', 'Liberação, no AVA, do e-book da 2ª disciplina híbrida do primeiro bimestre.', 'aula', 'media'],
   ['01/09', 'Início, no AVA, da 2ª disciplina híbrida do primeiro bimestre.', 'aula', 'alta', AVA_ATENTO],
-  ['04 e 05/09', 'Primeiro encontro presencial da 2ª disciplina híbrida — Atividades Avaliativas e Prova 1 (P1) do primeiro bimestre.', 'prova', 'alta', SUB48],
-  ['18 e 19/09', 'Segundo encontro presencial da 2ª disciplina híbrida — Atividades Avaliativas e Prova 2 (P2) do primeiro bimestre.', 'prova', 'alta', SUB48],
+  ['04 e 05/09', 'Primeiro encontro presencial da 2ª disciplina híbrida – Atividades Avaliativas e Prova 1 (P1) do primeiro bimestre.', 'prova', 'alta', SUB48],
+  ['18 e 19/09', 'Segundo encontro presencial da 2ª disciplina híbrida – Atividades Avaliativas e Prova 2 (P2) do primeiro bimestre.', 'prova', 'alta', SUB48],
   ['22/09', 'Liberação, no AVA, do e-book da 1ª disciplina híbrida do segundo bimestre.', 'aula', 'media'],
   ['29/09', 'Início, no AVA, da 1ª disciplina híbrida do segundo bimestre.', 'aula', 'alta', AVA_ATENTO],
   ...HIBRIDO_VIRADA,
-  ['02 e 03/10', 'Primeiro encontro presencial da 1ª disciplina híbrida — Atividades Avaliativas e Prova 1 (P1) do segundo bimestre.', 'prova', 'alta', SUB48],
-  ['16 e 17/10', 'Segundo encontro presencial da 1ª disciplina híbrida — Atividades Avaliativas e Prova 2 (P2) do segundo bimestre.', 'prova', 'alta', SUB48],
+  ['02 e 03/10', 'Primeiro encontro presencial da 1ª disciplina híbrida – Atividades Avaliativas e Prova 1 (P1) do segundo bimestre.', 'prova', 'alta', SUB48],
+  ['16 e 17/10', 'Segundo encontro presencial da 1ª disciplina híbrida – Atividades Avaliativas e Prova 2 (P2) do segundo bimestre.', 'prova', 'alta', SUB48],
   ['20/10', 'Liberação, no AVA, do e-book da 2ª disciplina híbrida do segundo bimestre.', 'aula', 'media'],
-  ['27/10', 'Início, no AVA, da 2ª disciplina híbrida do primeiro bimestre.', 'aula', 'alta', AVA_ATENTO, 'Transcrito como está impresso. Pela sequência do calendário — a 1ª híbrida do segundo bimestre começou em 29/09 — esta deveria ser a 2ª do SEGUNDO bimestre.'],
-  ['30 e 31/10', 'Primeiro encontro presencial da 2ª disciplina híbrida — Atividades Avaliativas e Prova 1 (P1) do segundo bimestre.', 'prova', 'alta', SUB48],
-  ['13 e 14/11', 'Segundo encontro presencial da 2ª disciplina — Atividades Avaliativas e Prova 1 (P1) do segundo bimestre.', 'prova', 'alta', SUB48, 'O PDF imprime «Prova 1 (P1)» no segundo encontro. Pelo padrão dos demais encontros, é a P2.'],
+  ['27/10', 'Início, no AVA, da 2ª disciplina híbrida do primeiro bimestre.', 'aula', 'alta', AVA_ATENTO, NOTA_27_10],
+  ['30 e 31/10', 'Primeiro encontro presencial da 2ª disciplina híbrida – Atividades Avaliativas e Prova 1 (P1) do segundo bimestre.', 'prova', 'alta', SUB48],
+  ['13 e 14/11', 'Segundo encontro presencial da 2ª disciplina – Atividades Avaliativas e Prova 1 (P1) do segundo bimestre.', 'prova', 'alta', SUB48, 'O PDF imprime «Prova 1 (P1)» no segundo encontro. Pelo padrão dos demais encontros, é a P2.'],
   ['05/12', 'Aplicação das provas substitutivas das disciplinas híbridas do segundo bimestre.', 'prova', 'alta'],
   ...HIBRIDO_FECHAMENTO,
 ];
 
 /* ==========================================================================
-   05 · CURSOS SEMANAIS AOS SÁBADOS
+   SEMIPRESENCIAL · Semanais aos sábados
    ========================================================================== */
 
-const R05: readonly Raw[] = [
+const R_SABADOS: readonly Raw[] = [
   ...HIBRIDO_ABERTURA,
   DIGITAL_2BIM,
   EXTENSIONISTA_INICIO,
   EVENTO_PRATICA_NOITE,
   ['31/07', 'Liberação, no AVA, do e-book da 1ª disciplina híbrida do primeiro bimestre.', 'aula', 'media'],
-  ['01/08', 'Evento on-line para Ingressantes: Ambientação — Ambiente Virtual de Aprendizagem (AVA) e Biblioteca Virtual.', 'evento', 'alta', `${YT_TV} Horário: 10h (horário de Brasília).`],
+  AMBIENTACAO_MANHA,
   ['04/08', 'Início, no AVA, da 1ª disciplina híbrida do primeiro bimestre.', 'aula', 'alta', AVA_ATENTO],
-  ['04/08', 'Evento on-line para Ingressantes: Ambientação — Ambiente Virtual de Aprendizagem (AVA) e Biblioteca Virtual.', 'evento', 'alta', `${YT_TV} Horário: 19h30 (horário de Brasília).`],
+  AMBIENTACAO_NOITE,
   ['08/08', 'Primeiro encontro presencial da 1ª disciplina híbrida do primeiro bimestre.', 'aula', 'alta'],
   ['22/08', 'Terceiro encontro presencial da 1ª disciplina híbrida do primeiro bimestre.', 'aula', 'alta'],
   ['25/08', 'Liberação, no AVA, do e-book da 2ª disciplina híbrida do primeiro bimestre.', 'aula', 'media'],
-  ['29/08', 'Quarto encontro presencial da 1ª disciplina híbrida do primeiro bimestre — Atividades Avaliativas e Provas 1 e 2 (P1 e P2) do primeiro bimestre.', 'prova', 'alta', SUB48],
+  ['29/08', 'Quarto encontro presencial da 1ª disciplina híbrida do primeiro bimestre – Atividades Avaliativas e Provas 1 e 2 (P1 e P2) do primeiro bimestre.', 'prova', 'alta', SUB48],
   ['01/09', 'Início, no AVA, da 2ª disciplina híbrida do primeiro bimestre.', 'aula', 'alta', AVA_ATENTO],
   ['05/09', 'Primeiro encontro presencial da 2ª disciplina híbrida do primeiro bimestre.', 'aula', 'alta'],
-  ['12/09', 'Segundo encontro presencial da 2ª disciplina híbrida — Atividades Avaliativas e Prova 1 (P1) do primeiro bimestre.', 'prova', 'alta', SUB48],
+  ['12/09', 'Segundo encontro presencial da 2ª disciplina híbrida – Atividades Avaliativas e Prova 1 (P1) do primeiro bimestre.', 'prova', 'alta', SUB48],
   ['19/09', 'Terceiro encontro presencial da 2ª disciplina híbrida do primeiro bimestre.', 'aula', 'alta'],
   ['22/09', 'Liberação, no AVA, do e-book da 1ª disciplina híbrida do segundo bimestre.', 'aula', 'media'],
-  ['26/09', 'Quarto encontro presencial da 2ª disciplina híbrida — Atividades Avaliativas e Prova 2 (P2) do primeiro bimestre.', 'prova', 'alta', SUB48],
+  ['26/09', 'Quarto encontro presencial da 2ª disciplina híbrida – Atividades Avaliativas e Prova 2 (P2) do primeiro bimestre.', 'prova', 'alta', SUB48],
   ['29/09', 'Início, no AVA, da 1ª disciplina híbrida do segundo bimestre.', 'aula', 'alta', AVA_ATENTO],
   ...HIBRIDO_VIRADA,
   ['03/10', 'Primeiro encontro presencial da 1ª disciplina híbrida do segundo bimestre.', 'aula', 'alta'],
   ['06/10', 'Início da Monitoria do segundo bimestre.', 'programa', 'media'],
-  ['10/10', 'Segundo encontro presencial da 2ª disciplina — Atividades Avaliativas e Prova 1 (P1) do primeiro bimestre.', 'prova', 'alta', SUB48],
+  ['10/10', 'Segundo encontro presencial da 2ª disciplina – Atividades Avaliativas e Prova 1 (P1) do primeiro bimestre.', 'prova', 'alta', SUB48],
   ['17/10', 'Terceiro encontro presencial da 1ª disciplina híbrida do segundo bimestre.', 'aula', 'alta'],
   ['20/10', 'Liberação, no AVA, do e-book da 2ª disciplina híbrida do segundo bimestre.', 'aula', 'media'],
-  ['24/10', 'Quarto encontro presencial da 1ª disciplina híbrida — Atividades Avaliativas e Prova 2 (P2) do segundo bimestre.', 'prova', 'alta', SUB48],
-  ['27/10', 'Início, no AVA, da 2ª disciplina híbrida do primeiro bimestre.', 'aula', 'alta', AVA_ATENTO, 'Transcrito como está impresso. Pela sequência do calendário — a 1ª híbrida do segundo bimestre começou em 29/09 — esta deveria ser a 2ª do SEGUNDO bimestre.'],
+  ['24/10', 'Quarto encontro presencial da 1ª disciplina híbrida – Atividades Avaliativas e Prova 2 (P2) do segundo bimestre.', 'prova', 'alta', SUB48],
+  ['27/10', 'Início, no AVA, da 2ª disciplina híbrida do primeiro bimestre.', 'aula', 'alta', AVA_ATENTO, NOTA_27_10],
   ['31/10', 'Primeiro encontro presencial da 2ª disciplina híbrida do segundo bimestre.', 'aula', 'alta'],
-  ['07/11', 'Segundo encontro presencial da 2ª disciplina — Atividades Avaliativas e Prova 1 (P1) do segundo bimestre.', 'prova', 'alta', SUB48],
+  ['07/11', 'Segundo encontro presencial da 2ª disciplina – Atividades Avaliativas e Prova 1 (P1) do segundo bimestre.', 'prova', 'alta', SUB48],
   ['14/11', 'Terceiro encontro presencial da 2ª disciplina híbrida do segundo bimestre.', 'aula', 'alta'],
-  ['28/11', 'Quarto encontro presencial da 2ª disciplina híbrida — Atividades Avaliativas e Prova 2 (P2) do segundo bimestre.', 'prova', 'alta', SUB48],
+  ['28/11', 'Quarto encontro presencial da 2ª disciplina híbrida – Atividades Avaliativas e Prova 2 (P2) do segundo bimestre.', 'prova', 'alta', SUB48],
   ['05/12', 'Aplicação das provas substitutivas das disciplinas híbridas do segundo bimestre.', 'prova', 'alta'],
   ...HIBRIDO_FECHAMENTO,
 ];
 
 /* ==========================================================================
-   06 · CURSOS SEMANAIS ÀS SEXTAS E SÁBADOS (EXCETO DIREITO)
+   SEMIPRESENCIAL · Semanais às sextas e sábados (exceto Direito)
    ========================================================================== */
 
-const R06: readonly Raw[] = [
+const R_SEX_SAB: readonly Raw[] = [
   ...HIBRIDO_ABERTURA,
   DIGITAL_2BIM,
-  // O PDF das sextas e sábados escreve esta linha diferente dos outros oito:
-  // não cita a Eletiva e manda consultar os projetos disponíveis.
+  // Este PDF escreve a linha da Prática diferente dos outros dez: não cita a
+  // Eletiva e manda consultar os projetos disponíveis.
   ['25/08', 'Início da Prática Extensionista via sistema disponível no App Grupo Anchieta.', 'programa', 'alta', 'Verifique quantas horas você ainda precisa cumprir e consulte os projetos disponíveis.'],
   ['31/07', 'Liberação, no AVA, do e-book da 1ª disciplina híbrida do primeiro bimestre.', 'aula', 'media'],
-  ['01/08', 'Evento on-line para Ingressantes: Ambientação — Ambiente Virtual de Aprendizagem (AVA) e Biblioteca Virtual.', 'evento', 'alta', `${YT_TV} Horário: 10h (horário de Brasília).`],
+  AMBIENTACAO_MANHA,
   ['04/08', 'Início, no AVA, da 1ª disciplina híbrida do primeiro bimestre.', 'aula', 'alta', AVA_ATENTO],
-  ['04/08', 'Evento on-line para Ingressantes: Ambientação — Ambiente Virtual de Aprendizagem (AVA) e Biblioteca Virtual.', 'evento', 'alta', `${YT_TV} Horário: 19h30 (horário de Brasília).`],
+  AMBIENTACAO_NOITE,
   ['07 e 08/08', 'Primeiro encontro presencial da 1ª disciplina híbrida do primeiro bimestre.', 'aula', 'alta'],
   ['21 e 22/08', 'Terceiro encontro presencial da 1ª disciplina híbrida do primeiro bimestre.', 'aula', 'alta'],
   ['25/08', 'Liberação, no AVA, do e-book da 2ª disciplina híbrida do primeiro bimestre.', 'aula', 'media'],
-  ['28 e 29/08', 'Quarto encontro presencial da 1ª disciplina híbrida do primeiro bimestre — Atividades Avaliativas e Provas 1 e 2 (P1 e P2) do primeiro bimestre.', 'prova', 'alta', SUB48],
+  ['28 e 29/08', 'Quarto encontro presencial da 1ª disciplina híbrida do primeiro bimestre – Atividades Avaliativas e Provas 1 e 2 (P1 e P2) do primeiro bimestre.', 'prova', 'alta', SUB48],
   ['01/09', 'Início, no AVA, da 2ª disciplina híbrida do primeiro bimestre.', 'aula', 'alta', AVA_ATENTO],
   ['04 e 05/09', 'Primeiro encontro presencial da 2ª disciplina híbrida do primeiro bimestre.', 'aula', 'alta'],
-  ['11 e 12/09', 'Segundo encontro presencial da 2ª disciplina — Atividades Avaliativas e Prova 1 (P1) do primeiro bimestre.', 'prova', 'alta', SUB48],
+  ['11 e 12/09', 'Segundo encontro presencial da 2ª disciplina – Atividades Avaliativas e Prova 1 (P1) do primeiro bimestre.', 'prova', 'alta', SUB48],
   ['18 e 19/09', 'Terceiro encontro presencial da 2ª disciplina híbrida do primeiro bimestre.', 'aula', 'alta'],
   ['22/09', 'Liberação, no AVA, do e-book da 1ª disciplina híbrida do segundo bimestre.', 'aula', 'media'],
-  ['25 e 26/09', 'Quarto encontro presencial da 2ª disciplina híbrida — Atividades Avaliativas e Prova 2 (P2) do primeiro bimestre.', 'prova', 'alta', SUB48],
+  ['25 e 26/09', 'Quarto encontro presencial da 2ª disciplina híbrida – Atividades Avaliativas e Prova 2 (P2) do primeiro bimestre.', 'prova', 'alta', SUB48],
   ['29/09', 'Início, no AVA, da 1ª disciplina híbrida do segundo bimestre.', 'aula', 'alta', AVA_ATENTO],
   ...HIBRIDO_VIRADA,
   ['02 e 03/10', 'Primeiro encontro presencial da 1ª disciplina híbrida do segundo bimestre.', 'aula', 'alta'],
-  ['09 e 10/10', 'Segundo encontro presencial da 2ª disciplina — Atividades Avaliativas e Prova 1 (P1) do primeiro bimestre.', 'prova', 'alta', SUB48],
+  ['09 e 10/10', 'Segundo encontro presencial da 2ª disciplina – Atividades Avaliativas e Prova 1 (P1) do primeiro bimestre.', 'prova', 'alta', SUB48],
   ['16 e 17/10', 'Terceiro encontro presencial da 1ª disciplina híbrida do segundo bimestre.', 'aula', 'alta'],
   ['20/10', 'Liberação, no AVA, do e-book da 2ª disciplina híbrida do segundo bimestre.', 'aula', 'media'],
-  ['23 e 24/10', 'Quarto encontro presencial da 1ª disciplina híbrida — Atividades Avaliativas e Prova 2 (P2) do segundo bimestre.', 'prova', 'alta', SUB48],
-  ['27/10', 'Início, no AVA, da 2ª disciplina híbrida do primeiro bimestre.', 'aula', 'alta', AVA_ATENTO, 'Transcrito como está impresso. Pela sequência do calendário — a 1ª híbrida do segundo bimestre começou em 29/09 — esta deveria ser a 2ª do SEGUNDO bimestre.'],
+  ['23 e 24/10', 'Quarto encontro presencial da 1ª disciplina híbrida – Atividades Avaliativas e Prova 2 (P2) do segundo bimestre.', 'prova', 'alta', SUB48],
+  ['27/10', 'Início, no AVA, da 2ª disciplina híbrida do primeiro bimestre.', 'aula', 'alta', AVA_ATENTO, NOTA_27_10],
   ['30 e 31/10', 'Primeiro encontro presencial da 2ª disciplina híbrida do segundo bimestre.', 'aula', 'alta'],
-  ['06 e 07/11', 'Segundo encontro presencial da 2ª disciplina — Atividades Avaliativas e Prova 1 (P1) do segundo bimestre.', 'prova', 'alta', SUB48],
+  ['06 e 07/11', 'Segundo encontro presencial da 2ª disciplina – Atividades Avaliativas e Prova 1 (P1) do segundo bimestre.', 'prova', 'alta', SUB48],
   ['13 e 14/11', 'Terceiro encontro presencial da 2ª disciplina híbrida do segundo bimestre.', 'aula', 'alta'],
-  ['27 e 28/11', 'Quarto encontro presencial da 2ª disciplina híbrida — Atividades Avaliativas e Prova 2 (P2) do segundo bimestre.', 'prova', 'alta', SUB48],
+  ['27 e 28/11', 'Quarto encontro presencial da 2ª disciplina híbrida – Atividades Avaliativas e Prova 2 (P2) do segundo bimestre.', 'prova', 'alta', SUB48],
   ['05/12', 'Aplicação das provas substitutivas das disciplinas híbridas do segundo bimestre.', 'prova', 'alta'],
   ...HIBRIDO_FECHAMENTO,
 ];
 
 /* ==========================================================================
-   07 · CURSO DE DIREITO ÀS SEXTAS E SÁBADOS
+   SEMIPRESENCIAL · Direito às sextas e sábados
    ========================================================================== */
 
 const MODULO_PROFESSOR =
   'As atividades presenciais serão realizadas dentro do módulo, a critério do professor.';
 
-const R07: readonly Raw[] = [
+const R_DIREITO_SEX_SAB: readonly Raw[] = [
   ...HIBRIDO_ABERTURA,
   EXTENSIONISTA_INICIO,
   EVENTO_PRATICA_NOITE,
   ['31/07', 'Liberação, no AVA, do e-book da 1ª disciplina híbrida do primeiro bimestre.', 'aula', 'media'],
-  ['01/08', 'Evento on-line para Ingressantes: Ambientação — Ambiente Virtual de Aprendizagem (AVA) e Biblioteca Virtual.', 'evento', 'alta', `${YT_TV} Horário: 10h (horário de Brasília).`],
+  AMBIENTACAO_MANHA,
   ['04/08', 'Início, no AVA, da 1ª disciplina híbrida do primeiro bimestre.', 'aula', 'alta', AVA_ATENTO],
-  ['04/08', 'Evento on-line para Ingressantes: Ambientação — Ambiente Virtual de Aprendizagem (AVA) e Biblioteca Virtual.', 'evento', 'alta', `${YT_TV} Horário: 19h30 (horário de Brasília).`],
+  AMBIENTACAO_NOITE,
   ['07 e 08/08', 'Primeiro encontro presencial da 1ª disciplina híbrida do primeiro bimestre.', 'aula', 'alta', MODULO_PROFESSOR],
-  ['21 e 22/08', 'Terceiro encontro presencial da 1ª disciplina híbrida — Prova 1 (P1) do primeiro bimestre.', 'prova', 'alta', SUB48],
+  ['21 e 22/08', 'Terceiro encontro presencial da 1ª disciplina híbrida – Prova 1 (P1) do primeiro bimestre.', 'prova', 'alta', SUB48],
   ['25/08', 'Liberação, no AVA, do e-book da 2ª disciplina híbrida do primeiro bimestre.', 'aula', 'media'],
-  ['28 e 29/08', 'Quarto encontro presencial da 1ª disciplina híbrida — Prova 2 (P2) do primeiro bimestre.', 'prova', 'alta', SUB48],
+  ['28 e 29/08', 'Quarto encontro presencial da 1ª disciplina híbrida – Prova 2 (P2) do primeiro bimestre.', 'prova', 'alta', SUB48],
   ['29/08', 'Aplicação da P1 da disciplina digital de formação específica.', 'prova', 'alta', 'Horário: Pós-aula às 13h10.'],
   ['01/09', 'Início, no AVA, da 2ª disciplina híbrida do primeiro bimestre.', 'aula', 'alta', AVA_ATENTO],
   ['04 e 05/09', 'Primeiro encontro presencial da 2ª disciplina híbrida do primeiro bimestre.', 'aula', 'alta', MODULO_PROFESSOR],
-  ['11 e 12/09', 'Segundo encontro presencial da 2ª disciplina — Prova 1 (P1) do primeiro bimestre.', 'prova', 'alta', SUB48],
+  ['11 e 12/09', 'Segundo encontro presencial da 2ª disciplina – Prova 1 (P1) do primeiro bimestre.', 'prova', 'alta', SUB48],
   ['18 e 19/09', 'Terceiro encontro presencial da 2ª disciplina híbrida do primeiro bimestre.', 'aula', 'alta', MODULO_PROFESSOR],
   ['22/09', 'Liberação, no AVA, do e-book da 1ª disciplina híbrida do segundo bimestre.', 'aula', 'media'],
-  ['25 e 26/09', 'Quarto encontro presencial da 2ª disciplina híbrida — Prova 2 (P2) do primeiro bimestre.', 'prova', 'alta', SUB48],
+  ['25 e 26/09', 'Quarto encontro presencial da 2ª disciplina híbrida – Prova 2 (P2) do primeiro bimestre.', 'prova', 'alta', SUB48],
   ['26/09', 'Aplicação da P2 da disciplina digital de formação específica.', 'prova', 'alta', 'Horário: Pós-aula às 13h10.'],
   ['29/09 a 05/10', 'Período de realização on-line, por meio do AVA, da prova das Disciplinas Digitais Regulares de Formação Geral do primeiro bimestre.', 'prova', 'alta', TRES_TENTATIVAS],
   ['29/09', 'Início, no AVA, da 1ª disciplina híbrida do segundo bimestre.', 'aula', 'alta', AVA_ATENTO],
@@ -446,18 +451,18 @@ const R07: readonly Raw[] = [
   ['05 a 09/10', 'Período para entrega do relatório final de Monitoria do primeiro bimestre.', 'programa', 'baixa'],
   DIGITAIS_ESPECIAIS,
   ['06/10', 'Início da Monitoria do segundo bimestre.', 'programa', 'media'],
-  ['09 e 10/10', 'Segundo encontro presencial da 2ª disciplina — Prova 1 (P1) do segundo bimestre.', 'prova', 'alta', SUB48],
+  ['09 e 10/10', 'Segundo encontro presencial da 2ª disciplina – Prova 1 (P1) do segundo bimestre.', 'prova', 'alta', SUB48],
   ['16 e 17/10', 'Terceiro encontro presencial da 1ª disciplina híbrida do segundo bimestre.', 'aula', 'alta', MODULO_PROFESSOR],
   ['20/10', 'Liberação, no AVA, do e-book da 2ª disciplina híbrida do segundo bimestre.', 'aula', 'media'],
-  ['23 e 24/10', 'Quarto encontro presencial da 1ª disciplina híbrida — Atividades Avaliativas e Prova 2 (P2) do segundo bimestre.', 'prova', 'alta', SUB48],
+  ['23 e 24/10', 'Quarto encontro presencial da 1ª disciplina híbrida – Atividades Avaliativas e Prova 2 (P2) do segundo bimestre.', 'prova', 'alta', SUB48],
   ['24/10', 'Aplicação das provas de recuperação das disciplinas híbridas do primeiro bimestre.', 'prova', 'alta', 'Horário: Pré-aula às 8h.'],
   ['24/10', 'Aplicação da P1 da disciplina digital de formação específica.', 'prova', 'alta', 'Horário: Pós-aula às 13h10.'],
-  ['27/10', 'Início, no AVA, da 2ª disciplina híbrida do primeiro bimestre.', 'aula', 'alta', AVA_ATENTO, 'Transcrito como está impresso. Pela sequência do calendário — a 1ª híbrida do segundo bimestre começou em 29/09 — esta deveria ser a 2ª do SEGUNDO bimestre.'],
+  ['27/10', 'Início, no AVA, da 2ª disciplina híbrida do primeiro bimestre.', 'aula', 'alta', AVA_ATENTO, NOTA_27_10],
   ['30 e 31/10', 'Primeiro encontro presencial da 2ª disciplina híbrida do segundo bimestre.', 'aula', 'alta', MODULO_PROFESSOR],
-  ['06 e 07/11', 'Segundo encontro presencial da 2ª disciplina — Prova 1 (P1) do segundo bimestre.', 'prova', 'alta', SUB48],
+  ['06 e 07/11', 'Segundo encontro presencial da 2ª disciplina – Prova 1 (P1) do segundo bimestre.', 'prova', 'alta', SUB48],
   ['13 e 14/11', 'Terceiro encontro presencial da 2ª disciplina híbrida do segundo bimestre.', 'aula', 'alta', MODULO_PROFESSOR],
-  ['14 e 28/11', 'Aplicação da Prova Oficial das disciplinas de Estudo Dirigido e Digitais Especiais.', 'prova', 'alta', 'Horário: 08h às 12h.', 'O PDF imprime «14 e 28/11»; nos demais calendários a mesma prova cai em 27 e 28/11.'],
-  ['27 e 28/11', 'Quarto encontro presencial da 2ª disciplina híbrida — Prova 2 (P2) do segundo bimestre.', 'prova', 'alta', SUB48],
+  ['14 e 28/11', 'Aplicação da Prova Oficial das disciplinas de Estudo Dirigido e Digitais Especiais.', 'prova', 'alta', 'Horário: 08h às 12h.', 'O PDF imprime «14 e 28/11». Nos demais calendários a mesma prova cai em 27 e 28/11.'],
+  ['27 e 28/11', 'Quarto encontro presencial da 2ª disciplina híbrida – Prova 2 (P2) do segundo bimestre.', 'prova', 'alta', SUB48],
   ['28/11', 'Aplicação da P2 da disciplina digital de formação específica.', 'prova', 'alta', 'Horário: Pós-aula às 13h10.'],
   ['01 a 14/12', 'Período de realização on-line, por meio do AVA, da prova das Disciplinas Digitais Regulares de Formação Geral do segundo bimestre.', 'prova', 'alta', TRES_TENTATIVAS],
   ['04/12', 'Término do Programa de Monitoria do segundo bimestre.', 'programa', 'baixa'],
@@ -471,206 +476,279 @@ const R07: readonly Raw[] = [
 ];
 
 /* ==========================================================================
-   08 · CURSOS QUINZENAIS — INGRESSANTES
+   SEMIPRESENCIAL · Quinzenais ingressantes
    ========================================================================== */
 
-const R08: readonly Raw[] = [
+const R_QUINZENAL_ING: readonly Raw[] = [
   ...HIBRIDO_ABERTURA,
   DIGITAL_2BIM,
   EXTENSIONISTA_INICIO,
   EVENTO_PRATICA_NOITE,
   ['31/07', 'Liberação, no AVA, do e-book da 1ª disciplina híbrida do primeiro bimestre.', 'aula', 'media'],
-  ['01/08', 'Evento on-line para Ingressantes: Ambientação — Ambiente Virtual de Aprendizagem (AVA) e Biblioteca Virtual.', 'evento', 'alta', `${YT_TV} Horário: 10h (horário de Brasília).`],
+  AMBIENTACAO_MANHA,
   ['04/08', 'Início, no AVA, da 1ª disciplina híbrida do primeiro bimestre.', 'aula', 'alta', AVA_ATENTO],
-  ['04/08', 'Evento on-line para Ingressantes: Ambientação — Ambiente Virtual de Aprendizagem (AVA) e Biblioteca Virtual.', 'evento', 'alta', `${YT_TV} Horário: 19h30 (horário de Brasília).`],
+  AMBIENTACAO_NOITE,
   ['08/08', 'Cerimônia do Jaleco.', 'evento', 'alta'],
   ['25/08', 'Liberação, no AVA, do e-book da 2ª disciplina híbrida do primeiro bimestre.', 'aula', 'media'],
-  ['29/08', 'Primeiro encontro presencial da 1ª disciplina híbrida — Atividades Avaliativas e Prova 1 (P1) do primeiro bimestre.', 'prova', 'alta', SUB48],
+  ['29/08', 'Primeiro encontro presencial da 1ª disciplina híbrida – Atividades Avaliativas e Prova 1 (P1) do primeiro bimestre.', 'prova', 'alta', SUB48],
   ['01/09', 'Início, no AVA, da 2ª disciplina híbrida do primeiro bimestre.', 'aula', 'alta', AVA_ATENTO],
-  ['12/09', 'Segundo encontro presencial da 1ª disciplina — Atividades Avaliativas e Prova 2 (P2) do primeiro bimestre.', 'prova', 'alta', SUB48],
+  ['12/09', 'Segundo encontro presencial da 1ª disciplina – Atividades Avaliativas e Prova 2 (P2) do primeiro bimestre.', 'prova', 'alta', SUB48],
   ['22/09', 'Liberação, no AVA, do e-book da 1ª disciplina híbrida do segundo bimestre.', 'aula', 'media'],
-  ['26/09', 'Primeiro encontro presencial da 2ª disciplina híbrida — Atividades Avaliativas e Prova 1 (P1) do primeiro bimestre.', 'prova', 'alta', SUB48],
+  ['26/09', 'Primeiro encontro presencial da 2ª disciplina híbrida – Atividades Avaliativas e Prova 1 (P1) do primeiro bimestre.', 'prova', 'alta', SUB48],
   ['29/09', 'Início, no AVA, da 1ª disciplina híbrida do segundo bimestre.', 'aula', 'alta', AVA_ATENTO],
   ...HIBRIDO_VIRADA,
   ['06/10', 'Início da Monitoria do segundo bimestre.', 'programa', 'media'],
-  ['10/10', 'Segundo encontro presencial da 2ª disciplina — Atividades Avaliativas e Prova 2 (P2) do primeiro bimestre.', 'prova', 'alta', SUB48],
+  ['10/10', 'Segundo encontro presencial da 2ª disciplina – Atividades Avaliativas e Prova 2 (P2) do primeiro bimestre.', 'prova', 'alta', SUB48],
   ['20/10', 'Liberação, no AVA, do e-book da 2ª disciplina híbrida do segundo bimestre.', 'aula', 'media'],
-  ['24/10', 'Primeiro encontro presencial da 1ª disciplina híbrida — Atividades Avaliativas e Prova 1 (P1) do segundo bimestre.', 'prova', 'alta', SUB48],
-  ['27/10', 'Início, no AVA, da 2ª disciplina híbrida do primeiro bimestre.', 'aula', 'alta', AVA_ATENTO, 'Transcrito como está impresso. Pela sequência do calendário — a 1ª híbrida do segundo bimestre começou em 29/09 — esta deveria ser a 2ª do SEGUNDO bimestre.'],
-  ['07/11', 'Segundo encontro presencial da 1ª disciplina — Atividades Avaliativas e Prova 2 (P2) do segundo bimestre.', 'prova', 'alta', SUB48],
-  ['28/11', 'Primeiro encontro presencial da 2ª disciplina híbrida — Atividades Avaliativas e Prova 1 (P1) do segundo bimestre.', 'prova', 'alta', SUB48],
-  ['05/12', 'Segundo encontro presencial da 2ª disciplina — Atividades Avaliativas e Prova 2 (P2) do segundo bimestre.', 'prova', 'alta', SUB48],
+  ['24/10', 'Primeiro encontro presencial da 1ª disciplina híbrida – Atividades Avaliativas e Prova 1 (P1) do segundo bimestre.', 'prova', 'alta', SUB48],
+  ['27/10', 'Início, no AVA, da 2ª disciplina híbrida do primeiro bimestre.', 'aula', 'alta', AVA_ATENTO, NOTA_27_10],
+  ['07/11', 'Segundo encontro presencial da 1ª disciplina – Atividades Avaliativas e Prova 2 (P2) do segundo bimestre.', 'prova', 'alta', SUB48],
+  ['28/11', 'Primeiro encontro presencial da 2ª disciplina híbrida – Atividades Avaliativas e Prova 1 (P1) do segundo bimestre.', 'prova', 'alta', SUB48],
+  ['05/12', 'Segundo encontro presencial da 2ª disciplina – Atividades Avaliativas e Prova 2 (P2) do segundo bimestre.', 'prova', 'alta', SUB48],
   ['12/12', 'Aplicação das provas substitutivas das disciplinas híbridas do segundo bimestre.', 'prova', 'alta'],
   ...HIBRIDO_FECHAMENTO,
 ];
 
 /* ==========================================================================
-   09 · CURSOS QUINZENAIS — VETERANOS
+   SEMIPRESENCIAL · Quinzenais veteranos
    ========================================================================== */
 
-const R09: readonly Raw[] = [
+const R_QUINZENAL_VET: readonly Raw[] = [
   ...HIBRIDO_ABERTURA,
   EXTENSIONISTA_INICIO,
   EVENTO_PRATICA_NOITE,
   ['31/07', 'Liberação, no AVA, do e-book da 1ª disciplina híbrida do primeiro bimestre.', 'aula', 'media'],
   ['04/08', 'Início, no AVA, da 1ª disciplina híbrida do primeiro bimestre.', 'aula', 'alta', AVA_ATENTO],
-  ['08/08', 'Primeiro encontro presencial da 1ª disciplina híbrida — Atividades Avaliativas e Prova 1 (P1) do primeiro bimestre.', 'prova', 'alta', SUB48],
-  ['22/08', 'Segundo encontro presencial da 1ª disciplina — Atividades Avaliativas e Prova 2 (P2) do primeiro bimestre.', 'prova', 'alta', SUB48],
+  ['08/08', 'Primeiro encontro presencial da 1ª disciplina híbrida – Atividades Avaliativas e Prova 1 (P1) do primeiro bimestre.', 'prova', 'alta', SUB48],
+  ['22/08', 'Segundo encontro presencial da 1ª disciplina – Atividades Avaliativas e Prova 2 (P2) do primeiro bimestre.', 'prova', 'alta', SUB48],
   ['25/08', 'Liberação, no AVA, do e-book da 2ª disciplina híbrida do primeiro bimestre.', 'aula', 'media'],
   ['01/09', 'Início, no AVA, da 2ª disciplina híbrida do primeiro bimestre.', 'aula', 'alta', AVA_ATENTO],
-  ['05/09', 'Primeiro encontro presencial da 2ª disciplina híbrida — Atividades Avaliativas e Prova 1 (P1) do primeiro bimestre.', 'prova', 'alta', SUB48],
-  ['19/09', 'Segundo encontro presencial da 2ª disciplina — Atividades Avaliativas e Prova 2 (P2) do primeiro bimestre.', 'prova', 'alta', SUB48],
+  ['05/09', 'Primeiro encontro presencial da 2ª disciplina híbrida – Atividades Avaliativas e Prova 1 (P1) do primeiro bimestre.', 'prova', 'alta', SUB48],
+  ['19/09', 'Segundo encontro presencial da 2ª disciplina – Atividades Avaliativas e Prova 2 (P2) do primeiro bimestre.', 'prova', 'alta', SUB48],
   ['22/09', 'Liberação, no AVA, do e-book da 1ª disciplina híbrida do segundo bimestre.', 'aula', 'media'],
   ...HIBRIDO_VIRADA,
-  ['03/10', 'Primeiro encontro presencial da 1ª disciplina híbrida — Atividades Avaliativas e Prova 1 (P1) do segundo bimestre.', 'prova', 'alta', SUB48],
+  ['03/10', 'Primeiro encontro presencial da 1ª disciplina híbrida – Atividades Avaliativas e Prova 1 (P1) do segundo bimestre.', 'prova', 'alta', SUB48],
   ['06/10', 'Início da Monitoria do segundo bimestre.', 'programa', 'media'],
-  ['17/10', 'Segundo encontro presencial da 1ª disciplina — Atividades Avaliativas e Prova 2 (P2) do segundo bimestre.', 'prova', 'alta', SUB48],
+  ['17/10', 'Segundo encontro presencial da 1ª disciplina – Atividades Avaliativas e Prova 2 (P2) do segundo bimestre.', 'prova', 'alta', SUB48],
   ['20/10', 'Liberação, no AVA, do e-book da 2ª disciplina híbrida do segundo bimestre.', 'aula', 'media'],
-  ['27/10', 'Início, no AVA, da 2ª disciplina híbrida do primeiro bimestre.', 'aula', 'alta', AVA_ATENTO, 'Transcrito como está impresso. Pela sequência do calendário — a 1ª híbrida do segundo bimestre começou em 29/09 — esta deveria ser a 2ª do SEGUNDO bimestre.'],
-  ['31/10', 'Primeiro encontro presencial da 2ª disciplina híbrida — Atividades Avaliativas e Prova 1 (P1) do segundo bimestre.', 'prova', 'alta', SUB48],
-  ['14/11', 'Segundo encontro presencial da 2ª disciplina — Atividades Avaliativas e Prova 2 (P2) do segundo bimestre.', 'prova', 'alta', SUB48],
+  ['27/10', 'Início, no AVA, da 2ª disciplina híbrida do primeiro bimestre.', 'aula', 'alta', AVA_ATENTO, NOTA_27_10],
+  ['31/10', 'Primeiro encontro presencial da 2ª disciplina híbrida – Atividades Avaliativas e Prova 1 (P1) do segundo bimestre.', 'prova', 'alta', SUB48],
+  ['14/11', 'Segundo encontro presencial da 2ª disciplina – Atividades Avaliativas e Prova 2 (P2) do segundo bimestre.', 'prova', 'alta', SUB48],
   ['05/12', 'Aplicação das provas substitutivas das disciplinas híbridas do segundo bimestre.', 'prova', 'alta'],
   ...HIBRIDO_FECHAMENTO,
 ];
 
 /* ==========================================================================
-   Os nove calendários
+   SEMIPRESENCIAL · Semanal de Estética e Cosmética
+   ========================================================================== */
+
+const R_ESTETICA: readonly Raw[] = [
+  ...HIBRIDO_ABERTURA,
+  DIGITAL_2BIM,
+  EXTENSIONISTA_INICIO,
+  EVENTO_PRATICA_NOITE,
+  ['31/07', 'Liberação, no AVA, do e-book da 1ª disciplina híbrida do primeiro bimestre.', 'aula', 'media'],
+  AMBIENTACAO_MANHA,
+  ['04/08', 'Início, no AVA, da 1ª disciplina híbrida do primeiro bimestre.', 'aula', 'alta', AVA_ATENTO],
+  AMBIENTACAO_NOITE,
+  ['08/08', 'Cerimônia do Jaleco.', 'evento', 'alta'],
+  ['10/08', 'Primeiro encontro presencial da 1ª disciplina híbrida do primeiro bimestre.', 'aula', 'alta'],
+  ['17/08', 'Segundo encontro presencial da 1ª disciplina – Atividades Avaliativas e Prova 1 (P1) do primeiro bimestre.', 'prova', 'alta', SUB48],
+  ['24/08', 'Terceiro encontro presencial da 1ª disciplina híbrida do primeiro bimestre.', 'aula', 'alta'],
+  ['25/08', 'Liberação, no AVA, do e-book da 2ª disciplina híbrida do primeiro bimestre.', 'aula', 'media'],
+  ['31/08', 'Quarto encontro presencial da 1ª disciplina híbrida do primeiro bimestre – Atividades Avaliativas e Prova 2 (P2) do primeiro bimestre.', 'prova', 'alta', SUB48],
+  ['01/09', 'Início, no AVA, da 2ª disciplina híbrida do primeiro bimestre.', 'aula', 'alta', AVA_ATENTO],
+  ['14/09', 'Segundo encontro presencial da 2ª disciplina – Atividades Avaliativas e Prova 1 (P1) do primeiro bimestre.', 'prova', 'alta', SUB48],
+  ['21/09', 'Terceiro encontro presencial da 2ª disciplina híbrida do primeiro bimestre.', 'aula', 'alta'],
+  ['22/09', 'Liberação, no AVA, do e-book da 1ª disciplina híbrida do segundo bimestre.', 'aula', 'media'],
+  ['28/09', 'Quarto encontro presencial da 2ª disciplina híbrida – Atividades Avaliativas e Prova 2 (P2) do primeiro bimestre.', 'prova', 'alta', SUB48],
+  ['29/09', 'Início, no AVA, da 1ª disciplina híbrida do segundo bimestre.', 'aula', 'alta', AVA_ATENTO],
+  ...HIBRIDO_VIRADA,
+  ['05/10', 'Primeiro encontro presencial da 1ª disciplina híbrida do segundo bimestre.', 'aula', 'alta'],
+  ['06/10', 'Início da Monitoria do segundo bimestre.', 'programa', 'media'],
+  ['19/10', 'Terceiro encontro presencial da 1ª disciplina híbrida do segundo bimestre.', 'aula', 'alta'],
+  ['20/10', 'Liberação, no AVA, do e-book da 2ª disciplina híbrida do segundo bimestre.', 'aula', 'media'],
+  ['26/10', 'Quarto encontro presencial da 1ª disciplina híbrida – Atividades Avaliativas e Provas 1 e 2 (P1 e P2) do segundo bimestre.', 'prova', 'alta', SUB48],
+  ['27/10', 'Início, no AVA, da 2ª disciplina híbrida do primeiro bimestre.', 'aula', 'alta', AVA_ATENTO, NOTA_27_10],
+  ['09/11', 'Segundo encontro presencial da 2ª disciplina – Atividades Avaliativas e Prova 1 (P1) do segundo bimestre.', 'prova', 'alta', SUB48],
+  ['16/11', 'Terceiro encontro presencial da 2ª disciplina híbrida do segundo bimestre.', 'aula', 'alta'],
+  ['23/11', 'Quarto encontro presencial da 2ª disciplina híbrida – Atividades Avaliativas e Prova 2 (P2) do segundo bimestre.', 'prova', 'alta', SUB48],
+  ['05/12', 'Aplicação das provas substitutivas das disciplinas híbridas do segundo bimestre.', 'prova', 'alta'],
+  ...HIBRIDO_FECHAMENTO,
+];
+
+/* ==========================================================================
+   EAD
+   ========================================================================== */
+
+const R_EAD: readonly Raw[] = [
+  ...ABERTURA,
+  ['20/07 a 10/08', 'Período de inscrição para Monitoria do primeiro bimestre.', 'programa', 'media'],
+  AMBIENTACAO_MANHA,
+  MONITORIA_EVENTO,
+  ['04/08', 'Início das Disciplinas Digitais Regulares, no AVA, para Calouros e Veteranos.', 'aula', 'alta'],
+  AMBIENTACAO_NOITE,
+  ELEICAO,
+  ['04 a 17/08', 'Sugestão de Estudo: Unidade 1 e atividades avaliativas do primeiro bimestre.', 'aula', 'media'],
+  ['11/08', 'Evento on-line para Ingressantes: Ambientação do Cenário EaD.', 'evento', 'alta', `${YT_TV} Horário: 19h30 (horário de Brasília).`],
+  ['13/08', 'Evento on-line: Estratégias de Estudo e Sucesso.', 'evento', 'media', `${YT_TV} Horário: 19h30 (horário de Brasília).`],
+  ['14/08', 'Divulgação dos nomes dos alunos classificados para a Monitoria do segundo semestre.', 'programa', 'media'],
+  ['17/08', 'Ambientação Vida do Monitor.', 'programa', 'baixa', 'Local: On-line, às 18h30. Será notificado apenas aos alunos monitores.'],
+  ['17/08', 'Início da Monitoria do primeiro bimestre.', 'programa', 'media'],
+  ['18 a 31/08', 'Sugestão de Estudo: Unidade 2 e atividades avaliativas do primeiro bimestre.', 'aula', 'media'],
+  EXTENSIONISTA_INICIO,
+  EVENTO_PRATICA_MANHA,
+  ['29/08', 'Evento on-line para Ingressantes: Ambientação do Cenário EaD.', 'evento', 'alta', `${YT_TV} Horário: 10h (horário de Brasília).`],
+  ['01 a 14/09', 'Sugestão de Estudo: Unidade 3 e atividades avaliativas do primeiro bimestre.', 'aula', 'media'],
+  EVENTO_PRATICA_NOITE,
+  ['15 a 21/09', 'Sugestão de Estudo: Revisão e atividade avaliativa do primeiro bimestre.', 'aula', 'media'],
+  ['21 a 30/09', 'Período de inscrição para Monitoria do segundo bimestre.', 'programa', 'media'],
+  ['29/09 a 05/10', 'Período de realização on-line, por meio do AVA, da prova das Disciplinas Regulares do primeiro bimestre.', 'prova', 'alta'],
+  ['02/10', 'Término do Programa de Monitoria do primeiro bimestre.', 'programa', 'baixa'],
+  ['03/10', 'Evento on-line para Ingressantes: Ambientação - Ambiente Virtual de Aprendizagem (AVA) e Biblioteca Virtual.', 'evento', 'alta', `${YT_TV} Horário: 10h (horário de Brasília).`],
+  ['05 a 09/10', 'Período para entrega do relatório final de Monitoria do primeiro bimestre.', 'programa', 'baixa'],
+  ['06/10', 'Início das Disciplinas Digitais Regulares do segundo bimestre no AVA, para Calouros e Veteranos.', 'aula', 'alta'],
+  ['06/10', 'Início das Disciplinas Digitais Especiais, no AVA, para Veterenos.', 'aula', 'alta', undefined, 'O PDF imprime «Veterenos», erro de digitação de «Veteranos» na origem.'],
+  ['06/10', 'Evento on-line para Ingressantes: Ambientação do Cenário EaD.', 'evento', 'alta', `${YT_TV} Horário: 19h30 (horário de Brasília).`],
+  ['06/10', 'Início da Monitoria do segundo bimestre.', 'programa', 'media'],
+  ['06 a 19/10', 'Sugestão de Estudo: Unidade 1 e atividades avaliativas do segundo bimestre.', 'aula', 'media'],
+  ['20/10 a 02/11', 'Sugestão de Estudo: Unidade 2 e atividades avaliativas do segundo bimestre.', 'aula', 'media'],
+  ['03 a 16/11', 'Sugestão de Estudo: Unidade 3 e atividades avaliativas do segundo bimestre.', 'aula', 'media'],
+  ['07/11', 'Evento on-line para Ingressantes: Ambientação do Cenário EaD.', 'evento', 'alta', `${YT_TV} Horário: 10h (horário de Brasília).`],
+  ['17 a 30/11', 'Sugestão de Estudo: Revisão e atividade avaliativa do primeiro bimestre.', 'aula', 'media', undefined, 'O PDF imprime «primeiro bimestre» numa linha de novembro, que pertence ao segundo.'],
+  ['01 a 14/12', 'Período de realização on-line, por meio do AVA, da prova das Disciplinas Regulares e Disciplinas Especiais do segundo bimestre.', 'prova', 'alta'],
+  ['04/12', 'Término do Programa de Monitoria do segundo bimestre.', 'programa', 'baixa'],
+  ...FERIADOS,
+  ...FECHAMENTO,
+];
+
+/* ==========================================================================
+   Os onze documentos
    ========================================================================== */
 
 export const SEMESTER = '2026/2';
 
 export const CALENDARS: AcademicCalendar[] = [
   {
-    id: 'cal-presencial-direito',
-    name: 'Cursos Presencial de Direito · 2º semestre',
-    shortName: 'Presencial · Direito',
-    modality: 'Presencial',
-    audience: 'Ambos',
-    semester: SEMESTER,
-    rhythm: 'Diário',
-    courses: ['Bacharelado em Direito'],
-    source: 'Curso Presencial Direito.pdf',
-    events: build('cal-presencial-direito', R01),
-  },
-  {
     id: 'cal-presencial-geral',
     name: 'Cursos Presencial (exceto Direito) · 2º semestre',
-    shortName: 'Presencial · demais cursos',
+    shortName: 'Presencial diurno e noturno',
     modality: 'Presencial',
-    audience: 'Ambos',
     semester: SEMESTER,
     rhythm: 'Diário',
-    courses: [
-      'Bacharelado em Ciências Contábeis',
-      'Bacharelado em Administração',
-      'Bacharelado em Psicologia',
-      'Bacharelado em Enfermagem',
-      'Bacharelado em Fisioterapia',
-      'Bacharelado em Nutrição',
-      'Bacharelado em Educação Física',
-      'Engenharia de Software',
-      'Engenharia Civil',
-      'Ciência da Computação',
-      'Bacharelado em Arquitetura e Urbanismo',
-    ],
-    source: 'Cursos Presenciais Diurno-Noturno (1).pdf',
-    events: build('cal-presencial-geral', R02),
+    source: 'calendario_presencial_2026_2.pdf',
+    url: `${S3}/calendario_presencial_2026_2.pdf`,
+    events: build('cal-presencial-geral', R_PRES_GERAL),
   },
   {
-    id: 'cal-semanal-ter-qui',
-    name: 'Cursos Semanais (Ingressantes e Veteranos) — terças e quintas · 2º semestre',
-    shortName: 'Semanal · terças e quintas',
-    modality: 'Híbrido',
-    audience: 'Ambos',
+    id: 'cal-presencial-direito',
+    name: 'Cursos Presencial de Direito · 2º semestre',
+    shortName: 'Presencial Direito',
+    modality: 'Presencial',
     semester: SEMESTER,
-    rhythm: 'Semanal',
-    courses: ['Bacharelado em Administração', 'Bacharelado em Ciências Contábeis'],
-    source: 'Ingressantes de janeiro à dezembro de 2026 (18) (1).pdf',
-    events: build('cal-semanal-ter-qui', R03),
+    rhythm: 'Diário',
+    source: 'calendario_direito_presencial_2026_2.pdf',
+    url: `${S3}/calendario_direito_presencial_2026_2.pdf`,
+    events: build('cal-presencial-direito', R_PRES_DIREITO),
   },
   {
-    id: 'cal-quinzenal-ads-vet',
-    name: 'Cursos Quinzenais às sextas e sábados — (ADS) Veteranos · 2º semestre',
-    shortName: 'Quinzenal · ADS veteranos',
+    id: 'cal-quinzenal-veteranos',
+    name: 'Cursos Quinzenais · Veteranos · 2º semestre',
+    shortName: 'Quinzenal veteranos',
     modality: 'Híbrido',
-    audience: 'Veterano',
     semester: SEMESTER,
     rhythm: 'Quinzenal',
-    courses: ['Tecnologia em Análise e Desenv. de Sistemas'],
-    source: 'Veteranos (2) (1).pdf',
-    events: build('cal-quinzenal-ads-vet', R04),
+    source: 'calendario_semipresenciais_quinzenais_veteranos_2026_2.pdf',
+    url: `${S3}/calendario_semipresenciais_quinzenais_veteranos_2026_2.pdf`,
+    events: build('cal-quinzenal-veteranos', R_QUINZENAL_VET),
+  },
+  {
+    id: 'cal-quinzenal-ingressantes',
+    name: 'Cursos Quinzenais · Ingressantes · 2º semestre',
+    shortName: 'Quinzenal ingressantes',
+    modality: 'Híbrido',
+    semester: SEMESTER,
+    rhythm: 'Quinzenal',
+    source: 'calendario_semipresenciais_quinzenais_ingressantes_2026_2.pdf',
+    url: `${S3}/calendario_semipresenciais_quinzenais_ingressantes_2026_2.pdf`,
+    events: build('cal-quinzenal-ingressantes', R_QUINZENAL_ING),
+  },
+  {
+    id: 'cal-bissemanal',
+    name: 'Cursos Semanais (Ingressantes e Veteranos) · terças e quintas · 2º semestre',
+    shortName: 'Bissemanal terças e quintas',
+    modality: 'Híbrido',
+    semester: SEMESTER,
+    rhythm: 'Semanal',
+    source: 'calendario_semipresenciais_bissemanais_2026_2.pdf',
+    url: `${S3}/calendario_semipresenciais_bissemanais_2026_2.pdf`,
+    events: build('cal-bissemanal', R_BISSEMANAL),
   },
   {
     id: 'cal-semanal-sabados',
     name: 'Cursos Semanais aos sábados · 2º semestre',
-    shortName: 'Semanal · sábados',
+    shortName: 'Semanal aos sábados',
     modality: 'Híbrido',
-    audience: 'Ambos',
     semester: SEMESTER,
     rhythm: 'Semanal',
-    courses: [
-      'Licenciatura em Pedagogia',
-      'Engenharia de Software',
-      'Ciência da Computação',
-    ],
-    source: 'Ingressantes de janeiro à dezembro de 2026 (20) (1).pdf',
-    events: build('cal-semanal-sabados', R05),
+    source: 'calendario_semipresenciais_semanais_aos_sabados_2026_2.pdf',
+    url: `${S3}/calendario_semipresenciais_semanais_aos_sabados_2026_2.pdf`,
+    events: build('cal-semanal-sabados', R_SABADOS),
   },
   {
     id: 'cal-semanal-sex-sab',
     name: 'Cursos Semanais às sextas e sábados (exceto Direito) · 2º semestre',
-    shortName: 'Semanal · sextas e sábados',
+    shortName: 'Semanal sextas e sábados',
     modality: 'Híbrido',
-    audience: 'Ambos',
     semester: SEMESTER,
     rhythm: 'Semanal',
-    courses: [
-      'Tecnologia em Logística',
-      'Tecnologia em Gestão de Recursos Humanos',
-      'Tecnologia em Gestão Financeira',
-    ],
-    source: 'Ingressantes de janeiro à dezembro de 2026 (27) (1).pdf',
-    events: build('cal-semanal-sex-sab', R06),
+    source: 'calendario_semipresenciais_semanais_sextas_e_sabados_2026_2.pdf',
+    url: `${S3}/calendario_semipresenciais_semanais_sextas_e_sabados_2026_2.pdf`,
+    events: build('cal-semanal-sex-sab', R_SEX_SAB),
   },
   {
     id: 'cal-direito-sex-sab',
     name: 'Curso de Direito às sextas e sábados · 2º semestre',
-    shortName: 'Semanal · Direito sextas e sábados',
+    shortName: 'Semipresencial Direito',
     modality: 'Híbrido',
-    audience: 'Ambos',
     semester: SEMESTER,
     rhythm: 'Semanal',
-    courses: ['Bacharelado em Direito'],
-    source: 'Ingressantes de janeiro à dezembro de 2026 (13).pdf',
-    events: build('cal-direito-sex-sab', R07),
+    source: 'calendario_semipresencial_direito_2026_2.pdf',
+    url: `${S3}/calendario_semipresencial_direito_2026_2.pdf`,
+    events: build('cal-direito-sex-sab', R_DIREITO_SEX_SAB),
   },
   {
-    id: 'cal-quinzenal-ingressantes',
-    name: 'Cursos Quinzenais — Ingressantes · 2º semestre',
-    shortName: 'Quinzenal · ingressantes',
+    id: 'cal-quinzenal-ads',
+    name: 'Cursos Quinzenais às sextas e sábados · (ADS) Veteranos · 2º semestre',
+    shortName: 'Quinzenal ADS veteranos',
     modality: 'Híbrido',
-    audience: 'Ingressante',
     semester: SEMESTER,
     rhythm: 'Quinzenal',
-    courses: [
-      'Bacharelado em Enfermagem',
-      'Bacharelado em Nutrição',
-      'Tecnologia em Análise e Desenv. de Sistemas',
-    ],
-    source: 'Veteranos (15) (1).pdf',
-    events: build('cal-quinzenal-ingressantes', R08),
+    source: 'calendario_semipresencial_quinzenal_ADS_2026_2.pdf',
+    url: `${S3}/calendario_semipresencial_quinzenal_ADS_2026_2.pdf`,
+    events: build('cal-quinzenal-ads', R_ADS),
   },
   {
-    id: 'cal-quinzenal-veteranos',
-    name: 'Cursos Quinzenais — Veteranos · 2º semestre',
-    shortName: 'Quinzenal · veteranos',
+    id: 'cal-estetica',
+    name: 'Curso Semanal de Estética e Cosmética · 2º semestre',
+    shortName: 'Semanal Estética',
     modality: 'Híbrido',
-    audience: 'Veterano',
     semester: SEMESTER,
-    rhythm: 'Quinzenal',
-    courses: ['Bacharelado em Enfermagem', 'Bacharelado em Nutrição'],
-    source: 'Ingressantes de janeiro à dezembro de 2026 (10) (1).pdf',
-    events: build('cal-quinzenal-veteranos', R09),
+    rhythm: 'Semanal',
+    source: 'calendario_semipresencial_estetica_2026_2.pdf',
+    url: `${S3}/calendario_semipresencial_estetica_2026_2.pdf`,
+    events: build('cal-estetica', R_ESTETICA),
+  },
+  {
+    id: 'cal-ead',
+    name: 'Cursos EAD · 2º semestre',
+    shortName: 'EAD',
+    modality: 'EaD',
+    semester: SEMESTER,
+    rhythm: 'A distância',
+    source: 'calendario_ead_2026_2.pdf',
+    url: `${S3}/calendario_ead_2026_2.pdf`,
+    events: build('cal-ead', R_EAD),
   },
 ];
 
@@ -678,41 +756,115 @@ export function calendarById(id: string): AcademicCalendar | undefined {
   return CALENDARS.find((c) => c.id === id);
 }
 
-/**
- * Arquivos duplicados encontrados na pasta `calendarios_academicos`.
- * Guardado para que a tela consiga dizer de quais PDFs cada calendário veio —
- * quem for conferir vai abrir o arquivo pelo nome que tem na mão.
- */
-export const SOURCE_ALIASES: Record<string, string[]> = {
-  'cal-quinzenal-veteranos': [
-    'Ingressantes de janeiro à dezembro de 2026 (10) (1).pdf',
-    'Ingressantes de janeiro à dezembro de 2026 (8).pdf',
-    'Veteranos (1).pdf',
-    'Veteranos (16).pdf',
-    'Veteranos (5).pdf',
-  ],
-  'cal-direito-sex-sab': [
-    'Ingressantes de janeiro à dezembro de 2026 (13).pdf',
-    'Veteranos (12) (1).pdf',
-  ],
-  'cal-semanal-ter-qui': [
-    'Ingressantes de janeiro à dezembro de 2026 (18) (1).pdf',
-    'Ingressantes de janeiro à dezembro de 2026 (23) (1).pdf',
-  ],
-  'cal-semanal-sabados': [
-    'Ingressantes de janeiro à dezembro de 2026 (20) (1).pdf',
-    'Veteranos (21).pdf',
-  ],
-  'cal-semanal-sex-sab': [
-    'Ingressantes de janeiro à dezembro de 2026 (27) (1).pdf',
-    'Veteranos (25) (1).pdf',
-  ],
-  'cal-quinzenal-ingressantes': [
-    'Veteranos (15) (1).pdf',
-    'Veteranos (4) (1).pdf',
-    'Veteranos (7) (1).pdf',
-  ],
-  'cal-quinzenal-ads-vet': ['Veteranos (2) (1).pdf'],
-  'cal-presencial-direito': ['Curso Presencial Direito.pdf'],
-  'cal-presencial-geral': ['Cursos Presenciais Diurno-Noturno (1).pdf'],
+/* ==========================================================================
+   As trinta e três linhas do site
+   ========================================================================== */
+
+const G_PRESENCIAL = 'Cursos Presenciais Diurno/Noturno';
+const G_PRESENCIAL_DIREITO = 'Curso Presencial Direito';
+const G_HIBRIDO = 'Cursos Híbridos (Semipresenciais e Presenciais Intensivos)';
+const G_EAD = 'Cursos EAD';
+
+const ING = 'Ingressantes de janeiro à dezembro de 2026';
+const VET = 'Veteranos';
+
+function slugOf(text: string): string {
+  return text
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/(^-|-$)/g, '');
+}
+
+/** Uma linha do bloco de híbridos, na ordem alfabética em que o site publica. */
+function hib(course: string, audienceLabel: string, calendarId: string): CalendarEntry {
+  const audience = audienceLabel === VET ? 'Veterano' : 'Ingressante';
+  return {
+    id: `entry-${slugOf(course)}-${audience === 'Veterano' ? 'vet' : 'ing'}`,
+    group: 'hibrido',
+    groupLabel: G_HIBRIDO,
+    course,
+    audience,
+    audienceLabel,
+    calendarId,
+  };
+}
+
+export const CALENDAR_ENTRIES: CalendarEntry[] = [
+  {
+    id: 'entry-presencial-geral',
+    group: 'presencial',
+    groupLabel: G_PRESENCIAL,
+    course: 'Todos os cursos presenciais diurnos e noturnos',
+    audience: 'Ambos',
+    audienceLabel: 'Exibir Calendário',
+    calendarId: 'cal-presencial-geral',
+    catchAll: true,
+  },
+  {
+    id: 'entry-presencial-direito',
+    group: 'presencial',
+    groupLabel: G_PRESENCIAL_DIREITO,
+    course: 'Direito',
+    audience: 'Ambos',
+    audienceLabel: 'Exibir Calendário',
+    calendarId: 'cal-presencial-direito',
+  },
+
+  hib('Administração', VET, 'cal-quinzenal-veteranos'),
+  hib('Análise e Desenvolvimento de Sistemas', VET, 'cal-quinzenal-ads'),
+  hib('Biomedicina', ING, 'cal-quinzenal-ingressantes'),
+  hib('Biomedicina', VET, 'cal-quinzenal-veteranos'),
+  hib('Ciências Biológicas', ING, 'cal-quinzenal-ingressantes'),
+  hib('Ciências Biológicas', VET, 'cal-quinzenal-veteranos'),
+  hib('Ciências Contábeis', VET, 'cal-quinzenal-veteranos'),
+  hib('Direito', ING, 'cal-direito-sex-sab'),
+  hib('Direito', VET, 'cal-direito-sex-sab'),
+  hib('Educação Física (Sábados)', ING, 'cal-quinzenal-ingressantes'),
+  hib('Educação Física (Sábados)', VET, 'cal-quinzenal-veteranos'),
+  hib('Educação Física (Terça e Quinta)', ING, 'cal-bissemanal'),
+  hib('Enfermagem', ING, 'cal-semanal-sabados'),
+  hib('Enfermagem', VET, 'cal-semanal-sabados'),
+  hib('Engenharia Civil', VET, 'cal-semanal-sex-sab'),
+  hib('Eng. Controle e Automação (Terça e Quinta)', ING, 'cal-bissemanal'),
+  hib('Engenharia de Produção', VET, 'cal-semanal-sex-sab'),
+  hib('Estética e Cosmética', VET, 'cal-estetica'),
+  hib('Fisioterapia', VET, 'cal-quinzenal-veteranos'),
+  hib('Fonoaudiologia', ING, 'cal-quinzenal-ingressantes'),
+  hib('Fonoaudiologia', VET, 'cal-semanal-sabados'),
+  hib('Nutrição', ING, 'cal-quinzenal-ingressantes'),
+  hib('Nutrição', VET, 'cal-quinzenal-veteranos'),
+  hib('Pedagogia', ING, 'cal-ead'),
+  hib('Psicologia', ING, 'cal-semanal-sabados'),
+  hib('Psicologia', VET, 'cal-semanal-sabados'),
+  hib('Recursos Humanos', VET, 'cal-quinzenal-veteranos'),
+  hib('Serviço Social', ING, 'cal-ead'),
+  hib('Terapia Ocupacional', ING, 'cal-quinzenal-ingressantes'),
+  hib('Terapia Ocupacional', VET, 'cal-semanal-sabados'),
+
+  {
+    id: 'entry-ead',
+    group: 'ead',
+    groupLabel: G_EAD,
+    course: 'Todos os cursos EAD',
+    audience: 'Ambos',
+    audienceLabel: 'Exibir Calendário',
+    calendarId: 'cal-ead',
+    catchAll: true,
+  },
+];
+
+/** Todas as linhas do site que usam um mesmo PDF. */
+export function entriesOfCalendar(calendarId: string): CalendarEntry[] {
+  return CALENDAR_ENTRIES.filter((e) => e.calendarId === calendarId);
+}
+
+export function entryById(id: string): CalendarEntry | undefined {
+  return CALENDAR_ENTRIES.find((e) => e.id === id);
+}
+
+export const SOURCE_PAGES = {
+  principal: 'https://anchieta.br/calendario-academico-segundo-semestre/',
+  hibridos: 'https://anchieta.br/calendario-academico-hibridos-segundo-semestre/',
 };

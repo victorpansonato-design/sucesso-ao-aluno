@@ -1,5 +1,7 @@
 import type {
   AcademicCalendar,
+  CalendarEntry,
+  CalendarGroup,
   CalendarEvent,
   PushAudience,
   PushDispatch,
@@ -45,25 +47,65 @@ export function audienceLabel(audience: PushAudience): string {
 }
 
 /**
- * O calendário do aluno é o cruzamento de modalidade, curso e coorte.
- *
- * Quando existe um calendário dedicado à coorte (os quinzenais têm um para
- * ingressante e outro para veterano) ele ganha do genérico — é mais específico
- * e é o que a coordenação de fato entrega àquela turma.
+ * O catálogo de cursos do app e a lista publicada pelo site não escrevem os
+ * mesmos nomes: aqui é "Tecnologia em Análise e Desenv. de Sistemas", lá é
+ * "Análise e Desenvolvimento de Sistemas". Casar por semelhança de texto
+ * acertaria a maioria e erraria em silêncio no resto, então a ponte é escrita à
+ * mão. Curso do catálogo que não aparece aqui simplesmente não tem oferta
+ * semipresencial no site, e é honesto que ele fique sem calendário híbrido.
  */
+const COURSE_ALIAS: Record<string, string> = {
+  'Bacharelado em Ciências Contábeis': 'Ciências Contábeis',
+  'Bacharelado em Administração': 'Administração',
+  'Bacharelado em Direito': 'Direito',
+  'Bacharelado em Psicologia': 'Psicologia',
+  'Bacharelado em Enfermagem': 'Enfermagem',
+  'Bacharelado em Fisioterapia': 'Fisioterapia',
+  'Bacharelado em Nutrição': 'Nutrição',
+  // O site oferta Educação Física em dois ritmos. Sem o dado de turma, a
+  // escolha fica no sábado, que é a oferta com as duas coortes publicadas.
+  'Bacharelado em Educação Física': 'Educação Física (Sábados)',
+  'Engenharia Civil': 'Engenharia Civil',
+  'Tecnologia em Análise e Desenv. de Sistemas': 'Análise e Desenvolvimento de Sistemas',
+  'Tecnologia em Gestão de Recursos Humanos': 'Recursos Humanos',
+  'Licenciatura em Pedagogia': 'Pedagogia',
+};
+
+function groupOf(student: Student): CalendarGroup {
+  if (student.modality === 'Presencial') return 'presencial';
+  if (student.modality === 'EaD') return 'ead';
+  return 'hibrido';
+}
+
+/**
+ * Qual linha do site vale para este aluno.
+ *
+ * Casa por bloco (presencial, híbrido, EAD), curso e coorte. A linha específica
+ * ganha da linha guarda-chuva: o site publica um calendário único para todos os
+ * presenciais diurnos e noturnos, mas Direito tem o seu, e é o de Direito que
+ * vale para quem cursa Direito.
+ */
+export function entryForStudent(
+  student: Student,
+  entries: CalendarEntry[],
+): CalendarEntry | undefined {
+  const audience = audienceOf(student);
+  const group = groupOf(student);
+  const label = COURSE_ALIAS[student.course] ?? student.course;
+
+  const pool = entries.filter(
+    (e) => e.group === group && (e.audience === 'Ambos' || e.audience === audience),
+  );
+  return pool.find((e) => !e.catchAll && e.course === label) ?? pool.find((e) => e.catchAll);
+}
+
 export function calendarForStudent(
   student: Student,
   calendars: AcademicCalendar[],
+  entries: CalendarEntry[],
 ): AcademicCalendar | undefined {
-  const audience = audienceOf(student);
-  return calendars
-    .filter(
-      (c) =>
-        c.modality === student.modality &&
-        c.courses.includes(student.course) &&
-        (c.audience === 'Ambos' || c.audience === audience),
-    )
-    .sort((a, b) => Number(a.audience === 'Ambos') - Number(b.audience === 'Ambos'))[0];
+  const entry = entryForStudent(student, entries);
+  return entry ? calendars.find((c) => c.id === entry.calendarId) : undefined;
 }
 
 /* -- Composição do texto --------------------------------------------------
@@ -71,8 +113,47 @@ export function calendarForStudent(
    outras palavras seria mais bonito e criaria a pior falha possível: o aviso
    dizendo uma coisa e o PDF oficial dizendo outra. */
 
+/**
+ * Tira a pontuação final antes de emendar a próxima frase.
+ *
+ * Também tira interrogação: sem isso, "O que é monitoria?" seguido de ". Acontece"
+ * virava "monitoria?. Acontece".
+ */
 function trimDot(text: string): string {
-  return text.replace(/\.\s*$/, '');
+  return text.replace(/[.?!]\s*$/, '');
+}
+
+/**
+ * Tira travessão e hífen do texto que vai para o celular.
+ *
+ * O calendário oficial usa travessão o tempo todo ("Feriado – Natal"), e num
+ * push isso lê como texto de máquina. A troca não é apagar: o travessão está
+ * separando um rótulo do que ele explica, e dois-pontos fazem o mesmo trabalho
+ * com cara de gente. Quando a frase já tem dois-pontos, o segundo empilharia,
+ * então ali vira ponto final e a maiúscula seguinte continua fazendo sentido.
+ *
+ * Roda no fim da geração, sobre título e corpo, para que nenhum texto novo
+ * escape por descuido.
+ */
+export function deDash(text: string): string {
+  const separator = /\s*[–—]\s*|\s+-\s+/;
+  let out = '';
+  let rest = text;
+
+  for (;;) {
+    const hit = rest.match(separator);
+    if (!hit || hit.index === undefined) break;
+    out += rest.slice(0, hit.index);
+    const sentence = out.split(/[.!?]\s/).pop() ?? '';
+    out += sentence.includes(':') ? '. ' : ': ';
+    rest = rest.slice(hit.index + hit[0].length);
+  }
+
+  return (out + rest)
+    .replace(/\s{2,}/g, ' ')
+    .replace(/\s+([.,;:])/g, '$1')
+    .replace(/:\s*\./g, '.')
+    .trim();
 }
 
 /** "Horário: 19h30." extraído do detalhe impresso, quando existe. */
@@ -142,18 +223,12 @@ function composeProva(event: CalendarEvent, early: boolean): Copy {
     if (/on-line|no AVA/i.test(event.title)) {
       return {
         title: '#NOME#, prova on-line em 3 dias',
-        body: `${trimDot(event.title)} — abre ${whenPhrase(event.start)}. São três tentativas pelo AVA, sem substitutiva nem recuperação. Organize o seu tempo.`.replace(
-          /\s+/g,
-          ' ',
-        ),
+        body: `${trimDot(event.title)}. Abre ${whenPhrase(event.start)}. São três tentativas pelo AVA, sem substitutiva nem recuperação. Organize o seu tempo.`,
       };
     }
     return {
       title: '#NOME#, prova daqui a 3 dias',
-      body: `${trimDot(event.title)} — ${whenPhrase(event.start)}. ${hint} Confira sala e horário no App Grupo Anchieta e organize seu estudo desde já.`.replace(
-        /\s+/g,
-        ' ',
-      ),
+      body: `${trimDot(event.title)}. Começa ${whenPhrase(event.start)}. ${hint} Confira sala e horário no App Grupo Anchieta e organize seu estudo desde já.`,
     };
   }
   // Prova on-line no AVA não tem sala, não tem documento e não tem
@@ -161,19 +236,16 @@ function composeProva(event: CalendarEvent, early: boolean): Copy {
   if (/on-line|no AVA/i.test(event.title)) {
     return {
       title: 'Sua prova on-line abriu, #NOME#',
-      body: `${trimDot(event.title)} — ${spanPhrase(event)}. São três tentativas pelo AVA e, por isso, não há substitutiva nem recuperação. Não deixe para o último dia.`.replace(
-        /\s+/g,
-        ' ',
-      ),
+      body: `${trimDot(event.title)}. Acontece ${spanPhrase(event)}. São três tentativas pelo AVA e, por isso, não há substitutiva nem recuperação. Não deixe para o último dia.`,
     };
   }
 
   const needsSub = /48 horas/.test(event.detail ?? '');
   return {
     title: 'Hoje tem prova, #NOME#',
-    body: `${trimDot(event.title)} — ${spanPhrase(event)}. ${hint} Leve documento com foto e chegue com antecedência. ${
+    body: `${trimDot(event.title)}. Acontece ${spanPhrase(event)}. ${hint} Leve documento com foto e chegue com antecedência. ${
       needsSub ? SUBSTITUTIVA_LEMBRETE : ''
-    }`.replace(/\s+/g, ' '),
+    }`,
   };
 }
 
@@ -189,7 +261,7 @@ function composeAula(event: CalendarEvent): Copy {
     // "presenciais" não casa com /presencial/, e por isso a série de encontros
     // — que é o aviso mais valioso do calendário híbrido — caía no genérico.
     title = isSeries(event) ? 'Seus encontros presenciais, #NOME#' : 'Amanhã tem encontro presencial';
-    tail = 'É no encontro presencial que acontecem as atividades avaliativas — confira o horário no app e não perca nenhum.';
+    tail = 'É no encontro presencial que acontecem as atividades avaliativas. Confira o horário no app e não perca nenhum.';
   } else if (/^Início, no AVA/.test(t)) {
     title = 'Sua nova disciplina abre amanhã';
     tail = 'Entre no AVA para ver o plano de ensino e os prazos das primeiras atividades.';
@@ -198,15 +270,18 @@ function composeAula(event: CalendarEvent): Copy {
     tail = 'Baixe assim que abrir: ele é a base das atividades avaliativas do bimestre.';
   } else if (/disciplinas digitais regulares/i.test(t)) {
     title = 'Suas digitais começam amanhã';
-    tail = 'As disciplinas digitais correm pelo AVA, no seu ritmo — mas com prazo. Entre e veja o cronograma.';
+    tail = 'As disciplinas digitais correm pelo AVA, no seu ritmo, mas com prazo. Entre e veja o cronograma.';
+  } else if (/Sugestão de Estudo/i.test(t)) {
+    title = 'Seu roteiro de estudo, #NOME#';
+    tail = 'No EaD o ritmo é seu, mas o roteiro existe para você não chegar no fim do bimestre com tudo junto.';
   } else if (/Digitais Especiais|Estudo Dirigido/i.test(t)) {
     title = 'Novas disciplinas amanhã, #NOME#';
-    tail = 'Estudo Dirigido e Digitais Especiais têm prova própria — comece pelo cronograma no AVA.';
+    tail = 'Estudo Dirigido e Digitais Especiais têm prova própria. Comece pelo cronograma no AVA.';
   }
 
   return {
     title,
-    body: `${trimDot(t)} — ${spanPhrase(event)}. ${tail}`.replace(/\s+/g, ' '),
+    body: `${trimDot(t)}. ${isSeries(event) ? 'São' : 'É'} ${spanPhrase(event)}. ${tail}`,
   };
 }
 
@@ -230,7 +305,7 @@ function composePrazo(event: CalendarEvent, early: boolean): Copy {
         }
       : {
           title: 'Amanhã encerra o semestre',
-          body: `${trimDot(t)} — ${fim}. Verifique se ficou alguma pendência de nota, atividade ou documento antes do fechamento.`,
+          body: `${trimDot(t)}, em ${fim}. Verifique se ficou alguma pendência de nota, atividade ou documento antes do fechamento.`,
         };
   }
 
@@ -248,7 +323,7 @@ function composePrazo(event: CalendarEvent, early: boolean): Copy {
   return {
     title: 'Amanhã é o último dia, #NOME#',
     body: heavy
-      ? `${trimDot(t)}. O prazo termina em ${fim}. Depois disso só com processo na secretaria — e nem sempre é aceito.`
+      ? `${trimDot(t)}. O prazo termina em ${fim}. Depois disso, só com processo na secretaria, e nem sempre é aceito.`
       : `${trimDot(t)}. O prazo termina em ${fim} e leva poucos minutos no app.`,
   };
 }
@@ -264,7 +339,7 @@ function composeEvento(event: CalendarEvent): Copy {
 
   return {
     title: isSemana ? 'Começa hoje a Semana Jurídica' : 'Hoje tem evento, #NOME#',
-    body: `${trimDot(event.title)} — ${spanPhrase(event)}. ${hint} ${local}`.replace(/\s+/g, ' ').trim(),
+    body: `${trimDot(event.title)}. Acontece ${spanPhrase(event)}. ${hint} ${local}`,
   };
 }
 
@@ -280,13 +355,13 @@ function composePrograma(event: CalendarEvent): Copy {
     tail = 'Ser monitor conta horas, dá desconto e fortalece o currículo.';
   } else if (/Início da Monitoria/i.test(t)) {
     title = 'A monitoria começou, #NOME#';
-    tail = 'Monitoria é gratuita e para todo mundo — veja os horários no app e agende sua dúvida.';
+    tail = 'Monitoria é gratuita e para todo mundo. Veja os horários no app e agende sua dúvida.';
   } else if (/Prática Extensionista/i.test(t)) {
     title = 'Suas horas de extensão abriram';
     tail = 'A Prática Extensionista é obrigatória para colar grau. Veja quantas horas faltam no app.';
   } else if (/Optativa de Libras|Bagagem/i.test(t)) {
     title = 'Cursos extras liberados, #NOME#';
-    tail = 'Libras, Português, Matemática, Inglês e Excel — sem custo e no seu ritmo.';
+    tail = 'Libras, Português, Matemática, Inglês e Excel, sem custo e no seu ritmo.';
   } else if (/Divulgação/i.test(t)) {
     title = 'Saiu o resultado da monitoria';
     tail = 'Confira a lista no Mural do App Grupo Anchieta.';
@@ -424,14 +499,14 @@ export function rulesFor(calendar: AcademicCalendar): PushRule[] {
         id: `${event.id}-r${index + 1}`,
         calendarId: calendar.id,
         eventId: event.id,
-        title: plan.copy.title,
-        body: plan.copy.body.trim(),
+        title: deDash(plan.copy.title),
+        body: deDash(plan.copy.body),
         sendDate: shiftDays(anchorDate, plan.offset),
         sendTime: plan.time,
         offset: plan.offset,
         offsetLabel: plan.label,
         category: event.category,
-        audience: calendar.audience,
+        audience: 'Ambos',
         enabled: true,
       });
     });

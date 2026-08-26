@@ -18,31 +18,37 @@ import { TemplateCatalog } from '../components/push/TemplateCatalog';
    O aplicativo Grupo Anchieta é o canal que chega ao aluno sem depender de ele
    procurar nada. Esta aba é o lugar onde se decide o que passa por ele.
 
-   Três abas, porque são três perguntas que ninguém faz ao mesmo tempo:
+   Três abas, na ordem em que a informação nasce:
 
-     Alunos      — "o que a gente mandou para ESTE aluno?"  (chega por telefone)
-     Calendários — "o que o calendário do curso manda?"     (uma vez por semestre)
-     Mensagens   — "que aviso automático existe?"           (na revisão do catálogo)
+     Calendários  o que a instituição publica. É a fonte de tudo.
+     Mensagens    o que disparamos por conta dos parâmetros do aluno.
+     Alunos       o que chegou no celular de cada um.
 
-   Os três números do topo não são enfeite: eles são o tamanho da operação que
-   roda sozinha. Quando "avisos programados" cai para zero, ou o semestre acabou
-   ou alguém desligou a régua inteira — e nos dois casos é melhor descobrir aqui
-   do que pelo aluno que não foi avisado.
+   Alunos abria primeiro e estava errado: quem entra aqui pela primeira vez
+   precisa ver a régua antes do histórico dela, senão o histórico é uma lista de
+   textos sem origem.
+
+   Cada aba tem uma faixa azul, e só uma, com o número que justifica a aba
+   inteira. Os números do cabeçalho ficam sóbrios de propósito: duas coisas
+   azuis na mesma tela não destacam nada.
    ========================================================================== */
 
-type Tab = 'alunos' | 'calendarios' | 'mensagens';
+type Tab = 'calendarios' | 'mensagens' | 'alunos';
 
 export function PushView({
   actions,
   calendarParam,
 }: {
   actions: ShellActions;
+  /** Id de uma linha do site, para mandar a régua de um curso por link. */
   calendarParam?: string | null;
 }) {
   const { students, toast } = useApp();
   const store = usePushStore();
 
-  const [tab, setTab] = useState<Tab>(calendarParam ? 'calendarios' : 'alunos');
+  /* Calendários abre primeiro porque é a fonte: a régua nasce dele, e as
+     mensagens e o histórico do aluno são o que ele produz. */
+  const [tab, setTab] = useState<Tab>('calendarios');
   const [openCalendar, setOpenCalendar] = useState<string | null>(calendarParam ?? null);
 
   /* O hash é a verdade sobre qual calendário está aberto, e não o estado local:
@@ -104,18 +110,17 @@ export function PushView({
                 );
               }}
             >
-              Descartar {edits} edição{edits > 1 ? 'ões' : ''}
+              Descartar {edits} {edits > 1 ? 'edições' : 'edição'}
             </Button>
           ) : undefined
         }
       >
-        {/* Tamanho da operação automática, sem caixa em volta de cada número.
-            Quatro descrevem o passado e um descreve o que ainda vai acontecer —
-            e é só esse que ganha o azul institucional. */}
+        {/* Números sóbrios aqui em cima: a faixa azul de cada aba é que carrega
+            o destaque, e duas coisas azuis na mesma tela não destacam nada. */}
         <div className="flex flex-wrap items-start gap-x-10 gap-y-4 border-t border-hairline pt-4">
-          <Metric label="Avisos ainda por disparar" value={totals.scheduled} tone="brand" />
+          <Metric label="Avisos ainda por disparar" value={totals.scheduled} />
           <Metric label="Avisos já disparados" value={totals.sent} />
-          <Metric label="Calendários digitalizados" value={totals.calendars} />
+          <Metric label="Combinações curso e público" value={store.entries.length} />
           <Metric label="Linhas transcritas dos PDFs" value={totals.lines} />
           <Metric label="Mensagens personalizadas ativas" value={totals.templates} />
           {totals.divergences > 0 && (
@@ -139,13 +144,12 @@ export function PushView({
           if (value !== 'calendarios') setOpenCalendar(null);
         }}
         tabs={[
-          { value: 'alunos', label: 'Alunos', count: students.length },
-          { value: 'calendarios', label: 'Calendários', count: totals.calendars },
+          { value: 'calendarios', label: 'Calendários', count: store.entries.length },
           { value: 'mensagens', label: 'Mensagens', count: store.templates.length },
+          { value: 'alunos', label: 'Alunos', count: students.length },
         ]}
       />
 
-      {tab === 'alunos' && <StudentPushPanel store={store} />}
       {tab === 'calendarios' && (
         <CalendarBrowser
           store={store}
@@ -157,6 +161,7 @@ export function PushView({
         />
       )}
       {tab === 'mensagens' && <TemplateCatalog store={store} />}
+      {tab === 'alunos' && <StudentPushPanel store={store} />}
     </motion.div>
   );
 }

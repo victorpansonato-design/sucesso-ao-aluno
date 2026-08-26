@@ -14,7 +14,7 @@ import { useApp } from '../../state/AppContext';
 import { COURSE_NAMES } from '../../data/catalog';
 import { searchKey } from '../../lib/format';
 import { shortDay, todayIso } from '../../lib/calendarDates';
-import { audienceOf, calendarForStudent, historyFor } from '../../lib/push';
+import { audienceLabel, audienceOf, calendarForStudent, entryForStudent, historyFor } from '../../lib/push';
 import { Send } from 'lucide-react';
 import type { PushStore } from '../../lib/pushStore';
 import { staggerContainer, staggerItem } from '../../lib/motion';
@@ -24,6 +24,7 @@ import { Button } from '../ui/Button';
 import { SearchInput, Segmented, Select } from '../ui/Fields';
 import { Avatar, HealthBadge, ModalityBadge } from '../ui/Badges';
 import {
+  BrandBand,
   CategoryTag,
   DeliveryTag,
   NextUpBanner,
@@ -90,9 +91,32 @@ export function StudentPushPanel({ store }: { store: PushStore }) {
   const active =
     query !== '' || course !== 'Todos' || modality !== 'Todas' || audience !== 'Todos';
 
+  /* Cobertura: quantos alunos da base caem numa linha do site e recebem régua.
+     É o número que diz se a Gestão de PUSH está de fato ligada na base, e o
+     único desta aba que muda o que alguém faz a seguir. */
+  const covered = useMemo(
+    () => students.filter((s) => entryForStudent(s, store.entries)).length,
+    [students, store.entries],
+  );
+  const noApp = useMemo(
+    () => students.filter((s) => !s.engagement.appInstalled).length,
+    [students],
+  );
+
   return (
     <>
       <div className="space-y-4">
+        <BrandBand
+          value={covered}
+          unit={`de ${students.length}`}
+          headline="alunos da base já ligados a um calendário e recebendo a régua do curso"
+          stats={[
+            { label: 'sem calendário', value: students.length - covered },
+            { label: 'sem o app instalado', value: noApp },
+            { label: 'mensagens ativas', value: store.templates.filter((t) => t.active).length },
+          ]}
+        />
+
         {/* Filtros */}
         <Card padded={false} className="p-4">
           <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
@@ -217,7 +241,8 @@ function StudentRow({
   today: string;
   onOpen: () => void;
 }) {
-  const calendar = calendarForStudent(student, store.calendars);
+  const entry = entryForStudent(student, store.entries);
+  const calendar = calendarForStudent(student, store.calendars, store.entries);
   const rules = calendar ? (store.rulesByCalendar[calendar.id] ?? []) : [];
   const history = useMemo(
     () => historyFor(student, calendar, rules, store.templates, today),
@@ -260,7 +285,7 @@ function StudentRow({
 
         <div className="hidden shrink-0 md:block md:w-52">
           <span className="block truncate text-[11.5px] text-ink-2">
-            {calendar?.shortName ?? 'sem calendário'}
+            {entry ? `${entry.course} · ${audienceLabel(entry.audience).toLowerCase()}` : 'sem calendário'}
           </span>
           {/* O próximo push é o que o atendente precisa saber antes de ligar:
               "espera, ele recebe um aviso amanhã de qualquer forma". */}
@@ -293,7 +318,8 @@ function StudentPushDrawer({
   today: string;
   onClose: () => void;
 }) {
-  const calendar = student ? calendarForStudent(student, store.calendars) : undefined;
+  const entry = student ? entryForStudent(student, store.entries) : undefined;
+  const calendar = student ? calendarForStudent(student, store.calendars, store.entries) : undefined;
   const rules = calendar ? (store.rulesByCalendar[calendar.id] ?? []) : [];
   const history = useMemo(
     () => (student ? historyFor(student, calendar, rules, store.templates, today) : null),
@@ -343,10 +369,18 @@ function StudentPushDrawer({
             <div className="mt-4 flex items-center gap-2.5 rounded-lg bg-surface-2 p-3">
               <CalendarRange className="h-4 w-4 shrink-0 text-ink-3" />
               <div className="min-w-0 flex-1">
-                <p className="text-[11px] text-ink-4">Calendário acadêmico atribuído</p>
-                <p className="truncate text-[12.5px] font-medium text-ink">
-                  {calendar?.name ?? 'Nenhum calendário cobre este curso e modalidade'}
+                <p className="text-[11px] text-ink-4">
+                  Calendário acadêmico atribuído
+                  {entry ? ` · ${entry.groupLabel}` : ''}
                 </p>
+                <p className="truncate text-[12.5px] font-medium text-ink">
+                  {entry
+                    ? `${entry.course} · ${audienceLabel(entry.audience).toLowerCase()}`
+                    : 'Nenhuma linha do site cobre este curso e modalidade'}
+                </p>
+                {calendar && (
+                  <p className="truncate text-[11px] text-ink-3">{calendar.name}</p>
+                )}
               </div>
               {!student.engagement.appInstalled && (
                 <span className="shrink-0 text-[11px] font-semibold text-crit-ink">

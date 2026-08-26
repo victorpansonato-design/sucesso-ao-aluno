@@ -25,7 +25,6 @@ export const KEYS = {
      calendário a cada render, então guardá-la seria duplicar a verdade. */
   pushEvents: `${PREFIX}pushEvents`,
   pushRules: `${PREFIX}pushRules`,
-  pushCourses: `${PREFIX}pushCourses`,
   pushTemplates: `${PREFIX}pushTemplates`,
 } as const;
 

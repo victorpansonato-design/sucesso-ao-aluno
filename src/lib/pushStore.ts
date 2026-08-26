@@ -1,12 +1,13 @@
 import { useCallback, useMemo, useState } from 'react';
 import type {
   AcademicCalendar,
+  CalendarEntry,
   CalendarEventOverride,
   PushRule,
   PushRuleOverride,
   PushTemplate,
 } from '../types';
-import { CALENDARS } from '../data/academicCalendars';
+import { CALENDARS, CALENDAR_ENTRIES } from '../data/academicCalendars';
 import { PUSH_TEMPLATES } from '../data/pushCatalog';
 import { rulesFor } from './push';
 import { KEYS, load, save } from './storage';
@@ -31,12 +32,13 @@ import { KEYS, load, save } from './storage';
 
 type EventOverrides = Record<string, CalendarEventOverride>;
 type RuleOverrides = Record<string, PushRuleOverride>;
-type CourseAssignments = Record<string, string[]>;
 type TemplateOverrides = Record<string, Partial<PushTemplate>>;
 
 export interface PushStore {
-  /** Calendários já com correções manuais e lista de cursos aplicadas. */
+  /** Os onze PDFs, já com as correções manuais aplicadas. */
   calendars: AcademicCalendar[];
+  /** As trinta e três linhas do site. Vêm de lá, não se editam aqui. */
+  entries: CalendarEntry[];
   /** Régua de cada calendário, na ordem de disparo. */
   rulesByCalendar: Record<string, PushRule[]>;
   templates: PushTemplate[];
@@ -50,7 +52,6 @@ export interface PushStore {
   editRule: (ruleId: string, patch: PushRuleOverride) => void;
   resetRule: (ruleId: string) => void;
   toggleRule: (ruleId: string, enabled: boolean) => void;
-  setCourses: (calendarId: string, courses: string[]) => void;
   editTemplate: (templateId: string, patch: Partial<PushTemplate>) => void;
   toggleTemplate: (templateId: string, active: boolean) => void;
   /** Devolve tudo ao que está impresso no PDF e ao catálogo de fábrica. */
@@ -64,9 +65,6 @@ export function usePushStore(): PushStore {
   const [ruleOverrides, setRuleOverrides] = useState<RuleOverrides>(() =>
     load<RuleOverrides>(KEYS.pushRules, {}),
   );
-  const [courseAssignments, setCourseAssignments] = useState<CourseAssignments>(() =>
-    load<CourseAssignments>(KEYS.pushCourses, {}),
-  );
   const [templateOverrides, setTemplateOverrides] = useState<TemplateOverrides>(() =>
     load<TemplateOverrides>(KEYS.pushTemplates, {}),
   );
@@ -76,13 +74,12 @@ export function usePushStore(): PushStore {
     () =>
       CALENDARS.map((calendar) => ({
         ...calendar,
-        courses: courseAssignments[calendar.id] ?? calendar.courses,
         events: calendar.events.map((event) => {
           const patch = eventOverrides[event.id];
           return patch ? { ...event, ...patch } : event;
         }),
       })),
-    [eventOverrides, courseAssignments],
+    [eventOverrides],
   );
 
   /* -- Régua derivada, com os textos manuais por cima --------------------- */
@@ -153,14 +150,6 @@ export function usePushStore(): PushStore {
     [editRule],
   );
 
-  const setCourses = useCallback((calendarId: string, courses: string[]) => {
-    setCourseAssignments((prev) => {
-      const next = { ...prev, [calendarId]: courses };
-      save(KEYS.pushCourses, next);
-      return next;
-    });
-  }, []);
-
   const editTemplate = useCallback((templateId: string, patch: Partial<PushTemplate>) => {
     setTemplateOverrides((prev) => {
       const next = { ...prev, [templateId]: { ...prev[templateId], ...patch } };
@@ -177,11 +166,9 @@ export function usePushStore(): PushStore {
   const resetAllPush = useCallback(() => {
     setEventOverrides({});
     setRuleOverrides({});
-    setCourseAssignments({});
     setTemplateOverrides({});
     save(KEYS.pushEvents, {});
     save(KEYS.pushRules, {});
-    save(KEYS.pushCourses, {});
     save(KEYS.pushTemplates, {});
   }, []);
 
@@ -199,6 +186,7 @@ export function usePushStore(): PushStore {
 
   return {
     calendars,
+    entries: CALENDAR_ENTRIES,
     rulesByCalendar,
     templates,
     editedEvents,
@@ -208,7 +196,6 @@ export function usePushStore(): PushStore {
     editRule,
     resetRule,
     toggleRule,
-    setCourses,
     editTemplate,
     toggleTemplate,
     resetAllPush,

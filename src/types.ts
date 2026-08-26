@@ -448,6 +448,10 @@ export interface CalendarEvent {
   note?: string;
 }
 
+/**
+ * Um dos PDFs publicados pela instituição. É o DOCUMENTO, não a oferta:
+ * o mesmo calendário de quinzenais veteranos serve seis cursos diferentes.
+ */
 export interface AcademicCalendar {
   id: string;
   /** Título exatamente como impresso no cabeçalho do PDF. */
@@ -455,15 +459,46 @@ export interface AcademicCalendar {
   /** Rótulo curto para chips, filtros e cabeçalhos de coluna. */
   shortName: string;
   modality: Modality;
-  audience: PushAudience;
   semester: string;
-  /** Ritmo de encontros — é o que separa dois calendários do mesmo curso. */
-  rhythm: 'Diário' | 'Semanal' | 'Quinzenal';
-  /** Cursos do catálogo cobertos por este calendário. Editável na tela. */
-  courses: string[];
-  /** Arquivo PDF de origem, para rastrear de onde veio cada linha. */
+  /** Ritmo de encontros, que é o que separa dois calendários do mesmo curso. */
+  rhythm: 'Diário' | 'Semanal' | 'Quinzenal' | 'A distância';
+  /** Nome do arquivo no S3 da instituição, para rastrear de onde veio a linha. */
   source: string;
+  /** Endereço público do PDF, para abrir o original ao lado da transcrição. */
+  url: string;
   events: CalendarEvent[];
+}
+
+/** Os três blocos em que o site organiza os calendários. */
+export type CalendarGroup = 'presencial' | 'hibrido' | 'ead';
+
+/**
+ * Uma linha da página de calendários do site: curso × público × PDF.
+ *
+ * O site não lista nove calendários; lista trinta e três combinações, e é assim
+ * que a coordenação fala ("o calendário de Fonoaudiologia veterano"). Vários
+ * apontam para o mesmo arquivo, e mesmo assim cada um existe por conta própria:
+ * quando a instituição desmembrar um deles no semestre que vem, a mudança cai
+ * numa linha só, sem ninguém ter de descobrir quais cursos estavam escondidos
+ * dentro de um PDF compartilhado.
+ */
+export interface CalendarEntry {
+  id: string;
+  group: CalendarGroup;
+  /** Rótulo do bloco, exatamente como escrito no site. */
+  groupLabel: string;
+  /** Nome do curso, exatamente como escrito no site. */
+  course: string;
+  audience: PushAudience;
+  /** Rótulo do link no site: "Veteranos", "Ingressantes de janeiro à…". */
+  audienceLabel: string;
+  calendarId: string;
+  /**
+   * Vale para qualquer aluno da modalidade que não tenha entrada própria.
+   * O site publica um único calendário para todos os presenciais diurnos e
+   * noturnos, sem listar curso por curso, e é isto que representa esse caso.
+   */
+  catchAll?: boolean;
 }
 
 /**

@@ -9,7 +9,7 @@ import type { PushStore } from '../../lib/pushStore';
 import { staggerContainer, staggerItem } from '../../lib/motion';
 import { Card, Callout, SectionLabel } from '../ui/Surfaces';
 import { Chip } from '../ui/Fields';
-import { CategoryIcon, EditedMark, NotificationPreview, PencilButton } from './PushBits';
+import { BrandBand, CategoryIcon, EditedMark, NotificationPreview, PencilButton } from './PushBits';
 import { TemplateEditor } from './PushEditors';
 
 /* ==========================================================================
@@ -49,9 +49,30 @@ export function TemplateCatalog({ store }: { store: PushStore }) {
   const visible = onlyActive ? store.templates.filter((t) => t.active) : store.templates;
   const activeCount = store.templates.filter((t) => t.active).length;
 
+  /* Quantos alunos da base estão, agora, dentro de pelo menos uma condição.
+     É o que separa um catálogo vivo de uma lista de boas intenções. */
+  const reached = useMemo(
+    () => students.filter((s) => store.templates.some((t) => matchesTemplate(t, s))).length,
+    [students, store.templates],
+  );
+
   return (
     <>
       <div className="space-y-4">
+        <BrandBand
+          value={reached}
+          unit={`de ${students.length}`}
+          headline="alunos da base batem agora na condição de pelo menos uma mensagem"
+          stats={[
+            { label: 'mensagens ativas', value: activeCount },
+            { label: 'no catálogo', value: store.templates.length },
+            {
+              label: 'sem alcance hoje',
+              value: store.templates.filter((t) => (reach[t.id] ?? 0) === 0).length,
+            },
+          ]}
+        />
+
         <Card>
           <SectionLabel
             action={

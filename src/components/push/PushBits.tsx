@@ -1,6 +1,8 @@
 import type { ReactNode } from 'react';
 import { motion } from 'motion/react';
 import {
+  ArrowRight,
+  ArrowUpRight,
   BellRing,
   BookOpen,
   CalendarClock,
@@ -294,6 +296,69 @@ export function TodayMarker({ label }: { label: string }) {
         hoje · {label}
       </span>
       <span className="h-px flex-1 bg-brand/25" />
+    </div>
+  );
+}
+
+/* -- Faixa azul -----------------------------------------------------------
+   O mesmo recurso que o Onboarding 90 dias usa: uma única superfície azul
+   preenchida por tela, com o número que justifica a tela inteira.
+
+   Vale a pena repetir a regra que faz esse elemento funcionar: UMA por tela.
+   A segunda faixa azul não chama o dobro de atenção, ela divide a atenção da
+   primeira pela metade, e a partir da terceira nenhuma chama nada. Por isso a
+   faixa vive no topo de cada aba e não se repete lá dentro. */
+
+export function BrandBand({
+  value,
+  unit,
+  headline,
+  stats,
+  action,
+}: {
+  value: number | string;
+  /** Palavra colada ao número, em corpo menor. */
+  unit?: string;
+  headline: ReactNode;
+  stats?: { label: string; value: number | string }[];
+  action?: { label: string; href?: string; onClick?: () => void };
+}) {
+  const actionClass =
+    'inline-flex items-center gap-1.5 rounded-full bg-white/15 px-3 py-1.5 text-[12px] font-medium text-on-brand transition-colors hover:bg-white/25';
+
+  return (
+    <div className="flex flex-wrap items-center justify-between gap-x-8 gap-y-4 rounded-xl bg-brand px-5 py-4 sm:px-6">
+      <div className="flex items-baseline gap-3">
+        <span className="font-mono text-[38px] leading-none font-medium tracking-tight text-on-brand">
+          {value}
+          {unit && <span className="ml-1.5 text-[17px] text-on-brand/60">{unit}</span>}
+        </span>
+        <span className="max-w-sm text-[13px] leading-snug text-on-brand/85">{headline}</span>
+      </div>
+
+      <div className="flex flex-wrap items-center gap-x-7 gap-y-2">
+        {stats?.map((item) => (
+          <span key={item.label} className="min-w-0">
+            <span className="block font-mono text-[17px] leading-none font-medium text-on-brand">
+              {item.value}
+            </span>
+            <span className="mt-1 block text-[11px] text-on-brand/70">{item.label}</span>
+          </span>
+        ))}
+
+        {action &&
+          (action.href ? (
+            <a href={action.href} target="_blank" rel="noreferrer" className={actionClass}>
+              {action.label}
+              <ArrowUpRight className="h-3.5 w-3.5" />
+            </a>
+          ) : (
+            <button onClick={action.onClick} className={actionClass}>
+              {action.label}
+              <ArrowRight className="h-3.5 w-3.5" />
+            </button>
+          ))}
+      </div>
     </div>
   );
 }

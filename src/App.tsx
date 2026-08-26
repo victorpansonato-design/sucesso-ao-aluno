@@ -128,8 +128,8 @@ function Shell() {
       case 'onboarding':
         return <OnboardingView key="onboarding" actions={actions} />;
       case 'push':
-        // O parâmetro é o id de um calendário, para que a régua de um curso
-        // possa ser mandada por link para a coordenação.
+        // O parâmetro é o id de uma linha do site (curso × público), para que a
+        // régua de um curso possa ser mandada por link para a coordenação.
         return <PushView key="push" actions={actions} calendarParam={route.param} />;
       case 'jornada':
         return <JourneyView key="jornada" actions={actions} />;
