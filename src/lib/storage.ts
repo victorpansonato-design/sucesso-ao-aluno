@@ -21,6 +21,12 @@ export const KEYS = {
   theme: `${PREFIX}theme`,
   currentUser: `${PREFIX}currentUser`,
   seededAt: `${PREFIX}seededAt`,
+  /* Gestão de PUSH — só o que foi editado à mão. A régua em si é derivada do
+     calendário a cada render, então guardá-la seria duplicar a verdade. */
+  pushEvents: `${PREFIX}pushEvents`,
+  pushRules: `${PREFIX}pushRules`,
+  pushCourses: `${PREFIX}pushCourses`,
+  pushTemplates: `${PREFIX}pushTemplates`,
 } as const;
 
 function available(): boolean {

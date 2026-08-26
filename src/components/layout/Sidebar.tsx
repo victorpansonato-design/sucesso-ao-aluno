@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { motion } from 'motion/react';
 import {
   BarChart3,
+  BellRing,
   BookMarked,
   ChevronDown,
   ChevronsLeft,
@@ -92,6 +93,7 @@ export function Sidebar({
     { route: 'alunos', label: 'Base de Alunos', Icon: GraduationCap },
     { route: 'radares', label: 'Radares', Icon: RadarIcon },
     { route: 'onboarding', label: 'Onboarding 90 dias', Icon: Sprout, badge: stats.onboarding },
+    { route: 'push', label: 'Gestão de PUSH', Icon: BellRing },
     { route: 'playbook', label: 'Playbook', Icon: BookMarked },
   ];
 

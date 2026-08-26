@@ -29,7 +29,7 @@ type Result =
   | { type: 'case'; id: string; label: string; sub: string }
   | { type: 'route'; id: RouteName; param?: string; label: string; sub: string };
 
-/** As onze telas, buscáveis por nome. O `sub` também entra na busca. */
+/** As doze telas, buscáveis por nome. O `sub` também entra na busca. */
 const SCREENS: { id: RouteName; label: string; sub: string }[] = [
   { id: 'cockpit', label: 'Cockpit', sub: 'O seu turno e quem precisa de você agora' },
   { id: 'dashboard', label: 'Dashboard', sub: 'Índices, evolução e resultado da operação' },
@@ -37,6 +37,7 @@ const SCREENS: { id: RouteName; label: string; sub: string }[] = [
   { id: 'alunos', label: 'Base de Alunos', sub: 'Diretório completo com filtros e exportação' },
   { id: 'radares', label: 'Radares', sub: 'Os cinco sensores, gatilhos e diretrizes' },
   { id: 'onboarding', label: 'Onboarding 90 dias', sub: 'Régua de acolhimento dos calouros' },
+  { id: 'push', label: 'Gestão de PUSH', sub: 'Calendário acadêmico, réguas de aviso e histórico por aluno' },
   { id: 'jornada', label: 'Jornada por Modalidade', sub: 'Funis de presencial e híbrido' },
   { id: 'indicadores', label: 'Indicadores', sub: 'Tabelas executivas e exportações em CSV' },
   { id: 'equipe', label: 'Equipe', sub: 'Carga real e roteamento por especialidade' },

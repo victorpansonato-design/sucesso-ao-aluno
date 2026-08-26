@@ -207,19 +207,31 @@ export function Metric({
   label: ReactNode;
   value: ReactNode;
   onClick?: () => void;
-  tone?: 'plain' | 'crit';
+  /**
+   * `brand` marca o número que responde "e agora?" numa fileira de números que
+   * apenas descrevem. Um por fileira — dois já viram wallpaper e o olho volta a
+   * ter de ler todos.
+   */
+  tone?: 'plain' | 'crit' | 'brand';
 }) {
   const inner = (
     <>
       <span
         className={[
           'block font-mono text-[30px] leading-none font-medium tracking-tight',
-          tone === 'crit' ? 'text-crit-ink' : 'text-ink',
+          tone === 'crit' ? 'text-crit-ink' : tone === 'brand' ? 'text-brand-text' : 'text-ink',
         ].join(' ')}
       >
         {value}
       </span>
-      <span className="mt-2 block text-[12px] font-medium text-ink-3">{label}</span>
+      <span
+        className={[
+          'mt-2 block text-[12px] font-medium',
+          tone === 'brand' ? 'text-ink-2' : 'text-ink-3',
+        ].join(' ')}
+      >
+        {label}
+      </span>
     </>
   );
 

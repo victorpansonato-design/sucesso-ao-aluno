@@ -24,6 +24,7 @@ import { StudentsView } from './views/StudentsView';
 import { Student360View } from './views/Student360View';
 import { RadarsView } from './views/RadarsView';
 import { OnboardingView } from './views/OnboardingView';
+import { PushView } from './views/PushView';
 import { JourneyView } from './views/JourneyView';
 import { IndicatorsView } from './views/IndicatorsView';
 import { TeamView } from './views/TeamView';
@@ -126,6 +127,10 @@ function Shell() {
         return <RadarsView key="radares" actions={actions} radarParam={route.param} />;
       case 'onboarding':
         return <OnboardingView key="onboarding" actions={actions} />;
+      case 'push':
+        // O parâmetro é o id de um calendário, para que a régua de um curso
+        // possa ser mandada por link para a coordenação.
+        return <PushView key="push" actions={actions} calendarParam={route.param} />;
       case 'jornada':
         return <JourneyView key="jornada" actions={actions} />;
       case 'indicadores':

@@ -385,3 +385,159 @@ export interface ScoreResult {
   factors: ScoreFactor[];
   profileLabel: string;
 }
+
+/* ==========================================================================
+   Gestão de PUSH — calendário acadêmico, réguas e disparos
+   --------------------------------------------------------------------------
+   O aplicativo Grupo Anchieta é o único canal que chega ao aluno sem depender
+   de ele abrir alguma coisa. Duas famílias de mensagem passam por ele e não
+   devem ser confundidas:
+
+     · A RÉGUA (PushRule) é calendário. Nasce de um evento do calendário
+       acadêmico do curso e vale para todo mundo daquele calendário. É previsível,
+       é institucional e é o que evita o "ninguém me avisou" de segunda-feira.
+     · O PERSONALIZADO (PushTemplate) é diagnóstico. Nasce dos parâmetros do
+       aluno — Health Score, dias sem acesso, frequência, situação financeira —
+       e só dispara para quem bate na condição.
+
+   As duas terminam no mesmo lugar: PushDispatch, que é o histórico que o
+   atendente lê antes de ligar para o aluno.
+   ========================================================================== */
+
+/** Quem recebe. "Ingressante" é a coorte Calouro sob a régua de 90 dias. */
+export type PushAudience = 'Ingressante' | 'Veterano' | 'Ambos';
+
+/**
+ * A natureza do aviso. Não é decoração: a categoria decide a antecedência do
+ * disparo, o horário e o tom do texto — uma prova avisa três dias antes às 9h,
+ * um feriado avisa na véspera às 17h.
+ */
+export type PushCategory =
+  | 'aula'
+  | 'prova'
+  | 'prazo'
+  | 'evento'
+  | 'feriado'
+  | 'programa'
+  | 'financeiro'
+  | 'engajamento'
+  | 'acolhimento';
+
+/**
+ * Quanto o evento importa para o aluno — e, por consequência, se ele vira
+ * push. "baixa" é o que só interessa a monitores e à secretaria: fica
+ * registrado no calendário digitalizado e não gera aviso.
+ */
+export type EventRelevance = 'alta' | 'media' | 'baixa';
+
+export interface CalendarEvent {
+  id: string;
+  /** O rótulo exatamente como impresso no PDF: "13, 14, 27 e 28/11". */
+  dateLabel: string;
+  /** Datas resolvidas em ISO, na ordem em que aparecem no rótulo. */
+  dates: string[];
+  /** Primeira e última data — o que a régua usa para calcular D-3, D-1, D-0. */
+  start: string;
+  end: string;
+  title: string;
+  /** Linhas complementares impressas abaixo do título (local, horário, notas). */
+  detail?: string;
+  category: PushCategory;
+  relevance: EventRelevance;
+  /** Divergência encontrada no PDF de origem, preservada para conferência. */
+  note?: string;
+}
+
+export interface AcademicCalendar {
+  id: string;
+  /** Título exatamente como impresso no cabeçalho do PDF. */
+  name: string;
+  /** Rótulo curto para chips, filtros e cabeçalhos de coluna. */
+  shortName: string;
+  modality: Modality;
+  audience: PushAudience;
+  semester: string;
+  /** Ritmo de encontros — é o que separa dois calendários do mesmo curso. */
+  rhythm: 'Diário' | 'Semanal' | 'Quinzenal';
+  /** Cursos do catálogo cobertos por este calendário. Editável na tela. */
+  courses: string[];
+  /** Arquivo PDF de origem, para rastrear de onde veio cada linha. */
+  source: string;
+  events: CalendarEvent[];
+}
+
+/**
+ * Um aviso agendado da régua. `offset` guarda a distância em dias do evento
+ * (negativo = antes), porque é isso que precisa ser recalculado quando alguém
+ * corrige a data de um evento no calendário.
+ */
+export interface PushRule {
+  id: string;
+  calendarId: string;
+  eventId: string;
+  title: string;
+  body: string;
+  /** Data do disparo, ISO. */
+  sendDate: string;
+  /** Horário do disparo, HH:mm. */
+  sendTime: string;
+  offset: number;
+  /** "3 dias antes", "na véspera", "no dia" — o que a tela mostra. */
+  offsetLabel: string;
+  category: PushCategory;
+  audience: PushAudience;
+  enabled: boolean;
+}
+
+/** Uma edição manual feita no lápis. Guardada à parte da régua gerada. */
+export interface PushRuleOverride {
+  title?: string;
+  body?: string;
+  sendDate?: string;
+  sendTime?: string;
+  enabled?: boolean;
+}
+
+/** Uma correção manual feita numa linha do calendário digitalizado. */
+export interface CalendarEventOverride {
+  dateLabel?: string;
+  title?: string;
+  detail?: string;
+  relevance?: EventRelevance;
+  category?: PushCategory;
+}
+
+/** Push personalizado: dispara pelos parâmetros do aluno, não pela data. */
+export interface PushTemplate {
+  id: string;
+  /** Código curto usado na conversa da equipe: "ACD-02". */
+  code: string;
+  name: string;
+  category: PushCategory;
+  audience: PushAudience;
+  /** A condição em português, do jeito que a operação fala. */
+  trigger: string;
+  title: string;
+  body: string;
+  /** Quantos dias esperar antes de repetir para o mesmo aluno. */
+  cooldownDays: number;
+  active: boolean;
+}
+
+export type PushStatus = 'Agendado' | 'Enviado' | 'Aberto' | 'Não entregue';
+
+export interface PushDispatch {
+  id: string;
+  studentId: string;
+  origin: 'regua' | 'personalizado';
+  /** Ids de origem — um dos dois, conforme `origin`. */
+  ruleId?: string;
+  templateId?: string;
+  calendarId?: string;
+  title: string;
+  body: string;
+  category: PushCategory;
+  /** ISO completo, com horário. */
+  sentAt: string;
+  status: PushStatus;
+}
