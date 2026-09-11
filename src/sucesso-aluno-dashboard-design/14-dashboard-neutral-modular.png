@@ -1,0 +1,35 @@
+# URLs e componentes de referência
+
+## Produto atual
+
+- Dashboard: https://sucesso-ao-aluno.vercel.app/#/dashboard
+- Indicadores: https://sucesso-ao-aluno.vercel.app/#/indicadores
+
+## Direção editorial e bibliotecas
+
+- Mindsparkle Mag: https://mindsparklemag.com/
+- React Bits: https://reactbits.dev/
+- Índice React Bits: https://reactbits.dev/get-started/index
+- 21st.dev: https://21st.dev/
+
+## Componentes que valem estudar
+
+- 21st — iPhone 16 Pro: https://21st.dev/%40designali-in/components/iphone-16-pro
+- 21st — Glass Real-time Chart: https://21st.dev/%40moazamtrade/components/glass-real-time-crypto-chart
+- 21st — Area Chart Analytics Card: https://21st.dev/%40ahmedmayara/components/area-chart-analytics-card
+- 21st — Line Charts 5: https://21st.dev/community/components/reui/line-charts-5/default
+- 21st — 3D Wrapper: https://21st.dev/community/components/badtzx0/3d-wrapper
+- 21st — Stats Card: https://21st.dev/%40kavikatiyar/components/stats-card-1
+
+No React Bits, pesquisar pelos componentes `Count Up`, `Animated Content`, `Glass Surface`, `Fluid Glass`, `Reflective Card`, `Spotlight Card`, `Tilted Card` e `Electric Border`.
+
+## Repositórios citados
+
+- shadcn-ui-dashboard: https://github.com/shadcn-examples/shadcn-ui-dashboard
+- next-shadcn-dashboard-starter: https://github.com/Kiranism/next-shadcn-dashboard-starter
+- shadcndashboard: https://github.com/shadcndashboard/shadcndashboard
+
+## Regra de uso
+
+Verifique licença, dependências, acessibilidade e compatibilidade antes de adaptar qualquer componente. Use as referências como matéria-prima, não como cópia integral.
+

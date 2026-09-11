@@ -1,61 +1,119 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from 'react';
 import { motion } from 'motion/react';
 import { FilterX } from 'lucide-react';
 import type { ShellActions } from '../App';
 import { useApp } from '../state/AppContext';
 import { pageVariants } from '../lib/motion';
-import { Card, EmptyState, PageHeader } from '../components/ui/Surfaces';
+import { Card, EmptyState, PageHeader, SectionLabel } from '../components/ui/Surfaces';
 import { Button } from '../components/ui/Button';
+import { Reveal } from '../components/ui/Reveal';
 import {
   NO_FOCUS,
-  OUTCOMES,
   chartRangeForPeriod,
   cockpitSnapshot,
   focusLabel,
   periodMeta,
   snapshotKey,
 } from '../lib/cockpit';
-import type { ChartRange, CockpitFocus } from '../lib/cockpit';
+import type { ChartRange, CockpitFocus, Kpi } from '../lib/cockpit';
+import { heroSeries, kpiSparks, pulseModel, signalMovement } from '../lib/pulse';
+import { TOTAL_MONITORED } from '../data/institution';
 import type { SignalKey } from '../data/institution';
-import { STATUS_SLUG } from '../lib/healthScore';
-import { CockpitFilters } from '../components/cockpit/CockpitFilters';
-import { CockpitKpis } from '../components/cockpit/CockpitKpis';
-import type { KpiAction } from '../components/cockpit/CockpitKpis';
+import { ContextBar } from '../components/dashboard/ContextBar';
+import { PulseHero } from '../components/dashboard/PulseHero';
+import { PulseDevice } from '../components/dashboard/PulseDevice';
+import { DrillPanel } from '../components/dashboard/DrillPanel';
+import type { DrillKey } from '../components/dashboard/PulsePhoneApp';
+import { KpiStrip } from '../components/dashboard/KpiStrip';
+import type { KpiCell } from '../components/dashboard/KpiStrip';
+import { AttentionFunnel } from '../components/dashboard/AttentionFunnel';
+import { SignalRanking } from '../components/dashboard/SignalRanking';
+import { OutcomeComposition } from '../components/dashboard/OutcomeComposition';
 import { EvolutionPanel } from '../components/cockpit/EvolutionPanel';
 import { JourneyPanel } from '../components/cockpit/JourneyPanel';
 import { InterventionsPanel } from '../components/cockpit/OperationPanels';
 import { PieCard } from '../components/cockpit/PieCard';
-import { AUTOMATION_COLOR, SIGNAL_COLOR, bandColors, outcomeColor } from '../components/cockpit/palette';
+import { AUTOMATION_COLOR } from '../components/cockpit/palette';
 import { decimal, int } from '../lib/format';
 
 /* ==========================================================================
-   Dashboard — Gestão
+   Dashboard — Student Pulse
    --------------------------------------------------------------------------
-   Tudo o que responde "como a operação está indo" mora aqui, e não no Cockpit.
-   A separação não é organizacional, é de público: o atendente abre o Cockpit
-   para saber o que fazer nos próximos dez minutos; a coordenação abre o
-   Dashboard para saber se o mês está funcionando. São perguntas diferentes, com
-   horizontes diferentes, e empilhá-las na mesma tela fez o Cockpit ficar longo
-   justamente para quem tem menos tempo.
+   Superfície de decisão diária. A pergunta que o Cockpit responde é "o que eu
+   faço nos próximos dez minutos"; a que esta tela responde é "o mês está
+   funcionando, e onde ele não está".
 
-   Aqui o scroll é bem-vindo — quem entra veio analisar.
+   Estrutura, e o peso de cada dobra é deliberado:
 
-   Um único ponto de azul preenchido: a TAXA DE ESTABILIZAÇÃO. Todos os outros
-   números da tela existem para explicar aquele. Volume de atendimento não é
-   resultado, e a hierarquia de cor diz isso antes de qualquer legenda.
+     PRIMEIRA DOBRA   abertura editorial com a leitura do ciclo, o indicador
+                      protagonista em vidro cristalino sobre a sua própria
+                      série em colunas, três chamadas, uma ação — e, à direita,
+                      o aparelho em dimensão real, que não ilustra o painel:
+                      ele o PILOTA.
+     SEGUNDA FAIXA    quatro indicadores primários, em superfície limpa. O
+                      material é do hero; aqui o que interessa é o valor e a
+                      variação, e um preenchimento de fundo responderia uma
+                      pergunta que ninguém fez (ver `KpiStrip`).
+     NÚCLEO           uma visualização dominante (evolução) e três módulos
+                      auxiliares que trocaram donut por forma adequada.
+     ABAIXO DA DOBRA  operação e automação, que são leitura de apoio.
+
+   A REGRA QUE GOVERNA ESTA TELA NESTA VERSÃO: NADA SAI DA ABA.
+
+   Antes, quase todo elemento clicável levava para a Fila de Atendimento, para
+   os Radares ou para a Base de Alunos. Era um erro de público, não de rota:
+   quem lê o Dashboard é a gestão e a diretoria, e a Fila é a ferramenta do
+   atendente. Despachar um diretor para a fila operacional para explicar por
+   que o alto risco subiu é responder "abra o sistema" a quem perguntou "como
+   estamos".
+
+   Agora todo aprofundamento acontece no `DrillPanel`, sobre o MESMO snapshot
+   que a página já calculou — então é impossível o detalhe discordar do cartão
+   que o abriu. As duas únicas exceções são a Base de Alunos e o botão de
+   limpar filtros, que não são aprofundamento e sim outra tarefa.
+
+   Nenhum indicador foi removido em nenhuma das reorganizações. O que mudou foi
+   peso, forma e nome — e três nomes mudaram porque estavam errados:
+
+     · "Em atenção" virou "Casos em atenção humana", porque 163 são casos e
+       1.741 são alunos numa faixa de score, e a tela mostrava os dois sem
+       distinguir.
+     · "Alto risco" virou "Casos de alto risco", porque a faixa de Health Score
+       chamada "Alto risco" tem 605 alunos e o indicador tinha 30 casos.
+     · O donut de sinais virou ranking de variação, porque cinco arcos de
+       tamanho parecido não respondem "o que mudou?".
    ========================================================================== */
 
-export function DashboardView({ actions }: { actions: ShellActions }) {
+/** Tradução de um degrau do funil para o painel que o explica. */
+const FUNNEL_DRILL: Record<string, DrillKey> = {
+  monitorada: 'atencao',
+  faixa: 'atencao',
+  humana: 'atencao',
+  'alto-risco': 'alto-risco',
+  retencao: 'retencao',
+};
+
+/**
+ * `actions` continua na assinatura porque o shell entrega o mesmo contrato a
+ * todas as views — mas esta tela não consome nenhuma delas, e a ausência é o
+ * requisito, não um esquecimento. Um `goto` disponível aqui é um convite a
+ * mandar a diretoria para a Fila de Atendimento, e foi assim que a versão
+ * anterior acabou com nove saídas para telas de outro público. Se um dia esta
+ * tela precisar de uma ação de shell, ela será um `openStudent` explícito com
+ * um rótulo que diz que sai daqui.
+ */
+export function DashboardView(_props: { actions: ShellActions }) {
   const { censusScope, period, resetFilters, filtersActive, theme } = useApp();
   const dark = theme === 'dark';
 
   const [focus, setFocus] = useState<CockpitFocus>(NO_FOCUS);
   const [range, setRange] = useState<ChartRange>(() => chartRangeForPeriod(period));
+  const [drill, setDrill] = useState<DrillKey | null>(null);
 
-  /* A janela do gráfico acompanha o período global — trocar para "90 dias" no
-     alto da página e o gráfico continuar em 30 seria um filtro que não filtra.
-     "Hoje" não tem linha correspondente, então a janela fica onde está e o
-     controle local do cartão continua disponível. */
+  /* A janela do gráfico acompanha a janela operacional — trocar para "90 dias"
+     no alto e o gráfico continuar em 30 seria um filtro que não filtra. "Hoje"
+     não tem linha correspondente, então o intervalo fica onde está e o controle
+     local do cartão continua disponível. */
   useEffect(() => {
     if (period !== 'hoje') setRange(chartRangeForPeriod(period));
   }, [period]);
@@ -64,6 +122,11 @@ export function DashboardView({ actions }: { actions: ShellActions }) {
     () => cockpitSnapshot(censusScope, period, focus),
     [censusScope, period, focus],
   );
+
+  const pulse = useMemo(() => pulseModel(snapshot), [snapshot]);
+  const series = useMemo(() => heroSeries(snapshot), [snapshot]);
+  const signals = useMemo(() => signalMovement(snapshot), [snapshot]);
+  const sparks = useMemo(() => kpiSparks(snapshot), [snapshot]);
 
   /* Um sinal que deixou de existir no novo escopo não pode continuar recortando
      a página — o usuário veria "0 casos" sem entender de onde veio o zero. */
@@ -79,18 +142,60 @@ export function DashboardView({ actions }: { actions: ShellActions }) {
     [censusScope, period, focus],
   );
 
-  const toggleSignal = useCallback((key: SignalKey) => {
-    setFocus((current) =>
-      current.kind === 'signal' && current.key === key ? NO_FOCUS : { kind: 'signal', key },
-    );
-  }, []);
+  /* -- Aviso de recálculo -------------------------------------------------
+     Os agregados são sincronos, então não existe estado de carregamento real a
+     mostrar. O que existe é uma troca de escopo, e o requisito é anunciá-la sem
+     layout shift. O aviso acende por 420ms na mudança de chave do snapshot e
+     apaga — tempo suficiente para o leitor de tela anunciar e para o olho
+     registrar que a página respondeu, sem simular latência que não existe. */
+  const [recalculating, setRecalculating] = useState(false);
+  const firstRender = useRef(true);
+  useEffect(() => {
+    if (firstRender.current) {
+      firstRender.current = false;
+      return;
+    }
+    setRecalculating(true);
+    const t = window.setTimeout(() => setRecalculating(false), 420);
+    return () => window.clearTimeout(t);
+  }, [seriesKey]);
+
+  /* -- Por que o recorte é uma transição -----------------------------------
+     Trocar o foco recalcula o snapshot inteiro e re-renderiza a dobra de vidro,
+     o aparelho, o gráfico de evolução, o funil, o ranking e as duas pizzas —
+     tudo num commit só. Sem `startTransition` esse commit acontece DENTRO do
+     clique: o navegador não consegue pintar sequer o estado pressionado do
+     item antes de o trabalho terminar, e o que se vê é a página travar por um
+     quadro e só então responder.
+
+     Marcada como transição, a re-renderização deixa de ser urgente. O toque
+     pinta na hora (o `whileTap` do item e o realce da linha), o React trabalha
+     depois e pode ser interrompido se outro clique chegar antes — o que
+     importa quando alguém alterna dois sinais em sequência rápida.
+
+     `isPending` alimenta o mesmo aviso de "recalculando" que a troca de escopo
+     já usa: agora ele acende sobre trabalho real em vez de sobre um timer. */
+  const [pending, startFocusTransition] = useTransition();
+
+  const toggleSignal = useCallback(
+    (key: SignalKey) => {
+      startFocusTransition(() => {
+        setFocus((current) =>
+          current.kind === 'signal' && current.key === key ? NO_FOCUS : { kind: 'signal', key },
+        );
+      });
+    },
+    [startFocusTransition],
+  );
 
   const toggleHighRisk = useCallback(() => {
-    setFocus((current) => (current.kind === 'high-risk' ? NO_FOCUS : { kind: 'high-risk' }));
-  }, []);
+    startFocusTransition(() => {
+      setFocus((current) => (current.kind === 'high-risk' ? NO_FOCUS : { kind: 'high-risk' }));
+    });
+  }, [startFocusTransition]);
 
-  /* -- Rótulo do escopo, em palavras -------------------------------------
-     Nenhum gráfico deve poder ser lido fora de contexto depois de um filtro. */
+  const openDrill = useCallback((key: DrillKey) => setDrill(key), []);
+
   const scopeLabel = useMemo(() => {
     const parts = [
       censusScope.modality !== 'Todas' ? censusScope.modality : null,
@@ -103,7 +208,7 @@ export function DashboardView({ actions }: { actions: ShellActions }) {
 
   const emptyReason = useMemo(() => {
     if (censusScope.cohort === 'Calouro' && censusScope.period > 1) {
-      return 'Um ingressante está, por definição, no 1º período — a janela de 90 dias termina antes do segundo. Deixe o período acadêmico em "Todos", ou troque a coorte para veteranos.';
+      return 'Um ingressante está, por definição, no 1º período — a janela de 90 dias termina antes do segundo. Deixe o período acadêmico em "Todos", ou troque o perfil para veteranos.';
     }
     if (censusScope.course !== 'Todos' && censusScope.modality !== 'Todas') {
       return `${censusScope.course} não é ofertado na modalidade ${censusScope.modality} neste ciclo. Os tecnológicos existem só no híbrido, e alguns bacharelados só no presencial.`;
@@ -114,83 +219,150 @@ export function DashboardView({ actions }: { actions: ShellActions }) {
   const activeFocus = focusLabel(focus);
   const meta = periodMeta(period);
 
-  const kpiActions: Record<string, KpiAction> = {
-    monitorados: { kind: 'link', run: () => actions.goto('alunos'), hint: 'Abrir a base de alunos' },
-    atencao: {
-      kind: 'link',
-      run: () => actions.goto('fila', 'equipe'),
-      hint: 'Abrir a fila com os casos da equipe',
-    },
-    'alto-risco': {
-      kind: 'focus',
-      active: focus.kind === 'high-risk',
-      run: toggleHighRisk,
-      hint: 'Recortar a página apenas no alto risco',
-    },
-    intervencoes: {
-      kind: 'link',
-      run: () => actions.goto('fila', 'equipe'),
-      hint: 'Abrir a fila de atendimento',
-    },
-    estabilizacao: {
-      kind: 'link',
-      run: () => actions.goto('indicadores'),
-      hint: 'Abrir os indicadores e as exportações',
-    },
+  /* -- Renomear os indicadores da faixa ----------------------------------
+     `lib/cockpit` é compartilhado com o Cockpit, então os rótulos são
+     reescritos AQUI em vez de na fonte: mudar `Kpi.label` no selector mudaria
+     também a tela do atendente, que não tem o funil ao lado para explicar a
+     diferença entre faixa de score e caso aberto. */
+  const RELABEL: Partial<Record<Kpi['key'], string>> = {
+    atencao: 'Casos em atenção humana',
+    'alto-risco': 'Casos de alto risco',
+    intervencoes: `Intervenções ${meta.inline}`,
   };
 
-  /* -- Pizzas ------------------------------------------------------------- */
+  const kpiOf = (key: Kpi['key']): Kpi => {
+    const found = snapshot.kpis.find((k) => k.key === key)!;
+    const label = RELABEL[key];
+    return label ? { ...found, label } : found;
+  };
 
-  const bandSlices = useMemo(() => {
-    const colors = bandColors(dark);
-    return snapshot.bands.map((band, i) => ({
-      key: band.status,
-      label: band.label,
-      value: band.count,
-      color: colors[i],
-    }));
-  }, [snapshot.bands, dark]);
+  /* -- As frações que cada denominador produz ----------------------------
+     Não desenham nada: são o texto do denominador impresso no pé de cada
+     célula. A faixa é limpa de propósito (ver `KpiStrip`), então a proporção é
+     publicada em número em vez de virar preenchimento colorido. */
+  const monitoredShare = (snapshot.base.monitored / Math.max(1, TOTAL_MONITORED)) * 100;
+  const attentionShare = (snapshot.cases.attention / Math.max(1, snapshot.base.monitored)) * 100;
+  const highRiskShare = (snapshot.cases.highRisk / Math.max(1, snapshot.cases.attention)) * 100;
+  const settledShare =
+    (snapshot.operations.concluded / Math.max(1, snapshot.operations.received)) * 100;
 
-  const signalSlices = useMemo(
-    () =>
-      [...snapshot.signals]
-        .sort((a, b) => b.count - a.count)
-        .map((signal) => ({
-          key: signal.key,
-          label: signal.label,
-          value: signal.count,
-          color: focus.kind === 'signal' && focus.key === signal.key
-            ? SIGNAL_COLOR.active
-            : signalTint(signal.key, dark),
-          detail:
-            signal.highRisk > 0 ? (
-              <>
-                <span className="font-mono font-medium text-ink-3">{int(signal.highRisk)}</span> em
-                alto risco
-              </>
-            ) : undefined,
-        })),
-    [snapshot.signals, focus, dark],
-  );
+  const leadCell: KpiCell = {
+    kpi: kpiOf('monitorados'),
+    spark: sparks.monitorados,
+    hint: 'Ver a composição da base',
+    onClick: () => openDrill('atencao'),
+    denominator: (
+      <>
+        <span className="font-mono font-medium text-ink tabular">
+          {decimal(monitoredShare, 1)}%
+        </span>{' '}
+        do censo institucional de{' '}
+        <span className="font-mono tabular">{int(TOTAL_MONITORED)}</span> alunos monitorados
+      </>
+    ),
+    definition: (
+      <>
+        Toda a graduação presencial e híbrida sob leitura automática de sinais. É a{' '}
+        <strong className="font-semibold text-ink">população</strong> do escopo, não uma fila: a
+        maioria destes alunos nunca é acionada. Denominador de quase todas as taxas desta página. O
+        denominador ao lado diz o tamanho deste recorte dentro do censo inteiro.
+      </>
+    ),
+  };
 
-  const outcomeSlices = useMemo(
-    () =>
-      OUTCOMES.map((outcome) => ({
-        key: outcome.key,
-        label: outcome.label,
-        value: snapshot.operations.outcomes.counts[outcome.key],
-        color: outcomeColor(outcome.key, dark),
-        detail: outcome.settled ? undefined : 'ainda sem desfecho apurado',
-      })),
-    [snapshot.operations.outcomes.counts, dark],
-  );
+  const cells: KpiCell[] = [
+    {
+      kpi: kpiOf('atencao'),
+      spark: sparks.atencao,
+      hint: 'Ver quanto da base exige uma pessoa',
+      onClick: () => openDrill('atencao'),
+      denominator: (
+        <>
+          <span className="font-mono font-medium text-ink tabular">
+            {decimal(attentionShare, 2)}%
+          </span>{' '}
+          de <span className="font-mono tabular">{int(snapshot.base.monitored)}</span> alunos
+          monitorados
+        </>
+      ),
+      definition: (
+        <>
+          <strong className="font-semibold text-ink">Casos abertos</strong> com uma pessoa
+          responsável — desvios que a automação não resolveu. Não confundir com a{' '}
+          <strong className="font-semibold text-ink">faixa de atenção</strong> do Health Score, que
+          é uma classificação de {int(snapshot.base.bands[1])} alunos sem caso aberto. O funil de
+          atenção abaixo mostra as duas medidas lado a lado.
+        </>
+      ),
+    },
+    {
+      kpi: kpiOf('alto-risco'),
+      spark: sparks['alto-risco'],
+      active: focus.kind === 'high-risk',
+      hint: 'Recortar a página apenas no alto risco',
+      onClick: toggleHighRisk,
+      denominator: (
+        <>
+          <span className="font-mono font-medium text-ink tabular">
+            {decimal(highRiskShare, 1)}%
+          </span>{' '}
+          de <span className="font-mono tabular">{int(snapshot.cases.attention)}</span> casos em
+          atenção humana
+        </>
+      ),
+      definition: (
+        <>
+          Subconjunto dos casos em atenção humana com risco elevado de não permanência.
+          Denominador: {int(snapshot.cases.attention)} casos em atenção humana. A{' '}
+          <strong className="font-semibold text-ink">faixa</strong> de Health Score de mesmo nome
+          tem {int(snapshot.base.bands[2])} alunos — é outra medida. Clicar aqui recorta a página
+          inteira no alto risco.
+        </>
+      ),
+    },
+    {
+      kpi: kpiOf('intervencoes'),
+      spark: sparks.intervencoes,
+      hint: 'Ver o desfecho de cada intervenção',
+      onClick: () => openDrill('intervencoes'),
+      denominator: (
+        <>
+          <span className="font-mono font-medium text-ink tabular">
+            {decimal(settledShare, 1)}%
+          </span>{' '}
+          com desfecho apurado ·{' '}
+          <span className="font-mono tabular">{int(snapshot.operations.pending)}</span> em
+          acompanhamento
+        </>
+      ),
+      definition: (
+        <>
+          Contatos humanos abertos na janela{' '}
+          <strong className="font-semibold text-ink">{meta.label.toLowerCase()}</strong>. Volume não
+          é resultado: {int(snapshot.operations.concluded)} tiveram desfecho apurado e{' '}
+          {int(snapshot.operations.pending)} seguem em acompanhamento. A taxa de
+          estabilização no alto da página é o resultado.
+        </>
+      ),
+    },
+  ];
 
   const automationSlices = useMemo(() => {
     const a = snapshot.automation;
     return [
       { key: 'auto', label: 'Automático concluído', value: a.auto, color: AUTOMATION_COLOR.auto },
-      { key: 'pending', label: 'Pendência na régua', value: a.pending, color: AUTOMATION_COLOR.pending },
-      { key: 'human', label: 'Intervenção humana', value: a.human, color: AUTOMATION_COLOR.human },
+      {
+        key: 'pending',
+        label: 'Pendência na régua',
+        value: a.pending,
+        color: AUTOMATION_COLOR.pending,
+      },
+      {
+        key: 'human',
+        label: 'Intervenção humana',
+        value: a.human,
+        color: AUTOMATION_COLOR.human,
+      },
     ];
   }, [snapshot.automation]);
 
@@ -222,10 +394,10 @@ export function DashboardView({ actions }: { actions: ShellActions }) {
           </>
         }
         title="Dashboard"
-        description="Índices, evolução e resultado da operação. Para o trabalho do turno, o Cockpit."
-      >
-        <CockpitFilters />
-      </PageHeader>
+        description="Pulso do ciclo, evolução e resultado da operação. Todo aprofundamento acontece nesta aba — para o trabalho do turno, o Cockpit."
+      />
+
+      <ContextBar loading={recalculating || pending} />
 
       {snapshot.empty ? (
         <Card>
@@ -244,180 +416,131 @@ export function DashboardView({ actions }: { actions: ShellActions }) {
         </Card>
       ) : (
         <>
-          {/* 1 — Indicadores executivos. A estabilização em azul. */}
-          <CockpitKpis
-            kpis={snapshot.kpis}
-            period={period}
-            actions={kpiActions}
-            accentKey="estabilizacao"
+          {/* 1 — Primeira dobra: a decisão, e o aparelho que a pilota. */}
+          <PulseHero
+            pulse={pulse}
+            series={series}
+            onOpenDrill={openDrill}
+            device={
+              <PulseDevice
+                snapshot={snapshot}
+                pulse={pulse}
+                signals={signals}
+                scopeLabel={scopeLabel}
+                focusKey={focus.kind === 'signal' ? focus.key : null}
+                onToggleSignal={toggleSignal}
+                onOpenDrill={openDrill}
+              />
+            }
           />
 
-          {/* 2 — Evolução */}
-          <EvolutionPanel
-            agg={snapshot.base}
-            seriesKey={seriesKey}
-            range={range}
-            onRangeChange={setRange}
-            scopeLabel={scopeLabel}
-          />
+          {/* Alternativa textual da primeira dobra. Não é `sr-only` por acaso:
+              o mesmo texto alimenta leitor de tela e a impressão do relatório,
+              onde o vidro e o aparelho não existem. */}
+          <p className="sr-only print:not-sr-only print:block">{pulse.summary}</p>
 
-          {/* 3 — As três pizzas que respondem "onde", "o quê" e "deu certo?" */}
-          <div className="grid gap-5 lg:grid-cols-2 xl:grid-cols-3">
-            <PieCard
-              title="Distribuição de risco"
-              subtitle="Leitura do Health Score sobre toda a base monitorada."
-              slices={bandSlices}
-              centerValue={snapshot.base.monitored}
-              centerLabel="monitorados"
-              onSliceClick={(key) => {
-                const band = snapshot.bands.find((b) => b.status === key);
-                if (band) actions.goto('alunos', STATUS_SLUG[band.status]);
-              }}
-              emptyMessage="Nenhum aluno no escopo selecionado."
-              footer={
-                <>
-                  <span className="font-mono font-medium text-ink">
-                    {int(snapshot.base.monitored)}
-                  </span>{' '}
-                  monitorados →{' '}
-                  <span className="font-mono font-medium text-ink">
-                    {int(snapshot.base.attention)}
-                  </span>{' '}
-                  em atenção humana →{' '}
-                  <span className="font-mono font-medium text-ink">
-                    {int(snapshot.base.highRisk)}
-                  </span>{' '}
-                  em alto risco →{' '}
-                  <span className="font-mono font-medium text-ink">
-                    {int(snapshot.base.retention)}
-                  </span>{' '}
-                  em retenção.{' '}
-                  {snapshot.base.monitored > 0 &&
-                    `${decimal((1 - snapshot.base.attention / snapshot.base.monitored) * 100, 1)}% da base seguiu sem qualquer toque humano.`}
-                  {activeFocus && (
+          {/* 2 — Indicadores primários, em superfície limpa. */}
+          <Reveal>
+            <KpiStrip lead={leadCell} cells={cells} period={period} />
+          </Reveal>
+
+          {/* 3 — Núcleo analítico: uma dominante + auxiliares. */}
+          <Reveal>
+            <div className="grid gap-5 xl:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
+              <EvolutionPanel
+                agg={snapshot.base}
+                seriesKey={seriesKey}
+                range={range}
+                onRangeChange={setRange}
+                scopeLabel={scopeLabel}
+              />
+              <AttentionFunnel
+                stages={pulse.funnel}
+                onSelect={(stageKey) => openDrill(FUNNEL_DRILL[stageKey] ?? 'atencao')}
+              />
+            </div>
+          </Reveal>
+
+          <Reveal>
+            <div className="grid gap-5 xl:grid-cols-2">
+              <SignalRanking
+                rows={signals}
+                activeKey={focus.kind === 'signal' ? focus.key : null}
+                onSelect={toggleSignal}
+                windowLabel={meta.label}
+              />
+              <OutcomeComposition
+                outcomes={snapshot.operations.outcomes}
+                windowInline={meta.inline}
+                dark={dark}
+              />
+            </div>
+          </Reveal>
+
+          {/* 4 — Jornada. Os dois trilhos abrem o painel correspondente: o de
+              entrada é a régua de ingressantes, o da base é a composição. */}
+          <Reveal>
+            <JourneyPanel
+              stages={snapshot.journey}
+              focusLabel={activeFocus}
+              onOpenTrack={(track) => openDrill(track === 'entrada' ? 'automacao' : 'atencao')}
+            />
+          </Reveal>
+
+          {/* 5 — Leitura de apoio, abaixo da dobra. */}
+          <Reveal>
+            <div className="space-y-3">
+              <SectionLabel>Operação e automação</SectionLabel>
+              <div className="grid items-start gap-5 xl:grid-cols-[minmax(0,1fr)_360px]">
+                <InterventionsPanel
+                  operations={snapshot.operations}
+                  period={period}
+                  actionLabel="Ver os desfechos"
+                  onOpenQueue={() => openDrill('intervencoes')}
+                />
+
+                <PieCard
+                  title="Automação × intervenção humana"
+                  subtitle="Automatizar o normal, detectar o desvio, humanizar a exceção — medido."
+                  slices={automationSlices}
+                  centerValue={snapshot.automation.freshmen}
+                  centerLabel="ingressantes"
+                  emptyMessage="Nenhum ingressante no escopo. A régua só existe dentro da janela de 90 dias."
+                  footer={
                     <>
-                      {' '}
-                      Este funil é da base inteira, sem o recorte de{' '}
-                      <span className="text-ink-2">{activeFocus}</span>.
+                      <span className="font-mono font-medium text-ink tabular">
+                        {decimal(100 - snapshot.automation.humanPercent, 1)}%
+                      </span>{' '}
+                      da régua segue sem uma pessoa, sobre{' '}
+                      <span className="font-mono tabular">
+                        {int(snapshot.automation.freshmen)}
+                      </span>{' '}
+                      ingressantes na janela. Cada ponto que sai desta conta é uma ligação que a
+                      equipe não precisou fazer.
                     </>
-                  )}
-                </>
-              }
-            />
-
-            <PieCard
-              title="Principais sinais detectados"
-              subtitle={
-                snapshot.cases.attention === 0
-                  ? 'Nenhuma exceção humana no escopo selecionado.'
-                  : `O que disparou as ${int(snapshot.cases.attention)} exceções que chegaram a uma pessoa. Clique para recortar.`
-              }
-              action={
-                activeFocus && focus.kind === 'signal' ? (
-                  <button
-                    onClick={() => setFocus(NO_FOCUS)}
-                    className="text-[12px] font-medium text-brand-text transition-colors hover:text-brand-2"
-                  >
-                    Limpar recorte
-                  </button>
-                ) : undefined
-              }
-              slices={signalSlices}
-              centerValue={snapshot.cases.attention}
-              centerLabel="em atenção"
-              activeKey={focus.kind === 'signal' ? focus.key : null}
-              onSliceClick={(key) => toggleSignal(key as SignalKey)}
-              emptyMessage="Nenhum sinal ativo no escopo."
-              footer={
-                focus.kind === 'signal'
-                  ? 'Indicadores, jornada e operação já estão recortados por este sinal.'
-                  : 'A distribuição de risco acima descreve a base; esta descreve os casos.'
-              }
-            />
-
-            <PieCard
-              title="Resultado das intervenções"
-              subtitle={`Desfecho dos ${int(snapshot.operations.outcomes.received)} contatos abertos ${meta.inline}.`}
-              slices={outcomeSlices}
-              centerValue={Math.round(snapshot.operations.outcomes.rate)}
-              centerLabel="% estabilizados"
-              emptyMessage="Nenhuma intervenção na janela selecionada."
-              footer={
-                <>
-                  <span className="font-mono font-medium text-ink">
-                    {int(snapshot.operations.outcomes.counts.estabilizado)}
-                  </span>{' '}
-                  estabilizados ÷{' '}
-                  <span className="font-mono font-medium text-ink">
-                    {int(snapshot.operations.outcomes.settled)}
-                  </span>{' '}
-                  com desfecho apurado. Os{' '}
-                  <span className="font-mono">
-                    {int(snapshot.operations.outcomes.counts.acompanhamento)}
-                  </span>{' '}
-                  em acompanhamento ficam fora da conta até fechar. Um caso só conta como
-                  estabilizado quando o sinal que o abriu deixa de aparecer nos ciclos seguintes.
-                </>
-              }
-            />
-          </div>
-
-          {/* 4 — Jornada */}
-          <JourneyPanel
-            stages={snapshot.journey}
-            focusLabel={activeFocus}
-            onOpenTrack={(track) => actions.goto(track === 'entrada' ? 'onboarding' : 'alunos')}
-          />
-
-          {/* 5 — Operação e a quarta pizza: quanto a máquina resolveu sozinha */}
-          <div className="grid items-start gap-5 xl:grid-cols-[minmax(0,1fr)_360px]">
-            <InterventionsPanel
-              operations={snapshot.operations}
-              period={period}
-              onOpenQueue={() => actions.goto('fila', 'equipe')}
-            />
-
-            <PieCard
-              title="Automação × intervenção humana"
-              subtitle="Automatizar o normal, detectar o desvio, humanizar a exceção — medido."
-              slices={automationSlices}
-              centerValue={snapshot.automation.freshmen}
-              centerLabel="ingressantes"
-              emptyMessage="Nenhum ingressante no escopo. A régua só existe dentro da janela de 90 dias."
-              footer={
-                <>
-                  <span className="font-mono font-medium text-ink">
-                    {decimal(100 - snapshot.automation.humanPercent, 1)}%
-                  </span>{' '}
-                  da régua segue sem uma pessoa. Cada ponto que sai desta conta é uma ligação que a
-                  equipe não precisou fazer.
-                </>
-              }
-            />
-          </div>
+                  }
+                />
+              </div>
+            </div>
+          </Reveal>
 
           <p className="px-1 pb-2 text-[11px] leading-relaxed text-ink-4">
-            {int(snapshot.base.monitored)} alunos monitorados no escopo{' '}
-            <span className="text-ink-3">{scopeLabel.toLowerCase()}</span>. Os agregados vêm do censo
-            institucional; a fila e os dossiês operam sobre a amostra de alunos carregada nesta
-            versão.
+            <span className="font-mono tabular">{int(snapshot.base.monitored)}</span> alunos
+            monitorados no escopo <span className="text-ink-3">{scopeLabel.toLowerCase()}</span>. Os
+            agregados vêm do censo institucional; a fila e os dossiês operam sobre a amostra de
+            alunos carregada nesta versão.
           </p>
+
+          {/* O aprofundamento, sempre dentro desta aba. */}
+          <DrillPanel
+            drill={drill}
+            snapshot={snapshot}
+            pulse={pulse}
+            signals={signals}
+            onClose={() => setDrill(null)}
+          />
         </>
       )}
     </motion.div>
   );
-}
-
-/**
- * Tinta das fatias de sinal. Não usa a rampa de risco porque sinal não é
- * severidade: "financeiro" não é pior que "acadêmico". É uma escala de cinzas em
- * ordem de volume, e o azul só aparece na fatia recortada.
- */
-function signalTint(key: string, dark: boolean): string {
-  const ramp = dark
-    ? ['#c3c9d1', '#a4abb5', '#8b929c', '#727984', '#5a606a']
-    : ['#4b5563', '#6b7280', '#868d99', '#a1a8b3', '#bcc2cc'];
-  const order = ['acesso', 'frequencia', 'financeiro', 'academico', 'onboarding'];
-  const i = order.indexOf(key);
-  return ramp[i < 0 ? 0 : i];
 }

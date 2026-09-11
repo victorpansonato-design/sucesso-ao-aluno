@@ -171,9 +171,14 @@ export function Segmented<T extends string>({
     <div
       role="tablist"
       className={[
-        'inline-flex shrink-0 items-center gap-0.5 rounded-full p-0.5',
-        tone === 'band' ? 'bg-surface-3' : 'bg-surface-2',
-        full ? 'w-full' : '',
+        /* `.seg-track` e `.seg-thumb` dão ESPESSURA ao controle: luz na aresta
+           de cima da pastilha, sombra de contato embaixo, trilho afundado. A
+           diferença entre um segmentado bonito e um botão com fundo é
+           exatamente essa — a pastilha selecionada precisa parecer estar
+           ACIMA do trilho, não pintada nele. */
+        'seg-track shrink-0 items-center',
+        tone === 'band' ? 'bg-surface-3' : '',
+        full ? 'flex w-full' : '',
       ].join(' ')}
     >
       {options.map((opt) => {
@@ -196,7 +201,7 @@ export function Segmented<T extends string>({
               <motion.span
                 layoutId={layoutId}
                 transition={spring}
-                className="absolute inset-0 rounded-full bg-surface"
+                className="seg-thumb"
               />
             )}
             <span className="relative z-10 flex items-center gap-1.5">

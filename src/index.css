@@ -98,6 +98,110 @@
   --track: #e6e8eb;
   --skeleton: #eaecf0;
 
+  /* -- Material: vidro e verde vital --------------------------------------
+     Sexta regra, e ela é a mesma das outras cinco em outra dimensão:
+     MATERIAL É CONQUISTADO. Assim como o azul institucional aparece em três
+     lugares para continuar significando algo, o vidro aparece em UM objeto
+     protagonista por dobra. Um sistema todo de vidro não é luxuoso — é
+     ilegível, e custa duas camadas de composição por card.
+
+     `--vital` é o único verde novo do sistema e ele significa exatamente uma
+     coisa: PROGRESSO MEDIDO. Nunca é a cor de um card genérico, nunca pinta um
+     risco de verde. A rampa de risco (SCORE_BANDS) continua sendo a única
+     escala ordinal, e este verde não pertence a ela.
+
+     Ele é o verde de TEXTO e de fio — fechado o suficiente para passar
+     contraste sobre superfície clara. O verde de PIGMENTO das colunas do
+     gráfico é outro (`--plot-*`, abaixo), e a diferença não é gosto: uma coluna
+     de 120px pintada com um verde de texto fica escura e morta. */
+  --vital: #17a355;
+  --vital-2: #0f8a45;
+  --vital-ink: #0b6a35;
+  --vital-soft: #eaf6ef;
+
+  /* -- Slab editorial: a abertura de um painel ----------------------------
+     Ela era grafite (#101317) com um halo verde. O grafite não estava errado
+     como material, estava errado como IDENTIDADE: a maior superfície colorida
+     de duas telas inteiras não pertencia à marca, e o halo verde fazia o
+     `--vital` — que no sistema significa PROGRESSO MEDIDO — virar decoração de
+     cabeçalho. Agora a abertura é o azul institucional, o mesmo do botão
+     primário: a peça mais visível da página passa a dizer de quem ela é.
+
+     É um token próprio e não um `--brand` direto porque o slab é uma
+     superfície de TIPOGRAFIA GRANDE EM BRANCO, e `--brand` no tema escuro é um
+     azul claro (#2b7cc9) que derrubaria o texto para 3,5:1. O slab tem o seu
+     próprio azul nos dois temas — fechado o suficiente para branco passar
+     10:1 no claro e ~13:1 no escuro.
+
+     UM token, e não quatro: o halo, o piso e a trama de pontos saíram. Cor
+     chapada é a decisão, não uma simplificação temporária. */
+  --slab: #00427f;
+
+  /* Um objeto de vidro não é um card: é um objeto. Por isso ele tem o seu
+     próprio raio, e o aparelho tem o dele. Exceções NOMEADAS ao raio único de
+     12px — não uma mistura aleatória. */
+  --radius-glass: 18px;
+  --radius-device: 42px;
+  /* O vidro cristalino é o objeto mais generoso do sistema e por isso tem o
+     raio mais aberto: 26px é o ponto em que a lâmina lê como um bloco de vidro
+     em vez de um card com cantos arredondados. */
+  --radius-crystal: 26px;
+
+  /* Geometria do objeto de vidro. Grade, colunas e placa leem os MESMOS
+     valores — três números iguais escritos em três lugares é como a régua de
+     um gráfico sai de lugar na primeira manutenção. */
+  --cg-pad-x: 20px;
+  --cg-pad-r: 34px;
+  --cg-pad-y: 18px;
+  --cg-gap: 11px;
+  --cg-col-max: 16px;
+  --cg-lens-inset: 12px;
+  --cg-lens-radius: 20px;
+
+  /* -- Vidro cristalino ---------------------------------------------------
+     Tinte baixo e desfoque pequeno: o material deixa passar em vez de
+     esconder. Ver a nota de versões em `.cg-shell`, em `@layer utilities`.
+
+     O tinte da placa é o que garante contraste do texto que vive DENTRO dela —
+     não existe cortina sobre o gráfico. Ele caiu de 32% para 26% quando o
+     desfoque passou a funcionar de fato (antes, um `isolation: isolate` no
+     invólucro amostrava um fundo vazio), e 26% é o piso: abaixo dele a
+     variação em `--ink-2` cai de 4,5:1 sobre o verde escuro do pé de uma
+     coluna, e o rodapé da placa é exatamente onde uma coluna alta passa. */
+  --cg-tint-hi: rgb(255 255 255 / 0.26);
+  --cg-tint-lo: rgb(255 255 255 / 0.18);
+  --cg-bright: 1.02;
+  /* Largura da faixa de espessura em `.cg-edge`. */
+  --cg-edge-w: 16px;
+  --cg-rim-top: rgb(255 255 255 / 0.85);
+  /* O fio escuro do contorno. Ele é obrigatório no tema claro: sem ele o vidro
+     não tem onde terminar sobre uma superfície branca, e o objeto deixa de ter
+     aresta. É a razão de este token não ser um branco translúcido. */
+  --cg-rim-hair: rgb(16 19 23 / 0.11);
+  --cg-rim-bottom: rgb(255 255 255 / 0.4);
+  --cg-rim-inner: rgb(16 19 23 / 0.26);
+  --cg-spec-hot: rgb(255 255 255 / 0.5);
+  --cg-spec-sweep: rgb(255 255 255 / 0.2);
+  --cg-pill-bg: rgb(255 255 255 / 0.34);
+  --cg-pill-bg-hover: rgb(255 255 255 / 0.5);
+  --cg-pill-hair: rgb(255 255 255 / 0.7);
+  --cg-floor: #eceff2;
+  --cg-grid: rgb(16 19 23 / 0.1);
+  --cg-grid-base: rgb(16 19 23 / 0.16);
+  --cg-dot: rgb(16 19 23 / 0.11);
+
+  /* -- Colunas do gráfico -------------------------------------------------
+     O verde do sistema (`--vital`) é o verde de TEXTO e de fio: ele foi
+     escolhido para passar contraste sobre superfície clara, e por isso é
+     fechado. Uma coluna de 120px pintada com ele fica escura e morta. Estes
+     três tons são a versão de PIGMENTO do mesmo verde — mais claros e mais
+     saturados, porque são vistos através de vidro, que rouba saturação. */
+  --plot-1: #0a7f45;
+  --plot-2: #1fb864;
+  --plot-crest: #45d98a;
+  --plot-tip: rgb(255 255 255 / 0.45);
+  --plot-glow-strong: rgb(31 184 100 / 0.5);
+
   /* -- Elevation: overlays only ------------------------------------------- */
   --shadow-raised: none;
   --shadow-overlay:
@@ -168,6 +272,46 @@
   --track: #262a2f;
   --skeleton: #1c1f23;
 
+  --vital: #35d67f;
+  --vital-2: #2bbd6d;
+  --vital-ink: #7ce8ac;
+  --vital-soft: #12241a;
+
+  /* No escuro o slab fecha mais: no tema claro ele é a peça mais escura da
+     página e por isso pode brilhar; no escuro, um azul da mesma intensidade
+     seria a peça mais CLARA — um retângulo aceso no meio de uma tela apagada,
+     que é exatamente o efeito que o painel não quer na primeira dobra. */
+  --slab: #012f5c;
+
+  /* No escuro o vidro não pode virar cinza opaco: o tinte cai quase a zero e a
+     luz da aresta faz todo o trabalho de dar forma ao objeto. */
+  /* No escuro a placa escurece em vez de clarear: o texto é claro, e clarear o
+     fundo dele sobre uma coluna verde derrubaria o contraste. */
+  --cg-tint-hi: rgb(14 17 21 / 0.42);
+  --cg-tint-lo: rgb(14 17 21 / 0.3);
+  --cg-bright: 1.06;
+  /* No escuro o contorno volta a ser luz: um fio preto sobre superfície escura
+     não desenha aresta nenhuma. */
+  --cg-rim-top: rgb(255 255 255 / 0.28);
+  --cg-rim-hair: rgb(255 255 255 / 0.13);
+  --cg-rim-bottom: rgb(0 0 0 / 0.45);
+  --cg-rim-inner: rgb(0 0 0 / 0.6);
+  --cg-spec-hot: rgb(255 255 255 / 0.18);
+  --cg-spec-sweep: rgb(255 255 255 / 0.08);
+  --cg-pill-bg: rgb(255 255 255 / 0.08);
+  --cg-pill-bg-hover: rgb(255 255 255 / 0.16);
+  --cg-pill-hair: rgb(255 255 255 / 0.16);
+  --cg-floor: #101216;
+  --cg-grid: rgb(255 255 255 / 0.09);
+  --cg-grid-base: rgb(255 255 255 / 0.16);
+  --cg-dot: rgb(255 255 255 / 0.1);
+
+  --plot-1: #0f9a52;
+  --plot-2: #2fd07a;
+  --plot-crest: #62eda4;
+  --plot-tip: rgb(255 255 255 / 0.4);
+  --plot-glow-strong: rgb(47 208 122 / 0.42);
+
   --shadow-raised: none;
   --shadow-overlay:
     0 1px 2px rgb(0 0 0 / 0.5), 0 12px 32px -8px rgb(0 0 0 / 0.6),
@@ -230,6 +374,15 @@
   --color-info: var(--info);
   --color-info-soft: var(--info-soft);
   --color-info-border: var(--info-border);
+
+  --color-vital: var(--vital);
+  --color-vital-2: var(--vital-2);
+  --color-vital-ink: var(--vital-ink);
+  --color-vital-soft: var(--vital-soft);
+
+  --radius-glass: var(--radius-glass);
+  --radius-device: var(--radius-device);
+  --radius-crystal: var(--radius-crystal);
 
   --color-track: var(--track);
   --color-skeleton: var(--skeleton);
@@ -424,7 +577,811 @@
     }
   }
 
-  /* -- Print: executive report extraction -------------------------------- */
+  /* ======================================================================
+     VIDRO CRISTALINO — o material do `CrystalGlassCard`
+     ----------------------------------------------------------------------
+     Este material passou por três versões, e as duas primeiras erraram pelo
+     mesmo motivo, que vale ficar escrito porque é a lição inteira:
+
+       v1  LÍQUIDO ATRÁS DE LÂMINA FOSCA. Uma coluna de cor subindo atrás de um
+           `blur(18px)`, com um véu branco sólido cobrindo o terço superior
+           para o texto passar contraste. Funcionava como medida e falhava como
+           material: um vidro que precisa de cortina branca por cima não é
+           vidro, é uma superfície opaca com degradê.
+
+       v2  VIDRO COBRINDO O CARTÃO INTEIRO. Tinte mínimo, pouco desfoque, muita
+           saturação — tecnicamente correto e visualmente inexistente. O
+           problema é que metade do cartão era branco sobre branco, e VIDRO SÓ
+           SE VÊ PELO QUE ELE DISTORCE. Sem nada atrás, a lâmina mais bem
+           construída do mundo é um retângulo transparente.
+
+       v3  ESTA. O gráfico é o CARTÃO, e o vidro é uma PLACA que flutua sobre
+           ele — que é literalmente o que a referência da Apple mostra: um
+           bloco de vidro sobre uma fotografia, com a imagem visível e curvada
+           na aresta. Aqui a "fotografia" é a série de colunas verdes mais a
+           grade do gráfico, e a placa carrega o texto.
+
+     Por que a v3 resolve os dois problemas de uma vez:
+
+       · REFRAÇÃO REAL, SEMPRE. A grade atravessa o cartão inteiro, então
+         existe conteúdo atrás de cada milímetro da placa. Quando o indicador
+         está alto, as colunas também passam por trás dela e o verde aparece
+         curvado na borda — que é o efeito da referência.
+       · CONTRASTE SEM VÉU. O texto vive DENTRO da placa, e a placa tem o seu
+         próprio tinte. Não é uma cortina sobre o gráfico: é o objeto que
+         segura o texto, com a espessura e a aresta de um bloco de vidro.
+       · O GRÁFICO FICA INTEIRO. Na v1 e na v2 a série era comprimida na metade
+         de baixo para o texto caber em cima. Agora ela usa a altura toda do
+         cartão, então a escala 0–100 é a do objeto e não a de um recorte.
+
+       v4  O TINTE DEIXOU DE SER A ÚNICA COISA VISÍVEL, E ISSO ERA UM BUG.
+           `.cg-lens` tinha `isolation: isolate`, que CRIA UM BACKDROP ROOT — e
+           um `backdrop-filter` só amostra o que foi pintado até o backdrop
+           root mais próximo. A placa estava, literalmente, desfocando o
+           próprio interior vazio: o único pixel dela que aparecia era o véu de
+           32% de branco, e é por isso que a v3 lia como cartão chapado apesar
+           de a composição estar certa. Quem isola agora é a CASCA, que é o
+           recorte correto, e com o material funcionando o tinte pôde cair para
+           26%.
+
+       v5  REFRAÇÃO ENTROU E SAIU. Entre a v4 e esta versão o material foi um
+           filtro SVG com deslocamento por canal (o `GlassSurface` do React
+           Bits): o fundo era realmente desviado e a aresta ganhava franja
+           cromática, como num bloco de vidro de verdade. Funcionou como
+           material e falhou como INSTRUMENTO, por duas razões que só aparecem
+           quando o que está atrás do vidro é um gráfico:
+
+             · AS COLUNAS ENTORTAVAM. Uma barra é uma medida; a altura e a
+               prumada dela são a informação. Um material que curva a série
+               para parecer mais rico está desenhando por cima do dado.
+             · A FRANJA ERA COLORIDA. Deslocar cada canal numa escala diferente
+               é exatamente o que produz a franja quente-e-fria de vidro real —
+               e sobre este gráfico ela pintava contornos azuis e amarelados
+               numa tela onde a única cor com significado é o verde.
+
+           Vidro sem refração ainda é vidro. O que faz a placa ler como peça
+           apoiada sobre o gráfico é translucidez + aresta + espessura na borda
+           + reflexo que segue o ponteiro. O desvio da luz era o quinto item da
+           lista, e era o único que mentia sobre a medida.
+
+     As decisões de material que sobreviveram de todas as versões:
+
+       · BLUR PEQUENO (5px na placa). Blur alto é vidro JATEADO: esconde. O
+         teste é sempre o mesmo — as doze colunas têm de continuar contáveis
+         através do material.
+       · SATURAÇÃO MODERADA (118%). A v2 usava 180% e o verde já saturado do
+         pigmento virava neon: doze colunas somavam-se numa parede só.
+       · NENHUMA DEFORMAÇÃO DO FUNDO. A borda desfoca mais que o centro
+         (`.cg-edge`), que é a pista de espessura que não custa uma única
+         curva. Espessura sim, distorção não.
+       · AS COLUNAS NÃO BRILHAM. A v2 punha halo em cada uma, e com doze os
+         halos se fundiam num borrão — as barras deixavam de ser contáveis. Só
+         a coluna de hoje tem halo, e é ele que a distingue.
+       · O CONTORNO É UM FIO ESCURO NO TEMA CLARO. Sem ele a placa não tem onde
+         terminar sobre superfície branca. No escuro ele volta a ser luz.
+
+     Custo: dois `backdrop-filter` na placa (o corpo e o anel de espessura) e um
+     por pastilha. É caro, e é por isso que este material aparece UMA vez por
+     dobra, num objeto grande e protagonista.
+     ====================================================================== */
+
+  .cg-shell {
+    position: relative;
+    isolation: isolate;
+    overflow: hidden;
+    border-radius: var(--radius-crystal);
+    background-color: var(--surface);
+    background-image: linear-gradient(180deg, var(--surface) 0%, var(--cg-floor) 100%);
+  }
+
+  /* A trama de pontos. Ela é o que o vidro DISTORCE nas áreas onde não há
+     coluna — e é isso que faz a placa parecer vidro em vez de um cartão branco
+     arredondado quando o indicador está baixo e as barras não chegam nela.
+     12px de passo: fino o suficiente para ler como textura e grosso o
+     suficiente para o desfoque da placa ser perceptível ponto a ponto. */
+  .cg-shell::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    pointer-events: none;
+    background-image: radial-gradient(var(--cg-dot) 1px, transparent 1px);
+    background-size: 12px 12px;
+    /* A trama é forte em cima, onde a placa mora e precisa de algo para
+       distorcer, e desaparece embaixo, onde as colunas moram. Uma trama
+       uniforme competiria com as barras pelo mesmo espaço visual. */
+    mask-image: linear-gradient(to bottom, #000 0%, rgb(0 0 0 / 0.35) 48%, transparent 78%);
+    -webkit-mask-image: linear-gradient(to bottom, #000 0%, rgb(0 0 0 / 0.35) 48%, transparent 78%);
+  }
+
+  /* A grade: a régua do gráfico E o que garante que exista algo atrás de toda
+     a altura da placa — sem conteúdo por trás, um material translúcido é um
+     retângulo transparente. Linhas a cada 20% da altura, mais uma base cheia. */
+  .cg-grid {
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    padding: var(--cg-pad-y) var(--cg-pad-r) var(--cg-pad-y) var(--cg-pad-x);
+  }
+
+  .cg-grid::before {
+    content: '';
+    display: block;
+    height: 100%;
+    background-image: repeating-linear-gradient(
+      to top,
+      var(--cg-grid) 0 1px,
+      transparent 1px 20%
+    );
+  }
+
+  .cg-grid::after {
+    content: '';
+    position: absolute;
+    inset: auto var(--cg-pad-r) calc(var(--cg-pad-y) - 1px) var(--cg-pad-x);
+    height: 1px;
+    background-color: var(--cg-grid-base);
+  }
+
+  /* As colunas usam a altura INTEIRA do cartão: a escala 0–100 é a do objeto,
+     e não a de um recorte reservado para caber texto em cima. */
+  .cg-plot {
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: var(--cg-gap);
+    padding: var(--cg-pad-y) var(--cg-pad-r) var(--cg-pad-y) var(--cg-pad-x);
+  }
+
+  .cg-col {
+    position: relative;
+    /* `max-width` com `space-between` no trilho: doze barras ocupando toda a
+       largura disponível formavam uma parede verde contínua, e uma parede não é
+       um gráfico. Com teto de largura, o branco entre as barras volta a
+       existir e elas voltam a ser contáveis. */
+    flex: 1 1 0;
+    min-width: 0;
+    max-width: var(--cg-col-max);
+    border-radius: 6px 6px 1px 1px;
+    /* Escuro no pé, claro no topo: é o que dá volume a uma barra. Um
+       preenchimento chapado lê como retângulo de cor. */
+    background-image: linear-gradient(to top, var(--plot-1) 0%, var(--plot-2) 100%);
+    will-change: height;
+  }
+
+  /* O fio de luz no topo da barra — a aresta virada para cima, em vez de um
+     corte reto. */
+  .cg-col::before {
+    content: '';
+    position: absolute;
+    inset: 0 0 auto 0;
+    height: 2px;
+    border-radius: 6px 6px 0 0;
+    background-color: var(--plot-tip);
+  }
+
+  /* A coluna de hoje: mesma família de cor, mais luz. Uma cor diferente faria o
+     olho ler duas categorias onde existe uma série. */
+  .cg-col[data-current='true'] {
+    background-image: linear-gradient(to top, var(--plot-2) 0%, var(--plot-crest) 100%);
+    box-shadow: 0 0 24px -6px var(--plot-glow-strong);
+  }
+
+  /* -- A PLACA DE VIDRO --------------------------------------------------
+     O objeto da referência: um bloco de vidro apoiado sobre o conteúdo. Ela
+     não cobre o cartão — flutua nele, com margem, para que a aresta seja
+     visível dos quatro lados. É a aresta que prova que existe espessura. */
+  .cg-lens {
+    position: absolute;
+    top: var(--cg-lens-inset);
+    left: var(--cg-lens-inset);
+    /* Ela NAO atravessa o cartao. Duas razoes: o vao da regua (0/50/100) a
+       direita tem de ficar livre, senao a marca de 100 nasce escondida atras da
+       placa; e uma placa que vai de borda a borda le como faixa de titulo, nao
+       como um objeto apoiado sobre o conteudo. */
+    width: fit-content;
+    max-width: calc(100% - var(--cg-lens-inset) - var(--cg-pad-r));
+    z-index: 3;
+    /* SEM `isolation: isolate`, e este é o bug que fazia a placa parecer um
+       cartão branco em vez de vidro. `isolation: isolate` CRIA UM BACKDROP
+       ROOT (Filter Effects 2, junto com `opacity` < 1, `filter`, `mask` e
+       `contain: paint`), e um `backdrop-filter` só amostra o que foi pintado
+       até o backdrop root mais próximo. Com a placa isolada, o fundo dela era
+       o interior da própria placa — ou seja, nada: o desfoque acontecia sobre
+       transparência e o único pixel visível era o tinte. Quem isola aqui é a
+       CASCA (`.cg-shell`), que é o recorte certo: a placa amostra a grade e as
+       colunas, e nada da página atrás do cartão. */
+    overflow: hidden;
+    border-radius: var(--cg-lens-radius);
+  }
+
+  /* -- O material da placa ------------------------------------------------
+     Duas coisas, e nada além delas: um TINTE em degradê direcional — é o
+     degradê que dá a leitura de uma peça inclinada contra a luz, uma cor
+     chapada leria como adesivo — e um desfoque que NÃO desloca nada.
+
+     A coluna atrás da placa continua reta, porque uma coluna é DADO. A
+     tentativa anterior distorcia o fundo com um filtro SVG de deslocamento por
+     canal e o preço foi alto de duas formas: as barras entortavam dentro do
+     vidro, e o deslocamento diferente por canal — que é o que produz franja
+     cromática em vidro real — pintava contornos azuis e amarelados sobre um
+     gráfico onde a única cor com significado é o verde. Num objeto decorativo
+     seria um efeito; sobre uma série medida é ruído colorido em cima de dado.
+
+     Vidro sem refração ainda é vidro: o que faz a placa ler como uma peça
+     apoiada sobre o gráfico é a soma de translucidez, aresta (`.cg-rim`),
+     espessura na borda (`.cg-edge`) e reflexo que segue o ponteiro
+     (`.cg-spec`). O desvio da luz era o quinto item da lista, não o primeiro. */
+  .cg-glass {
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    background-image: linear-gradient(
+      152deg,
+      var(--cg-tint-hi) 0%,
+      var(--cg-tint-lo) 46%,
+      var(--cg-tint-hi) 100%
+    );
+    /* 5px: o suficiente para a placa ter matéria, pouco o bastante para as
+       doze colunas continuarem CONTÁVEIS através dela. Desfoque alto é vidro
+       jateado — esconde a série em vez de deixá-la aparecer. */
+    backdrop-filter: blur(5px) saturate(118%) brightness(var(--cg-bright));
+    -webkit-backdrop-filter: blur(5px) saturate(118%) brightness(var(--cg-bright));
+  }
+
+  /* O anel de espessura. Um vidro real desfoca MAIS na aresta, porque ali a
+     luz atravessa mais material — e essa é a pista de espessura que não custa
+     uma única deformação: é o mesmo desfoque, mais forte, mascarado numa faixa
+     de 16px nas quatro bordas. A grade e as colunas entram na placa retas e
+     apenas ficam mais macias na moldura. */
+  .cg-edge {
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+    pointer-events: none;
+    backdrop-filter: blur(9px) saturate(112%);
+    -webkit-backdrop-filter: blur(9px) saturate(112%);
+    mask-image:
+      linear-gradient(
+        to right,
+        #000 0 var(--cg-edge-w),
+        transparent var(--cg-edge-w) calc(100% - var(--cg-edge-w)),
+        #000 calc(100% - var(--cg-edge-w)) 100%
+      ),
+      linear-gradient(
+        to bottom,
+        #000 0 var(--cg-edge-w),
+        transparent var(--cg-edge-w) calc(100% - var(--cg-edge-w)),
+        #000 calc(100% - var(--cg-edge-w)) 100%
+      );
+    mask-composite: add;
+    -webkit-mask-image:
+      linear-gradient(
+        to right,
+        #000 0 var(--cg-edge-w),
+        transparent var(--cg-edge-w) calc(100% - var(--cg-edge-w)),
+        #000 calc(100% - var(--cg-edge-w)) 100%
+      ),
+      linear-gradient(
+        to bottom,
+        #000 0 var(--cg-edge-w),
+        transparent var(--cg-edge-w) calc(100% - var(--cg-edge-w)),
+        #000 calc(100% - var(--cg-edge-w)) 100%
+      );
+    -webkit-mask-composite: source-over;
+  }
+
+  /* O brilho especular. Segue o ponteiro com amortecimento forte (`useSheen`)
+     — reflexo numa superfície curva chega atrasado. Seguir 1:1 transforma o
+     objeto num holofote e rouba a atenção do número. */
+  .cg-spec {
+    position: absolute;
+    inset: 0;
+    z-index: 2;
+    pointer-events: none;
+    background:
+      /* O reflexo acompanha o ponteiro no eixo HORIZONTAL e fica fixo no
+         vertical. `--mx`/`--my` são percentuais da CASCA, e a placa é uma
+         faixa curta no alto dela: com o ponteiro no pé do cartão, `--my` vale
+         ~90% e o brilho cairia fora da placa, sumindo justamente quando o
+         cursor está sobre o objeto. Numa superfície larga e baixa o movimento
+         que importa é o lateral, e é esse que fica. */
+      radial-gradient(
+        52% 150% at var(--mx, 24%) 30%,
+        var(--cg-spec-hot) 0%,
+        transparent 72%
+      ),
+      linear-gradient(126deg, transparent 2%, var(--cg-spec-sweep) 22%, transparent 42%);
+    transition: opacity 420ms cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  .cg-rim {
+    position: absolute;
+    inset: 0;
+    z-index: 3;
+    border-radius: inherit;
+    pointer-events: none;
+    box-shadow:
+      inset 0 0 0 1px var(--cg-rim-hair),
+      inset 0 1.5px 0 0 var(--cg-rim-top),
+      inset 0 -1.5px 0 0 var(--cg-rim-bottom),
+      inset 0 0 26px -16px var(--cg-rim-inner);
+  }
+
+  .cg-content {
+    position: relative;
+    z-index: 4;
+  }
+
+  /* Pastilha de vidro: um controle que fica sobre as colunas. É o padrão da
+     Apple para este problema exato, e a razão de ele existir é medível — um
+     botão de texto simples sobre a área pintada perde contraste conforme a
+     coluna atrás dele sobe, então o mesmo controle seria legível às 9h e
+     ilegível às 18h. */
+  .cg-pill {
+    position: relative;
+  }
+
+  /* O material fica num nó próprio, e não no `background` do botão, por um
+     motivo de pintura: a moldura de luz é uma sombra INTERNA, e sombra interna
+     do pai é desenhada abaixo do conteúdo dele — no botão ela apareceria por
+     baixo do rótulo. No nó do vidro ela fica onde deve. */
+  .cg-pill-glass {
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    border-radius: inherit;
+    background-color: var(--cg-pill-bg);
+    /* Mais desfoque que a placa e nenhuma distorção. A pastilha é pequena e
+       vive SOBRE as colunas, então o rótulo precisa de um fundo mais calmo —
+       mas as barras atrás dela continuam retas e verdes. */
+    backdrop-filter: blur(9px) saturate(125%);
+    -webkit-backdrop-filter: blur(9px) saturate(125%);
+    box-shadow:
+      inset 0 0 0 1px var(--cg-pill-hair),
+      inset 0 1px 0 0 var(--cg-rim-top);
+    transition: background-color 180ms ease-out;
+  }
+
+  /* O realce do `hover` é MAIS VIDRO, não menos opacidade. `opacity` < 1 no
+     botão criaria um backdrop root e apagaria o vidro da própria pastilha
+     exatamente quando o ponteiro está sobre ela. */
+  .cg-pill:hover .cg-pill-glass {
+    background-color: var(--cg-pill-bg-hover);
+  }
+
+  /* Fallback: sem `backdrop-filter` a placa vira superfície sólida com um fio
+     de verdade. Perde a translucidez, mantém a informação — as colunas
+     continuam contando a série, só que sem vidro na frente. */
+  @supports not ((backdrop-filter: blur(2px)) or (-webkit-backdrop-filter: blur(2px))) {
+    .cg-glass {
+      background-image: none;
+      background-color: color-mix(in oklab, var(--surface) 88%, transparent);
+    }
+    .cg-edge,
+    .cg-spec {
+      display: none;
+    }
+    .cg-pill-glass {
+      background-color: var(--surface);
+    }
+  }
+
+  /* ======================================================================
+     APARELHO 3D — `Pulso agora`
+     ----------------------------------------------------------------------
+     DOM + CSS 3D, sem canvas e sem Three.js: o aparelho é uma moldura e a UI
+     de dentro é HTML de verdade, focável e clicável. Um `<img>` do iPhone
+     daria a mesma foto e zero função.
+
+     A perspectiva desce em dois degraus e desaparece no terceiro:
+       >= 1200px  perspectiva cheia
+       < 1200px   perspectiva rasa (o chassi ainda existe, quase de frente)
+       < 1024px   chassi fora, mesma UI como card compacto (feito no React)
+     ====================================================================== */
+
+  .device-stage {
+    perspective: 1500px;
+    perspective-origin: 62% 30%;
+  }
+
+  .device-body {
+    position: relative;
+    transform: rotateX(var(--rx, 0deg)) rotateY(var(--ry, 0deg));
+    transform-style: preserve-3d;
+    transition: transform 620ms cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  /* `will-change` só enquanto o ponteiro está sobre o objeto. Deixá-lo fixo
+     mantém uma camada de composição viva de graça pelo resto da sessão. */
+  .device-body[data-tilting='true'] {
+    will-change: transform;
+    transition: transform 110ms linear;
+  }
+
+  .device-chassis {
+    position: absolute;
+    inset: 0;
+    border-radius: var(--radius-device);
+    background-image: linear-gradient(150deg, #4a5058 0%, #23262b 34%, #6d747e 62%, #1b1e22 100%);
+    box-shadow:
+      inset 0 0 0 1px rgb(255 255 255 / 0.22),
+      inset 0 1px 1px 1px rgb(255 255 255 / 0.14),
+      0 26px 60px -26px rgb(8 10 14 / 0.55);
+  }
+
+  /* Os dois botões físicos. Puramente cenográficos, e por isso dentro do
+     chassi, que é `aria-hidden`. Sem maçã, sem etiqueta de modelo. */
+  .device-chassis::before,
+  .device-chassis::after {
+    content: '';
+    position: absolute;
+    left: -2px;
+    width: 2px;
+    border-radius: 2px;
+    background-image: linear-gradient(180deg, #6d747e, #33373d);
+  }
+  .device-chassis::before {
+    top: 21%;
+    height: 7%;
+  }
+  .device-chassis::after {
+    top: 32%;
+    height: 13%;
+  }
+
+  .device-screen {
+    position: relative;
+    border-radius: calc(var(--radius-device) - 10px);
+    background-image: radial-gradient(120% 78% at 50% 0%, #1b2028 0%, #0b0d11 60%, #07080a 100%);
+    transform: translateZ(1px);
+    overflow: hidden;
+  }
+
+  @media (max-width: 1199px) {
+    .device-stage {
+      perspective: 3400px;
+    }
+  }
+
+  /* Toque não tem ponteiro para seguir, e um tilt que só responde ao primeiro
+     `touchstart` fica torto e não volta ao repouso. */
+  @media (pointer: coarse) {
+    .device-body {
+      transform: none !important;
+    }
+  }
+
+
+  /* ======================================================================
+     APARELHO EM DIMENSÃO REAL — iPhone 16 Pro
+     ----------------------------------------------------------------------
+     `.device-*` acima é a maquete pequena da versão anterior e continua
+     servindo a quem precisa de um aparelho decorativo. Isto aqui é outra
+     coisa: um aparelho em GRANDEZA NATURAL, com as medidas publicadas do
+     iPhone 16 Pro em pontos, porque "tamanho real" só é verdade se os números
+     forem os do fabricante:
+
+       tela        402 x 874 pt          raio do display   55 pt
+       moldura     ~12 pt uniforme       raio do corpo     67 pt
+       ilha        125 x 36 pt           topo da ilha      11 pt
+       safe area   62 pt no topo         home indicator    140 x 5 pt
+
+     Nada disso é arredondado para um número redondo, e é por isso que o
+     objeto passa no teste de encostar um aparelho de verdade na tela.
+
+     O corpo inteiro é DOM. A tela de dentro é a aplicação — HTML focável,
+     clicável, lido por leitor de tela — e não uma captura. Um `<img>` daria a
+     mesma fotografia e zero função, e a única razão de um aparelho ocupar 900
+     pixels de altura numa tela de gestão é ele fazer trabalho.
+
+     Escala: o aparelho não encolhe redesenhando-se, ele encolhe como objeto
+     físico (`transform: scale`). Assim as proporções continuam sendo as do
+     fabricante em qualquer viewport, e a UI de dentro nunca reflui para um
+     layout que não existe em nenhum iPhone.
+     ====================================================================== */
+
+  .ios-stage {
+    perspective: 2600px;
+    perspective-origin: 58% 26%;
+  }
+
+  .ios-device {
+    --ios-w: 402px;
+    --ios-h: 874px;
+    --ios-bezel: 12px;
+    --ios-screen-radius: 55px;
+    --ios-scale: 1;
+
+    position: relative;
+    width: calc((var(--ios-w) + var(--ios-bezel) * 2) * var(--ios-scale));
+    height: calc((var(--ios-h) + var(--ios-bezel) * 2) * var(--ios-scale));
+    flex: none;
+  }
+
+  /* O nó que realmente carrega o aparelho. Separado do `.ios-device` porque
+     `scale` e `rotate3d` na mesma transform disputam a origem: aqui a escala
+     mora fora e a inclinação dentro, e cada uma tem a sua origem correta. */
+  .ios-scaler {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: calc(var(--ios-w) + var(--ios-bezel) * 2);
+    height: calc(var(--ios-h) + var(--ios-bezel) * 2);
+    transform: scale(var(--ios-scale));
+    transform-origin: top left;
+  }
+
+  .ios-body {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    border-radius: calc(var(--ios-screen-radius) + var(--ios-bezel));
+    transform-style: preserve-3d;
+    transform: rotateX(var(--rx, 0deg)) rotateY(var(--ry, 0deg));
+    transition: transform 700ms cubic-bezier(0.16, 1, 0.3, 1);
+    /* Titânio preto. As faixas claras e escuras alternadas são o que faz metal
+       escovado parecer metal: um gradiente de duas paradas vira plástico. */
+    background-image: linear-gradient(
+      142deg,
+      #71767e 0%,
+      #2b2e33 13%,
+      #9298a1 27%,
+      #3c4046 43%,
+      #212429 58%,
+      #848a93 73%,
+      #33363b 87%,
+      #61656c 100%
+    );
+    box-shadow:
+      inset 0 0 0 1px rgb(255 255 255 / 0.26),
+      inset 0 1.5px 1px 0 rgb(255 255 255 / 0.34),
+      inset 0 -1.5px 1px 0 rgb(0 0 0 / 0.5),
+      0 2px 4px -1px rgb(8 10 14 / 0.4),
+      0 34px 70px -24px rgb(8 10 14 / 0.55),
+      0 70px 120px -50px rgb(8 10 14 / 0.45);
+  }
+
+  .ios-body[data-tilting='true'] {
+    will-change: transform;
+    transition: transform 110ms linear;
+  }
+
+  /* O display é assentado abaixo do plano da carcaça: um aparelho real tem
+     essa sombra de encaixe entre o titânio e o vidro. */
+  .ios-screen {
+    position: absolute;
+    inset: var(--ios-bezel);
+    border-radius: var(--ios-screen-radius);
+    overflow: hidden;
+    background-color: #000;
+    transform: translateZ(0.5px);
+    box-shadow:
+      0 0 0 1px rgb(0 0 0 / 0.9),
+      inset 0 0 3px 1px rgb(0 0 0 / 0.8);
+  }
+
+  /* Reflexo do vidro. Fica ACIMA da aplicação e não intercepta ponteiro — é a
+     camada que impede a tela de parecer um `div` preto com texto. Baixíssima
+     opacidade de propósito: acima de ~7% ele começa a comer contraste do
+     conteúdo, e o conteúdo aqui é informação institucional. */
+  .ios-glare {
+    position: absolute;
+    inset: 0;
+    z-index: 40;
+    pointer-events: none;
+    border-radius: inherit;
+    background-image: linear-gradient(
+      118deg,
+      rgb(255 255 255 / 0.09) 0%,
+      rgb(255 255 255 / 0.035) 16%,
+      transparent 34%,
+      transparent 66%,
+      rgb(255 255 255 / 0.028) 88%,
+      rgb(255 255 255 / 0.06) 100%
+    );
+  }
+
+  /* Botões físicos. Cenografia, e por isso `aria-hidden` no React. Ordem real
+     do 16 Pro: à esquerda o botão de ação e o par de volume; à direita o
+     lateral e o Controle da Câmera. */
+  .ios-key {
+    position: absolute;
+    border-radius: 2px;
+    background-image: linear-gradient(180deg, #9297a0 0%, #4a4e55 42%, #2a2d31 100%);
+    box-shadow: 0 1px 1px rgb(0 0 0 / 0.5);
+  }
+  .ios-key[data-side='left'] {
+    left: -2.5px;
+    width: 3px;
+  }
+  .ios-key[data-side='right'] {
+    right: -2.5px;
+    width: 3px;
+  }
+
+  /* Ilha dinâmica: 125 x 36 pt, 11 pt abaixo do topo do display.
+     A centralização mora no invólucro, e não na própria ilha, porque a ilha é
+     um nó com `layout` do Motion: um `translateX(-50%)` escrito por CSS seria
+     sobrescrito pela transform que a animação de layout aplica, e a pílula
+     saltaria para a esquerda no meio da expansão. */
+  .ios-island-wrap {
+    position: absolute;
+    top: 11px;
+    left: 0;
+    right: 0;
+    z-index: 30;
+    display: flex;
+    justify-content: center;
+    pointer-events: none;
+  }
+
+  .ios-island {
+    pointer-events: auto;
+    background-color: #000;
+    box-shadow: 0 0 0 0.5px rgb(255 255 255 / 0.06);
+  }
+
+  .ios-home-indicator {
+    position: absolute;
+    bottom: 8px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 30;
+    width: 140px;
+    height: 5px;
+    border-radius: 3px;
+    background-color: rgb(255 255 255 / 0.32);
+    pointer-events: none;
+  }
+
+  /* A área rolável da aplicação. Barra de rolagem escondida como no aparelho,
+     e `overscroll-behavior` preso para que rolar dentro do iPhone não arraste
+     a página do dashboard junto. */
+  .ios-scroll {
+    overscroll-behavior: contain;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+  }
+  .ios-scroll::-webkit-scrollbar {
+    display: none;
+  }
+
+  /* Vidro de dentro da aplicação. É deliberadamente mais barato que
+     `.lg-pane`: são vários widgets pequenos numa tela só, e replicar o blur
+     grande do hero aqui multiplicaria por seis o custo da dobra. */
+  .ios-glass {
+    background-color: rgb(255 255 255 / 0.07);
+    backdrop-filter: blur(9px) saturate(140%);
+    -webkit-backdrop-filter: blur(9px) saturate(140%);
+    box-shadow:
+      inset 0 0 0 1px rgb(255 255 255 / 0.1),
+      inset 0 1px 0 0 rgb(255 255 255 / 0.13);
+  }
+
+  /* Degraus de escala. O aparelho existe inteiro em telas largas; abaixo disso
+     ele encolhe como objeto e, no fim, o React troca o invólucro por um card. */
+  @media (max-width: 1535px) {
+    .ios-device {
+      --ios-scale: 0.88;
+    }
+  }
+  @media (max-width: 1365px) {
+    .ios-device {
+      --ios-scale: 0.76;
+    }
+  }
+  @media (pointer: coarse) {
+    .ios-body {
+      transform: none !important;
+    }
+  }
+
+  /* ======================================================================
+     SLAB EDITORIAL — o cabeçalho que abre um painel
+     ----------------------------------------------------------------------
+     UMA cor e uma frase. Nada mais.
+
+     Ele já teve halo no canto, degradê escurecendo o pé e uma trama de pontos
+     mascarada na diagonal — três camadas que existiam para "dar volume" a um
+     retângulo. Volume é o que uma peça precisa quando ela tem de competir por
+     atenção, e esta não tem: ela é a maior superfície de cor da página e a
+     única coisa escrita nela é a frase que abre o painel. O degradê não estava
+     ajudando a ler a frase, estava fazendo a peça ter dois azuis.
+
+     Azul chapado, então, e ele é o azul institucional — o mesmo do botão
+     primário. Ele existe UMA vez por tela: repetido, deixa de ser abertura e
+     vira papel de parede.
+     ====================================================================== */
+
+  .editorial-slab {
+    position: relative;
+    overflow: hidden;
+    border-radius: var(--radius-glass);
+    background-color: var(--slab);
+  }
+
+  /* ======================================================================
+     CONTROLE SEGMENTADO FÍSICO
+     ----------------------------------------------------------------------
+     A referência mostra o que separa um segmentado bonito de um botão com
+     fundo: a pastilha selecionada tem ESPESSURA — luz na aresta de cima,
+     sombra de contato embaixo, e um halo claro por fora que a levanta do
+     trilho. Aqui a pastilha é um nó do Motion com `layoutId`, então ela
+     desliza entre as opções em vez de piscar.
+     ====================================================================== */
+
+  .seg-track {
+    position: relative;
+    display: inline-flex;
+    padding: 3px;
+    border-radius: 9999px;
+    background-color: var(--surface-2);
+    box-shadow: inset 0 1px 2px rgb(16 19 23 / 0.07);
+  }
+  .dark .seg-track {
+    box-shadow: inset 0 1px 2px rgb(0 0 0 / 0.45);
+  }
+
+  /* A pastilha mora DENTRO do botão ativo (`inset: 0`) e não no trilho: é o nó
+     com `layoutId`, e o Motion a move medindo a caixa do irmão de destino.
+     Ancorá-la no trilho exigiria calcular deslocamento e largura em JS a cada
+     troca — a mesma animação, escrita à mão e errada em `resize`. */
+  .seg-thumb {
+    position: absolute;
+    inset: 0;
+    border-radius: 9999px;
+    background-color: var(--surface);
+    box-shadow:
+      0 0 0 0.5px rgb(16 19 23 / 0.06),
+      0 1px 1px rgb(16 19 23 / 0.05),
+      0 3px 8px -2px rgb(16 19 23 / 0.16),
+      inset 0 1px 0 0 rgb(255 255 255 / 0.9);
+  }
+  .dark .seg-thumb {
+    background-color: var(--surface-3);
+    box-shadow:
+      0 0 0 0.5px rgb(0 0 0 / 0.5),
+      0 2px 6px -1px rgb(0 0 0 / 0.5),
+      inset 0 1px 0 0 rgb(255 255 255 / 0.12);
+  }
+
+  /* ======================================================================
+     REDUCED MOTION
+     ----------------------------------------------------------------------
+     A camada base já zera duração de animação e transição. O que ela NÃO
+     alcança são os efeitos que existem por serem contínuos: a ondulação da
+     crista e o brilho que segue o ponteiro. Aqui eles são desligados de
+     verdade. Tilt e count-up são desligados no JS (`useReducedMotion`),
+     porque nenhum dos dois é CSS.
+     ====================================================================== */
+  @media (prefers-reduced-motion: reduce) {
+    .cg-spec {
+      background: none !important;
+    }
+    .cg-col {
+      transition: none !important;
+    }
+    .device-body {
+      transform: none !important;
+      will-change: auto !important;
+    }
+    .pulse-dot::after {
+      animation: none !important;
+      opacity: 0 !important;
+    }
+  }
+
+  /* -- Print: executive report extraction --------------------------------
+     A blindagem do `[data-reveal]` não é zelo: as dobras do Dashboard e de
+     Indicadores nascem em opacidade 0 e sobem ao entrar no viewport. Numa
+     impressão nada entra em viewport nenhum, então sem esta regra o relatório
+     executivo sairia com metade das páginas em branco — e ninguém descobriria
+     isso antes da reunião. Uma regra de folha de estilo com `!important` vence
+     o `style` inline que o Motion escreve. */
   @media print {
     .print\:hidden {
       display: none !important;
@@ -432,6 +1389,10 @@
     .print-report {
       background: #fff !important;
       color: #000 !important;
+    }
+    [data-reveal] {
+      opacity: 1 !important;
+      transform: none !important;
     }
   }
 }
@@ -443,5 +1404,112 @@
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
+  }
+}
+
+/* ==========================================================================
+   IMPRESSÃO DA FOLHA DO ALUNO — e só dela
+   --------------------------------------------------------------------------
+   A Trilha do Aluno tem duas saídas para o aluno: a tela do aplicativo e uma
+   folha. A folha é o artefato que a matrícula manda por link e que o aluno
+   imprime ou salva em PDF — e ela precisa sair do papel SOZINHA, sem a barra
+   lateral, sem o cabeçalho da aba e sem o iPhone de 900 pixels ao lado.
+
+   POR QUE `visibility` E NÃO `display: none` NO RESTO DA PÁGINA
+   A folha mora no fundo de uma árvore de dez níveis (aba → cartão →
+   componente). Esconder os ancestrais por `display` levaria a folha junto, e
+   caçar cada nível com um seletor próprio seria frágil. `visibility: hidden` em
+   tudo, seguido de `visible` na folha e nos descendentes dela, ignora a árvore
+   inteira: os ancestrais continuam no fluxo mas não pintam nada, e a folha é
+   reposicionada para o topo.
+
+   POR QUE TODO SELETOR COMEÇA COM `body:has(.trilha-sheet)`
+   Porque já existe impressão neste sistema. O relatório executivo dos
+   Indicadores imprime pela classe `.print-report`, e um `body *` sem escopo
+   apagaria o relatório junto — uma tela nova quebrando uma tela antiga em
+   silêncio, e só na impressora, que é onde ninguém testa. O `:has()` prende
+   estas regras às páginas que de fato carregam a folha; nas outras, nada aqui
+   existe.
+
+   O ENDEREÇO IMPRESSO AO LADO DO LINK
+   Papel não tem clique. `a[href^="http"]::after` escreve o endereço ao lado do
+   texto, e isso não é capricho tipográfico: a folha promete que o documento
+   oficial é o calendário publicado pela instituição, e uma promessa com link
+   morto no papel é uma promessa quebrada. Impressa em fevereiro, a folha
+   continua levando ao PDF em novembro.
+   ========================================================================== */
+
+@media print {
+  @page {
+    size: A4;
+    margin: 14mm;
+  }
+
+  body:has(.trilha-sheet) {
+    background: #ffffff !important;
+  }
+
+  /* Tudo para de pintar — inclusive sombra, que em impressora vira cinza sujo. */
+  body:has(.trilha-sheet) * {
+    visibility: hidden !important;
+    box-shadow: none !important;
+    text-shadow: none !important;
+  }
+
+  body:has(.trilha-sheet) .trilha-sheet,
+  body:has(.trilha-sheet) .trilha-sheet * {
+    visibility: visible !important;
+  }
+
+  body:has(.trilha-sheet) .trilha-sheet {
+    position: absolute !important;
+    top: 0 !important;
+    left: 0 !important;
+    width: 100% !important;
+    max-width: none !important;
+    margin: 0 !important;
+    border: 0 !important;
+    border-radius: 0 !important;
+    background: #ffffff !important;
+  }
+
+  body:has(.trilha-sheet) .trilha-print-source {
+    display: block !important;
+  }
+
+  /* Controles da aba que não existem no papel. */
+  body:has(.trilha-sheet) .print-hide,
+  body:has(.trilha-sheet) .trilha-sheet button {
+    display: none !important;
+  }
+
+  body:has(.trilha-sheet) .trilha-sheet a {
+    color: #000000 !important;
+    text-decoration: underline;
+  }
+
+  body:has(.trilha-sheet) .trilha-sheet a[href^='http']::after {
+    content: ' (' attr(href) ')';
+    font-size: 9px;
+    word-break: break-all;
+  }
+
+  /* Nenhuma seção deve ser cortada no meio por uma quebra de página. */
+  body:has(.trilha-sheet) .trilha-sheet section,
+  body:has(.trilha-sheet) .trilha-sheet li {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  body:has(.trilha-sheet) .trilha-sheet h1,
+  body:has(.trilha-sheet) .trilha-sheet h2 {
+    break-after: avoid;
+    page-break-after: avoid;
+  }
+}
+
+@media screen {
+  .trilha-print-source {
+    display: none;
   }
 }

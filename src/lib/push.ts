@@ -78,6 +78,23 @@ function groupOf(student: Student): CalendarGroup {
 }
 
 /**
+ * O nome do curso como o SITE escreve, que é a chave das linhas publicadas.
+ *
+ * Exposto porque a Trilha do Aluno precisa da mesma ponte para procurar a linha
+ * de outra coorte quando a do aluno não existe. Reconstruir a tabela lá seria
+ * criar uma segunda verdade sobre os mesmos dois nomes de curso, e a primeira
+ * vez que alguém corrigisse um deles a outra ficaria para trás em silêncio.
+ */
+export function siteCourseOf(student: Student): string {
+  return COURSE_ALIAS[student.course] ?? student.course;
+}
+
+/** O bloco do site — presencial, híbrido ou EAD — a que este aluno pertence. */
+export function calendarGroupOf(student: Student): CalendarGroup {
+  return groupOf(student);
+}
+
+/**
  * Qual linha do site vale para este aluno.
  *
  * Casa por bloco (presencial, híbrido, EAD), curso e coorte. A linha específica
@@ -91,7 +108,7 @@ export function entryForStudent(
 ): CalendarEntry | undefined {
   const audience = audienceOf(student);
   const group = groupOf(student);
-  const label = COURSE_ALIAS[student.course] ?? student.course;
+  const label = siteCourseOf(student);
 
   const pool = entries.filter(
     (e) => e.group === group && (e.audience === 'Ambos' || e.audience === audience),

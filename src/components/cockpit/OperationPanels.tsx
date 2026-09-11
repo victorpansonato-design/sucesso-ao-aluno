@@ -57,10 +57,21 @@ export function InterventionsPanel({
   operations,
   period,
   onOpenQueue,
+  actionLabel = 'Abrir a fila',
 }: {
   operations: Operations;
   period: CockpitPeriod;
   onOpenQueue: () => void;
+  /**
+   * O rótulo da ação do cabeçalho.
+   *
+   * Ele é um parâmetro porque este painel serve a dois públicos com o mesmo
+   * gráfico. No Cockpit a ação abre a Fila de Atendimento, e "Abrir a fila" é
+   * literal. No Dashboard ela abre o detalhe dos desfechos na própria aba —
+   * manter ali um botão escrito "Abrir a fila" seria um rótulo que mente sobre
+   * o próprio destino, que é pior do que um rótulo genérico.
+   */
+  actionLabel?: string;
 }) {
   const meta = periodMeta(period);
 
@@ -88,7 +99,7 @@ export function InterventionsPanel({
         subtitle={`Contatos humanos abertos ${meta.inline}, com a aderência ao SLA em horas úteis.`}
         action={
           <LinkButton onClick={onOpenQueue} iconRight={<ArrowRight className="h-3.5 w-3.5" />}>
-            Abrir a fila
+            {actionLabel}
           </LinkButton>
         }
       />

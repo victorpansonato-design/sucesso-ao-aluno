@@ -303,6 +303,8 @@ interface StudentSpec {
   campus: string;
   period: number;
   shift: Student['shift'];
+  /** Turma dentro da oferta. É o que desempata linha de calendário com dois dias. */
+  turma?: string;
   daysSinceEnrollment: number;
   gpa: number;
   attendance: number;
@@ -359,6 +361,7 @@ function makeStudent(spec: StudentSpec): Student {
     totalPeriods: info.totalPeriods,
     shift: spec.shift,
     cohort,
+    turma: spec.turma,
     healthScore: 0, // recomputed by the engine at boot
     status: 'Estável',
     trend: 'flat',
@@ -894,12 +897,18 @@ const deep: Student[] = [
     campus: CAMPUS,
     period: 1,
     shift: 'Noturno',
+    turma: 'RH1-B',
     daysSinceEnrollment: 47,
     gpa: 8.3,
     attendance: 100,
     moduleName: 'Módulo 1 — Comportamento Organizacional',
     financial: { situation: 'Regular', monthlyFee: 490, lastPayment: isoPlusDays(-6, BOOT) },
     engagement: eng({ lastAccessDaysAgo: 0, accessesLast30Days: 27, accessesPrev30Days: 22, deliveryRate: 96, weeklyHours: 5.4, forumInteractions: 9, accessTrend: [4, 5, 6, 6, 7, 7, 6, 7] }),
+    disciplines: [
+      disc({ code: 'RH-101', name: 'Comportamento Organizacional', teacher: 'Prof. Ubiratan Salles Mendes', grade: 8.6, attendancePercent: 100, absences: 0, absenceLimit: 4, format: 'Híbrida', schedule: 'Sáb · encontro quinzenal + AVA' }),
+      disc({ code: 'RH-103', name: 'Fundamentos de Gestão de Pessoas', teacher: 'Profa. Marlene Do Carmo Pires', grade: 8.1, attendancePercent: 100, absences: 0, absenceLimit: 4, format: 'Híbrida', schedule: 'Sáb · encontro quinzenal + AVA' }),
+      disc({ code: 'RH-105', name: 'Comunicação Empresarial', teacher: 'Profa. Heloísa Vidigal Campos', grade: 8.2, attendancePercent: 100, absences: 0, absenceLimit: 4, format: 'Digital', schedule: 'AVA · entregas semanais' }),
+    ],
     onboardingSteps: [
       { label: 'Contrato assinado', done: true },
       { label: 'Primeiro acesso ao portal', done: true },
@@ -1181,7 +1190,51 @@ interface BreadthSpec {
   negotiation?: boolean;
   scholarship?: number;
   cancelPage?: boolean;
+  /**
+   * Grade do aluno. A maioria dos registros de largura não traz — eles existem
+   * para dar espalhamento a filtros e distribuições, não para abrir dossiê.
+   *
+   * Onde ela existe, a Trilha do Aluno consegue traduzir as linhas do
+   * calendário que falam em posição («1ª disciplina híbrida») para o nome que
+   * o aluno conhece. Onde não existe, a trilha mostra o texto oficial e diz que
+   * não sabe qual é a disciplina — que é a resposta honesta e a razão de o
+   * campo ser opcional em vez de preenchido com um placeholder.
+   */
+  disciplines?: Discipline[];
+  turma?: string;
 }
+
+/* -- Grades de Gestão de Recursos Humanos ---------------------------------
+   RH é o curso em que a Trilha do Aluno é conferida contra o PDF, então os três
+   registros de RH da base têm grade de verdade em vez de lista vazia.
+
+   A forma da grade não é decorativa: ela espelha o que o calendário quinzenal
+   de veteranos pressupõe — DUAS híbridas e UMA digital. É isso que permite às
+   linhas que falam em posição («1ª disciplina híbrida», «2ª disciplina
+   híbrida», «disciplina digital») serem resolvidas para o nome que o aluno
+   conhece. Uma terceira híbrida aqui tornaria o ordinal ambíguo, e a trilha
+   passaria a dizer que não sabe — corretamente, mas sem demonstrar nada.
+
+   As médias fecham com o `gpa` de cada registro de largura, porque o Health
+   Score lê as duas coisas e um aluno com média 5,9 e três notas altas seria
+   incoerente na primeira tela que mostrasse ambas. */
+
+const RH_HIBRIDA = 'Sáb · encontro quinzenal + AVA';
+const RH_DIGITAL = 'AVA · entregas semanais';
+
+/** Wesley, 4º módulo. Média 5,9 com duas abaixo de 6 e presença intacta. */
+const RH_MODULO_4: Discipline[] = [
+  disc({ code: 'RH-401', name: 'Gestão Estratégica de Pessoas', teacher: 'Profa. Simone Aparecida Rocha', grade: 4.2, attendancePercent: 100, absences: 0, absenceLimit: 4, format: 'Híbrida', pendingActivities: 4, status: 'Em risco', schedule: RH_HIBRIDA }),
+  disc({ code: 'RH-403', name: 'Auditoria e Consultoria em RH', teacher: 'Prof. Everaldo Munhoz Filho', grade: 5.1, attendancePercent: 100, absences: 0, absenceLimit: 4, format: 'Híbrida', pendingActivities: 3, status: 'Em risco', schedule: RH_HIBRIDA }),
+  disc({ code: 'RH-405', name: 'Legislação Trabalhista Aplicada', teacher: 'Profa. Cláudia Bertoni', grade: 8.4, attendancePercent: 100, absences: 0, absenceLimit: 4, format: 'Digital', pendingActivities: 1, schedule: RH_DIGITAL }),
+];
+
+/** Caio, 2º módulo. Frequência em queda de 92% para 70%. */
+const RH_MODULO_2: Discipline[] = [
+  disc({ code: 'RH-201', name: 'Recrutamento e Seleção', teacher: 'Profa. Marlene Do Carmo Pires', grade: 5.8, attendancePercent: 68, absences: 3, absenceLimit: 4, format: 'Híbrida', pendingActivities: 2, status: 'Em risco', schedule: RH_HIBRIDA }),
+  disc({ code: 'RH-203', name: 'Cargos, Salários e Carreira', teacher: 'Prof. Norberto Aguiar Leal', grade: 6.2, attendancePercent: 70, absences: 2, absenceLimit: 4, format: 'Híbrida', schedule: RH_HIBRIDA }),
+  disc({ code: 'RH-205', name: 'Direito Empresarial Aplicado', teacher: 'Profa. Cláudia Bertoni', grade: 7.2, attendancePercent: 72, absences: 2, absenceLimit: 4, format: 'Digital', schedule: RH_DIGITAL }),
+];
 
 const BREADTH: BreadthSpec[] = [
   { ra: '2648770', name: 'Sofia Meireles Aguiar', courseIndex: 3, modality: 'Presencial', period: 1, shift: 'Noturno', days: 18, gpa: 8.4, att: 96, lastAccess: 0, acc30: 19, accPrev: 8, delivery: 92 },
@@ -1189,7 +1242,7 @@ const BREADTH: BreadthSpec[] = [
   { ra: '2646003', name: 'Manuela Ferraz Coelho', courseIndex: 15, modality: 'Híbrido', period: 1, shift: 'Noturno', days: 55, gpa: 8.8, att: 100, lastAccess: 0, acc30: 30, accPrev: 26, delivery: 99 },
   { ra: '2644891', name: 'Otávio Bastos Lemes', courseIndex: 12, modality: 'Híbrido', period: 1, shift: 'Noturno', days: 61, gpa: 5.4, att: 100, lastAccess: 17, acc30: 2, accPrev: 15, delivery: 30, late: 3, failing: 2 },
   { ra: '2643220', name: 'Helena Quintana Bruno', courseIndex: 6, modality: 'Presencial', period: 1, shift: 'Matutino', days: 72, gpa: 7.8, att: 92, lastAccess: 1, acc30: 21, accPrev: 18, delivery: 88 },
-  { ra: '2641005', name: 'Caio Vinícius Tavares', courseIndex: 13, modality: 'Híbrido', period: 2, shift: 'Noturno', days: 88, gpa: 6.4, att: 70, attPrev: 92, lastAccess: 11, acc30: 5, accPrev: 20, delivery: 48, overdue: 1, daysOverdue: 14, late: 2 },
+  { ra: '2641005', name: 'Caio Vinícius Tavares', courseIndex: 13, modality: 'Híbrido', period: 2, shift: 'Noturno', days: 88, gpa: 6.4, att: 70, attPrev: 92, lastAccess: 11, acc30: 5, accPrev: 20, delivery: 48, overdue: 1, daysOverdue: 14, late: 2, disciplines: RH_MODULO_2, turma: 'RH2-A' },
 
   { ra: '2596440', name: 'Larissa Fontes Medeiros', courseIndex: 2, modality: 'Presencial', period: 6, shift: 'Matutino', days: 980, gpa: 9.2, att: 99, lastAccess: 0, acc30: 34, accPrev: 32, delivery: 100 },
   { ra: '2588211', name: 'Pedro Henrique Salgado', courseIndex: 10, modality: 'Presencial', period: 5, shift: 'Noturno', days: 810, gpa: 7.6, att: 89, lastAccess: 2, acc30: 20, accPrev: 22, delivery: 86 },
@@ -1206,7 +1259,10 @@ const BREADTH: BreadthSpec[] = [
   { ra: '2532001', name: 'Priscila Amaral Guedes', courseIndex: 3, modality: 'Presencial', period: 8, shift: 'Noturno', days: 1300, gpa: 8.9, att: 98, lastAccess: 0, acc30: 31, accPrev: 30, delivery: 98 },
   { ra: '2528655', name: 'Anderson Klein Poli', courseIndex: 8, modality: 'Híbrido', period: 6, shift: 'Noturno', days: 1010, gpa: 6.6, att: 78, attPrev: 86, lastAccess: 8, acc30: 9, accPrev: 20, delivery: 62, late: 2, failing: 1 },
   { ra: '2524410', name: 'Débora Nascimento Pires', courseIndex: 4, modality: 'Híbrido', period: 7, shift: 'Noturno', days: 1150, gpa: 8.3, att: 93, lastAccess: 1, acc30: 24, accPrev: 23, delivery: 93 },
-  { ra: '2519903', name: 'Wesley Portela Cunha', courseIndex: 13, modality: 'Híbrido', period: 4, shift: 'Noturno', days: 700, gpa: 5.9, att: 100, lastAccess: 19, acc30: 2, accPrev: 14, delivery: 36, overdue: 2, daysOverdue: 44, failing: 2, cancelPage: true },
+  // Sem `turma` de propósito: é o registro em que se confere o que a trilha faz
+  // quando o PDF imprime dois dias para uma prova («27 e 28/11») e o sistema não
+  // sabe a turma. Ela diz que não sabe. Caio, acima, é o contraste com turma.
+  { ra: '2519903', name: 'Wesley Portela Cunha', courseIndex: 13, modality: 'Híbrido', period: 4, shift: 'Noturno', days: 700, gpa: 5.9, att: 100, lastAccess: 19, acc30: 2, accPrev: 14, delivery: 36, overdue: 2, daysOverdue: 44, failing: 2, cancelPage: true, disciplines: RH_MODULO_4 },
   { ra: '2515220', name: 'Carolina Vasconcelos Dias', courseIndex: 6, modality: 'Híbrido', period: 5, shift: 'Noturno', days: 830, gpa: 8.6, att: 94, lastAccess: 0, acc30: 27, accPrev: 25, delivery: 96 },
   { ra: '2511008', name: 'Igor Sampaio Furtado', courseIndex: 10, modality: 'Presencial', period: 7, shift: 'Noturno', days: 1140, gpa: 7.2, att: 87, lastAccess: 3, acc30: 18, accPrev: 20, delivery: 83, deps: 1 },
   { ra: '2506611', name: 'Renata Bulhões Aquino', courseIndex: 1, modality: 'Presencial', period: 8, shift: 'Matutino', days: 1290, gpa: 9.0, att: 99, lastAccess: 0, acc30: 33, accPrev: 31, delivery: 99 },
@@ -1236,6 +1292,8 @@ const breadth: Student[] = BREADTH.map((b, i) => {
     campus: CAMPUS,
     period: b.period,
     shift: b.shift,
+    turma: b.turma,
+    disciplines: b.disciplines,
     daysSinceEnrollment: b.days,
     gpa: b.gpa,
     attendance: b.att,

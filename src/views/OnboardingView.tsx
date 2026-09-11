@@ -4,6 +4,7 @@ import {
   ArrowRight,
   CheckCircle2,
   Circle,
+  Compass,
   MessageSquare,
   Plus,
   ShieldAlert,
@@ -422,6 +423,14 @@ export function OnboardingView({ actions }: { actions: ShellActions }) {
                         </div>
 
                         <div className="flex items-center gap-1.5">
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            icon={<Compass className="h-3.5 w-3.5" />}
+                            onClick={() => actions.goto('trilha', s.ra)}
+                          >
+                            Trilha
+                          </Button>
                           <Button
                             size="sm"
                             variant="ghost"

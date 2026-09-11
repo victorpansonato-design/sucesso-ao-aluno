@@ -6,6 +6,7 @@ import {
   BookOpen,
   CalendarClock,
   CheckCircle2,
+  Compass,
   ExternalLink,
   Mail,
   MessageSquare,
@@ -119,6 +120,14 @@ export function Student360View({
         </Button>
 
         <div className="flex flex-wrap items-center gap-2">
+          <Button
+            size="sm"
+            variant="ghost"
+            icon={<Compass className="h-3.5 w-3.5" />}
+            onClick={() => actions.goto('trilha', student.ra)}
+          >
+            Ver trilha
+          </Button>
           <Button
             size="sm"
             variant="ghost"

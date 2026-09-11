@@ -7,6 +7,7 @@ import {
   ChevronDown,
   ChevronsLeft,
   ChevronsRight,
+  Compass,
   GraduationCap,
   LayoutDashboard,
   ListChecks,
@@ -94,6 +95,11 @@ export function Sidebar({
     { route: 'radares', label: 'Radares', Icon: RadarIcon },
     { route: 'onboarding', label: 'Onboarding 90 dias', Icon: Sprout, badge: stats.onboarding },
     { route: 'push', label: 'Gestão de PUSH', Icon: BellRing },
+    /* Vizinha de PUSH de propósito: as duas nascem do mesmo calendário
+       acadêmico e terminam no mesmo celular. PUSH é a metade que fala, a
+       Trilha é a metade que responde quando o aluno vai olhar. Lidas juntas na
+       navegação, dizem a coisa certa. */
+    { route: 'trilha', label: 'Trilha do Aluno', Icon: Compass },
     { route: 'playbook', label: 'Playbook', Icon: BookMarked },
   ];
 

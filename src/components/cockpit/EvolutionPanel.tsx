@@ -89,12 +89,22 @@ export function EvolutionPanel({
         title="Evolução dos alunos por nível de atenção"
         subtitle={`${scopeLabel} · ${meta.label} · ${series.sampling}. O último ponto é hoje e vale exatamente o que os indicadores acima mostram.`}
         action={
-          <Segmented<ChartRange>
-            layoutId="cockpit-evolution-range"
-            value={range}
-            onChange={onRangeChange}
-            options={CHART_RANGES.map((r) => ({ value: r.key, label: r.label }))}
-          />
+          /* O alcance do controle vem escrito ao lado dele.
+             A janela operacional da barra de contexto recorta a página inteira;
+             este intervalo recorta SÓ este gráfico. Sem o rótulo, os dois
+             controles pareciam o mesmo controle em dois lugares — e trocar um e
+             ver o outro parado é o que fazia o filtro parecer quebrado. */
+          <div className="flex flex-col items-end gap-1.5">
+            <span className="text-[10.5px] font-medium tracking-tight whitespace-nowrap text-ink-4">
+              Intervalo do gráfico · afeta só este cartão
+            </span>
+            <Segmented<ChartRange>
+              layoutId="cockpit-evolution-range"
+              value={range}
+              onChange={onRangeChange}
+              options={CHART_RANGES.map((r) => ({ value: r.key, label: r.label }))}
+            />
+          </div>
         }
       />
 

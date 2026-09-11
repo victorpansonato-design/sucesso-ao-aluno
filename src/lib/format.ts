@@ -37,13 +37,34 @@ export function signed(value: number): string {
   return value > 0 ? `+${value}` : `−${Math.abs(value)}`;
 }
 
+/**
+ * Aceita as duas formas de data que existem no sistema.
+ *
+ * "2026-09-11T14:30:00" é um INSTANTE e `new Date` resolve certo. "2026-09-11"
+ * é uma DATA DE CALENDÁRIO e não tem fuso — mas `new Date` a lê como meia-noite
+ * UTC, que em Brasília é 21h do dia anterior. Formatada, saía um dia antes:
+ * `fullDate('2026-01-01')` devolvia 31/12/2025, atravessando o ano.
+ *
+ * Ancorar ao meio-dia local é o mesmo remédio que `dateInputToIso` já aplica
+ * logo abaixo — doze horas de folga cobrem qualquer fuso do planeta em que a
+ * instituição seja lida.
+ *
+ * Isto é aditivo: quem já passava timestamp completo não muda de resultado,
+ * porque a forma só-data é reconhecida pelo padrão e mais nada.
+ */
+const DATE_ONLY = /^\d{4}-\d{2}-\d{2}$/;
+
+function asDate(iso: string): Date {
+  return new Date(DATE_ONLY.test(iso) ? `${iso}T12:00:00` : iso);
+}
+
 export function shortDate(iso: string): string {
-  const d = new Date(iso);
+  const d = asDate(iso);
   return Number.isNaN(d.getTime()) ? iso : dateFmt.format(d);
 }
 
 export function fullDate(iso: string): string {
-  const d = new Date(iso);
+  const d = asDate(iso);
   return Number.isNaN(d.getTime()) ? iso : dateFullFmt.format(d);
 }
 

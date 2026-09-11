@@ -1,0 +1,43 @@
+# Mapa das referências visuais
+
+As imagens devem orientar princípios, não ser copiadas como layout final.
+
+## Estado atual
+
+- `current/01-dashboard-current.jpg`: hierarquia e densidade atuais do Dashboard. Use para preservar informações e medir a evolução.
+- `current/02-indicators-current.jpg`: estado atual de Indicadores. Use para garantir que nenhuma métrica desapareça na reorganização.
+
+## Referências enviadas
+
+- `user/01-ios-clear-material.png`: transparência e refração. Usar como inspiração para a materialidade do vidro.
+- `user/02-3d-phone-dark-ui-closeup.png`: profundidade do aparelho, UI escura e enquadramento premium.
+- `user/03-3d-phone-product-stage.png`: construção do dispositivo como objeto de produto. Evitar que a cenografia domine o dashboard.
+- `user/04-liquid-glass-control.png`: highlights internos, borda óptica e profundidade de controles.
+- `user/05-translucent-layered-cards.png`: sobreposição suave e separação por material, com muito espaço negativo.
+- `user/06-neon-outline-kpi-tile.png`: verde vital como sinal de progresso. Não usar a borda neon em todos os cards.
+- `user/07-editorial-insights-header.png`: tipografia grande, contraste e confiança editorial.
+- `user/08-kpi-liquid-fill.png`: principal referência para o indicador com líquido subindo atrás do vidro.
+- `user/09-electric-green-progress-card.png`: energia visual e leitura imediata de percentual.
+- `user/10-modular-liquid-widgets.png`: composição modular com preenchimento por valor.
+- `user/11-glass-segmented-control.png`: filtros segmentados com seleção física/translúcida.
+- `user/12-live-activity-pattern.png`: base para `Pulso agora` dentro do dispositivo 3D.
+- `user/13-dashboard-lime-organic.png`: integração entre forma orgânica, gráfico e dashboard. Aproveitar a assimetria, não a paleta inteira.
+- `user/14-dashboard-neutral-modular.png`: densidade, modularidade e organização de um dashboard educacional.
+
+## Referências públicas
+
+- `web/01-mindsparkle-home.jpg`: ousadia editorial, uso de escala e composição. Não copiar conteúdo visual.
+- `web/02-21st-home.jpg`: acabamento moderno, profundidade e organização de biblioteca de componentes.
+
+## Síntese
+
+Use a soma destas ideias:
+
+- a confiança editorial de `07`;
+- o material de `01`, `04` e `05`;
+- o preenchimento vivo de `08`, `09` e `10`;
+- o dispositivo funcional de `02`, `03` e `12`;
+- a organização de `13` e `14`.
+
+Evite o erro de misturar todos os efeitos em todos os componentes. O luxo vem da hierarquia e do controle.
+

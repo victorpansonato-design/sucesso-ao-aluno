@@ -3,6 +3,7 @@ import type { ReactNode } from 'react';
 import { motion } from 'motion/react';
 import { emphasis } from '../../lib/motion';
 import { int } from '../../lib/format';
+import { useReducedMotion } from '../../lib/reactive';
 
 /* ==========================================================================
    Data visualisation
@@ -24,6 +25,7 @@ export function AnimatedNumber({
   format = true,
   decimals = 0,
   resetOnChange = false,
+  countUp = true,
 }: {
   value: number;
   duration?: number;
@@ -33,7 +35,20 @@ export function AnimatedNumber({
    *  shown value — for counters where each update should read as a fresh
    *  count-up (e.g. the donut re-scoping to a new filter), not a drift. */
   resetOnChange?: boolean;
+  /**
+   * `false` renders the value with no count-up at all.
+   *
+   * A contagem a partir do zero é honesta para VOLUME — "41 intervenções"
+   * realmente foi de 0 a 41 ao longo do dia. Para um ÍNDICE limitado (um Health
+   * Score de 0 a 100, uma taxa) ela mente por um instante: durante os primeiros
+   * quadros a tela exibe `0`, e `Health Score médio 0/100` é uma frase que
+   * alguém pode fotografar, imprimir ou simplesmente acreditar. Índice não
+   * conta: ele preenche. Quem mostra um índice passa `countUp={false}` e anima
+   * o calibre, não os dígitos.
+   */
+  countUp?: boolean;
 }) {
+  const reduced = useReducedMotion();
   const [shown, setShown] = useState(value);
   const fromRef = useRef(value);
   const firstRun = useRef(true);
@@ -41,7 +56,8 @@ export function AnimatedNumber({
   useEffect(() => {
     // Count up from zero on mount, then tween between values on updates so a
     // score changing 78 → 86 reads as movement rather than a jump cut.
-    const from = firstRun.current || resetOnChange ? 0 : fromRef.current;
+    const animate = countUp && !reduced;
+    const from = animate ? (firstRun.current || resetOnChange ? 0 : fromRef.current) : value;
     firstRun.current = false;
     fromRef.current = value;
 
@@ -62,7 +78,7 @@ export function AnimatedNumber({
     };
     raf = requestAnimationFrame(step);
     return () => cancelAnimationFrame(raf);
-  }, [value, duration]);
+  }, [value, duration, countUp, reduced, resetOnChange]);
 
   const text =
     decimals > 0

@@ -11,7 +11,7 @@ import { Avatar, ModalityBadge, Pill, PriorityBadge } from '../components/ui/Bad
 import { SlaPill } from '../components/domain/SlaPill';
 import { isOpen, isTerminal } from '../lib/caseFlow';
 import { compareBySla, slaStatus, useClock } from '../lib/sla';
-import { decimal, percent } from '../lib/format';
+import { decimal, int, percent } from '../lib/format';
 
 /* ==========================================================================
    Equipe
@@ -198,15 +198,23 @@ export function TeamView({ actions }: { actions: ShellActions }) {
                       <span className="text-[11px] font-medium text-ink-4">
                         Carga operacional
                       </span>
-                      <span
-                        className={[
-                          'font-mono text-[12px] font-semibold',
-                          saturated ? 'text-crit-ink' : 'text-ink',
-                        ].join(' ')}
-                      >
-                        {openCases.length}
-                        <span className="font-normal text-ink-4">/{spec.capacity}</span>
-                        <span className="ml-1.5 text-ink-3">{percent(load * 100)}</span>
+                      {/* `11/14` e `79%` com 6px entre eles liam como
+                          `11/1479%`. O fio separa as duas grandezas, e a
+                          fração fica como denominador visível da carga. */}
+                      <span className="flex shrink-0 items-center font-mono text-[12px]">
+                        <span
+                          className={[
+                            'text-right font-semibold tabular',
+                            saturated ? 'text-crit-ink' : 'text-ink',
+                          ].join(' ')}
+                        >
+                          {int(openCases.length)}
+                          <span className="font-normal text-ink-4">/{int(spec.capacity)}</span>
+                        </span>
+                        <span className="mx-2 h-3.5 w-px bg-hairline" aria-hidden="true" />
+                        <span className="w-11 text-right text-ink-3 tabular">
+                          {percent(load * 100)}
+                        </span>
                       </span>
                     </div>
                     <MeterBar

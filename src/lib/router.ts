@@ -16,6 +16,7 @@ import { useCallback, useEffect, useState } from 'react';
      #/radares                    #/radares/:radarKey
      #/onboarding
      #/push                       #/push/:calendarId
+     #/trilha                     #/trilha/:ra
      #/jornada
      #/indicadores
      #/equipe
@@ -31,6 +32,7 @@ export type RouteName =
   | 'radares'
   | 'onboarding'
   | 'push'
+  | 'trilha'
   | 'jornada'
   | 'indicadores'
   | 'equipe'
@@ -71,6 +73,7 @@ const VALID: RouteName[] = [
   'radares',
   'onboarding',
   'push',
+  'trilha',
   'jornada',
   'indicadores',
   'equipe',

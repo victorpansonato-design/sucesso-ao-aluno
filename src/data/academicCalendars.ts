@@ -628,6 +628,22 @@ const R_EAD: readonly Raw[] = [
 
 export const SEMESTER = '2026/2';
 
+/**
+ * Início das aulas do semestre, em ISO.
+ *
+ * Os onze PDFs coincidem nesta data em 2026/2, e a linha foi conferida em cada
+ * um deles: os presenciais imprimem «Início das aulas para Calouros», os
+ * híbridos «Início, no AVA, da disciplina digital do primeiro bimestre» e o
+ * EAD «Início das Disciplinas Digitais Regulares, no AVA, para Calouros e
+ * Veteranos».
+ *
+ * Coincidirem num semestre não faz da data uma propriedade do semestre. Ela
+ * continua declarada calendário por calendário porque é o documento que manda
+ * nela: basta a instituição escalonar uma entrada no semestre que vem para a
+ * coincidência acabar, e então a mudança cai numa linha só.
+ */
+const CLASSES_START = '2026-08-04';
+
 export const CALENDARS: AcademicCalendar[] = [
   {
     id: 'cal-presencial-geral',
@@ -635,6 +651,7 @@ export const CALENDARS: AcademicCalendar[] = [
     shortName: 'Presencial diurno e noturno',
     modality: 'Presencial',
     semester: SEMESTER,
+    classesStart: CLASSES_START,
     rhythm: 'Diário',
     source: 'calendario_presencial_2026_2.pdf',
     url: `${S3}/calendario_presencial_2026_2.pdf`,
@@ -646,6 +663,7 @@ export const CALENDARS: AcademicCalendar[] = [
     shortName: 'Presencial Direito',
     modality: 'Presencial',
     semester: SEMESTER,
+    classesStart: CLASSES_START,
     rhythm: 'Diário',
     source: 'calendario_direito_presencial_2026_2.pdf',
     url: `${S3}/calendario_direito_presencial_2026_2.pdf`,
@@ -657,6 +675,7 @@ export const CALENDARS: AcademicCalendar[] = [
     shortName: 'Quinzenal veteranos',
     modality: 'Híbrido',
     semester: SEMESTER,
+    classesStart: CLASSES_START,
     rhythm: 'Quinzenal',
     source: 'calendario_semipresenciais_quinzenais_veteranos_2026_2.pdf',
     url: `${S3}/calendario_semipresenciais_quinzenais_veteranos_2026_2.pdf`,
@@ -668,6 +687,7 @@ export const CALENDARS: AcademicCalendar[] = [
     shortName: 'Quinzenal ingressantes',
     modality: 'Híbrido',
     semester: SEMESTER,
+    classesStart: CLASSES_START,
     rhythm: 'Quinzenal',
     source: 'calendario_semipresenciais_quinzenais_ingressantes_2026_2.pdf',
     url: `${S3}/calendario_semipresenciais_quinzenais_ingressantes_2026_2.pdf`,
@@ -679,6 +699,7 @@ export const CALENDARS: AcademicCalendar[] = [
     shortName: 'Bissemanal terças e quintas',
     modality: 'Híbrido',
     semester: SEMESTER,
+    classesStart: CLASSES_START,
     rhythm: 'Semanal',
     source: 'calendario_semipresenciais_bissemanais_2026_2.pdf',
     url: `${S3}/calendario_semipresenciais_bissemanais_2026_2.pdf`,
@@ -690,6 +711,7 @@ export const CALENDARS: AcademicCalendar[] = [
     shortName: 'Semanal aos sábados',
     modality: 'Híbrido',
     semester: SEMESTER,
+    classesStart: CLASSES_START,
     rhythm: 'Semanal',
     source: 'calendario_semipresenciais_semanais_aos_sabados_2026_2.pdf',
     url: `${S3}/calendario_semipresenciais_semanais_aos_sabados_2026_2.pdf`,
@@ -701,6 +723,7 @@ export const CALENDARS: AcademicCalendar[] = [
     shortName: 'Semanal sextas e sábados',
     modality: 'Híbrido',
     semester: SEMESTER,
+    classesStart: CLASSES_START,
     rhythm: 'Semanal',
     source: 'calendario_semipresenciais_semanais_sextas_e_sabados_2026_2.pdf',
     url: `${S3}/calendario_semipresenciais_semanais_sextas_e_sabados_2026_2.pdf`,
@@ -712,6 +735,7 @@ export const CALENDARS: AcademicCalendar[] = [
     shortName: 'Semipresencial Direito',
     modality: 'Híbrido',
     semester: SEMESTER,
+    classesStart: CLASSES_START,
     rhythm: 'Semanal',
     source: 'calendario_semipresencial_direito_2026_2.pdf',
     url: `${S3}/calendario_semipresencial_direito_2026_2.pdf`,
@@ -723,6 +747,7 @@ export const CALENDARS: AcademicCalendar[] = [
     shortName: 'Quinzenal ADS veteranos',
     modality: 'Híbrido',
     semester: SEMESTER,
+    classesStart: CLASSES_START,
     rhythm: 'Quinzenal',
     source: 'calendario_semipresencial_quinzenal_ADS_2026_2.pdf',
     url: `${S3}/calendario_semipresencial_quinzenal_ADS_2026_2.pdf`,
@@ -734,6 +759,7 @@ export const CALENDARS: AcademicCalendar[] = [
     shortName: 'Semanal Estética',
     modality: 'Híbrido',
     semester: SEMESTER,
+    classesStart: CLASSES_START,
     rhythm: 'Semanal',
     source: 'calendario_semipresencial_estetica_2026_2.pdf',
     url: `${S3}/calendario_semipresencial_estetica_2026_2.pdf`,
@@ -745,6 +771,7 @@ export const CALENDARS: AcademicCalendar[] = [
     shortName: 'EAD',
     modality: 'EaD',
     semester: SEMESTER,
+    classesStart: CLASSES_START,
     rhythm: 'A distância',
     source: 'calendario_ead_2026_2.pdf',
     url: `${S3}/calendario_ead_2026_2.pdf`,

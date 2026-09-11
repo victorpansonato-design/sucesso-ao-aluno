@@ -234,6 +234,14 @@ export interface Student {
   totalPeriods: number;
   shift: Shift;
   cohort: Cohort;
+  /**
+   * Turma do aluno dentro da oferta. É o que resolve as linhas de calendário
+   * que imprimem dois dias para uma prova ("21 e 22/08"): o PDF cobre duas
+   * turmas, o aluno pertence a uma. Opcional porque a integração que traz esse
+   * dado não existe para toda oferta — e onde ele falta, a trilha diz que não
+   * sabe em vez de escolher uma das duas datas.
+   */
+  turma?: string;
   /** Derived from the score engine on every mutation — never hand-written. */
   healthScore: number;
   status: HealthStatus;
@@ -460,6 +468,18 @@ export interface AcademicCalendar {
   shortName: string;
   modality: Modality;
   semester: string;
+  /**
+   * Início das aulas deste documento, em ISO. DECLARADO, não inferido.
+   *
+   * É a âncora de que a trilha precisa para saber quantos dias separam a
+   * matrícula do primeiro dia de aula — a variável que decide o que faz
+   * sentido mostrar a cada aluno. Deduzir por busca de texto não serve: só
+   * dois dos onze PDFs escrevem «Início das aulas»; os híbridos escrevem
+   * «Início, no AVA, da disciplina digital» e o EAD «Início das Disciplinas
+   * Digitais Regulares». Uma expressão regular acertaria a maioria e erraria
+   * em silêncio no resto, que é o pior modo de falha para uma data.
+   */
+  classesStart: string;
   /** Ritmo de encontros, que é o que separa dois calendários do mesmo curso. */
   rhythm: 'Diário' | 'Semanal' | 'Quinzenal' | 'A distância';
   /** Nome do arquivo no S3 da instituição, para rastrear de onde veio a linha. */
@@ -575,4 +595,246 @@ export interface PushDispatch {
   /** ISO completo, com horário. */
   sentAt: string;
   status: PushStatus;
+}
+
+/* ==========================================================================
+   Trilha do Aluno — a linha do tempo pessoal e a trilha de entrada
+   --------------------------------------------------------------------------
+   O calendário oficial responde «o que acontece no semestre». O aluno pergunta
+   «o que acontece comigo». São perguntas diferentes, e a segunda não se
+   responde apagando linhas da primeira.
+
+   O QUE ESTA SEÇÃO MODELA, E POR QUE É UM MODELO E NÃO UMA TELA
+   `TrilhaModel` é DADO. A partir dele saem três renderizações — a tela do
+   aparelho, a página imprimível e a régua de push — e nenhuma delas escreve
+   texto próprio. É a mesma disciplina que `lib/push.ts` já declara para a
+   régua: derivar de uma fonte, nunca redigir em paralelo. Duas renderizações
+   escritas à mão divergem, e o dia em que divergirem é o dia em que a citação
+   do PDF deixa de valer.
+
+   TRADUZIR, NÃO SUBTRAIR
+   O valor não está em esconder linhas, está em resolver as que existem. O PDF
+   diz «Segundo encontro presencial da 1ª disciplina – Prova 2». O aluno precisa
+   de «Prova 2 de Gestão de Pessoas, sábado 22/08, 19h30». Por isso todo
+   `TimelineItem` carrega o texto oficial ao lado do traduzido: o nosso está EM
+   CIMA do oficial, nunca EM VEZ do oficial.
+
+   O CONTADOR É O MECANISMO DE HONESTIDADE
+   `shownCount` e `totalCount` existem para que a tela possa dizer «você está
+   vendo 8 das 51 datas do seu curso». Um aluno que leu isso e não abriu o resto
+   fez uma escolha informada. Um aluno que viu 8 sem saber que havia 51 foi
+   induzido — e é essa diferença que separa priorizar de omitir.
+   ========================================================================== */
+
+/**
+ * Distância entre a matrícula e o primeiro dia de aula, em faixas.
+ *
+ * Não é enfeite: é a variável que mais muda o conteúdo. Não faz sentido falar
+ * de prazo de Atividades Complementares de dezembro para quem começa em
+ * quatro meses, nem abrir a trilha completa de doze passos para quem começa na
+ * semana que vem.
+ */
+export type TrilhaBand =
+  /** Δ maior que 60. O calendário do semestre dele provavelmente não existe ainda. */
+  | 'antecipada'
+  /** Δ de 15 a 60. Cabe a trilha inteira e o primeiro mês de datas. */
+  | 'confortavel'
+  /** Δ de 3 a 14. Só o que tem de acontecer antes do primeiro dia. */
+  | 'vespera'
+  /** Δ menor que 3, incluindo negativo. As aulas começaram, ou começam agora. */
+  | 'em-curso';
+
+/**
+ * Quanto o aluno perde se não souber.
+ *
+ * `irrecuperavel` é a única faixa que nenhuma configuração recolhe. Ela não
+ * mede interesse, mede dano: prazo que fecha, prova que não se repete, janela
+ * de 48 horas que expira. Ver `IRRECUPERAVEL` em `lib/trilha.ts`.
+ */
+export type Consequence = 'irrecuperavel' | 'alta' | 'media' | 'baixa';
+
+/** Como o calendário deste aluno foi encontrado — e se foi. */
+export type CalendarMatch =
+  /** O site publica a linha exata deste curso para esta coorte. */
+  | 'exata'
+  /**
+   * O site publica este curso, mas só para a outra coorte. O ritmo de encontros
+   * é propriedade do curso, não da coorte, então o documento serve — com aviso.
+   * Melhor que o vazio, e honesto sobre o que é.
+   */
+  | 'outra-coorte'
+  /** O site não publica calendário para este curso. Nada a inventar. */
+  | 'nenhuma';
+
+export interface CalendarResolution {
+  calendar?: AcademicCalendar;
+  entry?: CalendarEntry;
+  match: CalendarMatch;
+  /** Por que a resolução é esta, em português, para aparecer na tela. */
+  note?: string;
+}
+
+/**
+ * As duas distâncias, que não são a mesma coisa e foram confundidas uma vez.
+ *
+ * `delta` é HISTÓRICO: quantos dias o aluno teve de folga entre assinar a
+ * matrícula e o primeiro dia de aula. É a variável que decide quanta trilha
+ * cabia — quem teve 90 dias pôde resolver tudo com calma, quem teve 5 chegou
+ * correndo — e é o que a operação configura.
+ *
+ * `daysToClasses` é PRESENTE: quantos dias faltam, de hoje, para o primeiro
+ * dia. É o que decide o que é acionável agora.
+ *
+ * A faixa sai do PRESENTE, não do histórico. Medir a faixa pelo histórico
+ * colocava um veterano de quarto módulo em «matrícula antecipada», porque ele
+ * se matriculou 662 dias antes deste semestre — verdade aritmética e absurdo
+ * operacional.
+ */
+export interface DeltaInfo {
+  /** Data da matrícula, ISO. */
+  enrolledAt: string;
+  /** Início das aulas do calendário aplicável, ISO. */
+  classesStart: string;
+  /** Matrícula → início das aulas. Negativo = matriculou-se com o semestre andando. */
+  delta: number;
+  /** Hoje → início das aulas. Negativo = as aulas já começaram. */
+  daysToClasses: number;
+  /**
+   * Se `delta` diz algo sobre este aluno. Falso para veterano: a distância
+   * entre a matrícula dele e o início DESTE semestre é um número sem sentido,
+   * e a tela mostra o semestre de ingresso no lugar.
+   */
+  relevant: boolean;
+  band: TrilhaBand;
+  /** True quando a faixa vem do simulador da tela, não do dado do aluno. */
+  simulated: boolean;
+}
+
+/**
+ * Uma data da linha do tempo pessoal.
+ *
+ * Carrega as duas versões de propósito: `title` e `lines` é o que o aluno lê,
+ * `officialTitle` e `officialDetail` é o que está impresso no PDF. Quando as
+ * duas divergirem, a tela mostra as duas e o PDF ganha.
+ */
+export interface TimelineItem {
+  id: string;
+  eventId: string;
+  /** Datas resolvidas do evento, ISO, na ordem do rótulo. */
+  dates: string[];
+  start: string;
+  end: string;
+  /** O rótulo exatamente como impresso: «13, 14, 27 e 28/11». */
+  dateLabel: string;
+  /** Título traduzido para a língua do aluno. */
+  title: string;
+  /** Contexto resolvido: horário do turno, local, disciplina, regra de falta. */
+  lines: string[];
+  consequence: Consequence;
+  category: PushCategory;
+  /** Texto oficial, literal. A citação que mantém o respaldo de pé. */
+  officialTitle: string;
+  officialDetail?: string;
+  /** Divergência encontrada no PDF de origem, preservada da transcrição. */
+  officialNote?: string;
+  /** Nome curto e endereço do PDF, para abrir o original. */
+  sourceName: string;
+  sourceUrl: string;
+  /**
+   * True quando a linha imprime mais de um dia para um evento único e não
+   * sabemos a turma do aluno. A tela diz que não sabe; nunca escolhe um dia.
+   */
+  ambiguousDay: boolean;
+  /** Dias de hoje até `start`. Negativo = já passou. */
+  inDays: number;
+  /** Onde o item cai no recorte. */
+  bucket: TrilhaBucket;
+  /** Atalho para `bucket === 'agora' || bucket === 'guardado'`. */
+  shown: boolean;
+  /** Por que ficou fora do recorte. Texto curto, para a tela do completo. */
+  hiddenReason?: string;
+}
+
+/**
+ * Onde um item cai no recorte pessoal.
+ *
+ * `guardado` é o que resolve a tensão entre «nunca omitir o irrecuperável» e
+ * «não encher a tela de dezembro em setembro»: o prazo de Atividades
+ * Complementares de 07/12 não pode ser escondido de ninguém, mas também não é
+ * uma «próxima data» em setembro. Ele fica numa faixa própria, sempre presente,
+ * fora da fila cronológica.
+ *
+ * `recolhido` continua contado em `totalCount` e alcançável na tela do
+ * calendário completo. Recolher não é apagar — é a diferença inteira entre
+ * priorizar e omitir.
+ */
+export type TrilhaBucket =
+  /** Entra na fila das próximas datas. */
+  | 'agora'
+  /** Irrecuperável fora da janela: faixa própria, sempre visível. */
+  | 'guardado'
+  /** Já aconteceu. Só aparece na tela do completo, ou na janela das 48 horas. */
+  | 'passado'
+  /** Fora do recorte por consequência baixa ou por configuração. */
+  | 'recolhido';
+
+/** Onde o aluno resolve um passo da trilha de entrada. */
+export type StepPlace = 'portal' | 'app' | 'ava' | 'secretaria' | 'campus' | 'financeiro';
+
+export interface TrilhaStep {
+  id: string;
+  title: string;
+  /** O que o aluno faz, em imperativo curto. */
+  action: string;
+  place: StepPlace;
+  /** Em que faixas este passo aparece. Vazio = todas. */
+  bands: TrilhaBand[];
+  /** Modalidades a que se aplica. Vazio = todas. */
+  modalities: Modality[];
+  /** Bloqueante trava o primeiro dia de aula se não for feito. */
+  blocking: boolean;
+  /** Marcado como concluído pelos sinais que o sistema já tem. */
+  done: boolean;
+  /** De onde veio o «done», para que a tela não minta sobre o que sabe. */
+  evidence?: string;
+}
+
+/**
+ * O artefato completo de um aluno. Uma fonte, três renderizações.
+ */
+export interface TrilhaModel {
+  student: Student;
+  resolution: CalendarResolution;
+  delta: DeltaInfo;
+  /** A trilha de entrada, já filtrada pela faixa e pela modalidade. */
+  steps: TrilhaStep[];
+  /** Tudo do calendário, traduzido. `shown` decide o que entra no recorte. */
+  items: TimelineItem[];
+  /** Quantos itens o recorte mostra e quantos o calendário tem. O contador. */
+  shownCount: number;
+  totalCount: number;
+  /** A próxima data relevante, para o ícone e para a primeira dobra. */
+  next?: TimelineItem;
+  /** Data de referência do cálculo, ISO. */
+  today: string;
+}
+
+/**
+ * O que a operação pode ajustar sem tocar em código.
+ *
+ * Deliberadamente pequeno. A classificação de consequência já mora nos
+ * overrides de evento da Gestão de PUSH (`CalendarEventOverride.relevance`) e
+ * não é duplicada aqui — duas telas mandando na mesma classificação é o começo
+ * de uma divergência silenciosa.
+ */
+export interface TrilhaConfig {
+  /** Passos da trilha de entrada, na ordem em que o aluno os cumpre. */
+  steps: TrilhaStep[];
+  /**
+   * Categorias que o recorte pessoal recolhe quando não são irrecuperáveis.
+   * Recolher não é apagar: o item continua no calendário completo, contado.
+   */
+  collapsed: PushCategory[];
+  /** Quantos dias à frente o recorte olha, por faixa. */
+  horizonDays: Record<TrilhaBand, number>;
 }

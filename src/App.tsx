@@ -25,6 +25,7 @@ import { Student360View } from './views/Student360View';
 import { RadarsView } from './views/RadarsView';
 import { OnboardingView } from './views/OnboardingView';
 import { PushView } from './views/PushView';
+import { TrilhaView } from './views/TrilhaView';
 import { JourneyView } from './views/JourneyView';
 import { IndicatorsView } from './views/IndicatorsView';
 import { TeamView } from './views/TeamView';
@@ -131,10 +132,16 @@ function Shell() {
         // O parâmetro é o id de uma linha do site (curso × público), para que a
         // régua de um curso possa ser mandada por link para a coordenação.
         return <PushView key="push" actions={actions} calendarParam={route.param} />;
+      case 'trilha':
+        // O parâmetro é o RA do aluno, para que a trilha de um aluno possa ser
+        // mandada por link para a coordenação ou para quem o atende.
+        return <TrilhaView key="trilha" actions={actions} raParam={route.param} />;
       case 'jornada':
         return <JourneyView key="jornada" actions={actions} />;
       case 'indicadores':
-        return <IndicatorsView key="indicadores" actions={actions} />;
+        // O parâmetro é a aba do workspace analítico, para que o painel de que
+        // se está falando numa reunião possa ser mandado por link.
+        return <IndicatorsView key="indicadores" actions={actions} tabParam={route.param} />;
       case 'equipe':
         return <TeamView key="equipe" actions={actions} />;
       case 'playbook':

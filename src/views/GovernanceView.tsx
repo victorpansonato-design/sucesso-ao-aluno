@@ -203,9 +203,16 @@ export function GovernanceView() {
                 ].map((row) => (
                   <div key={row.status} className="flex items-center justify-between gap-2">
                     <HealthBadge status={row.status} />
-                    <span className="font-mono text-[12px] font-semibold text-ink">
-                      {row.value}
-                      <span className="ml-1.5 font-normal text-ink-4">
+                    {/* Contagem e percentual em células separadas por um fio.
+                        Encostados com uma margem de 6px, `14` e `26%` liam como
+                        `1426%` — o mesmo defeito que a distribuição do Health
+                        Score tinha em Indicadores. */}
+                    <span className="flex shrink-0 items-center font-mono text-[12px]">
+                      <span className="w-10 text-right font-semibold text-ink tabular">
+                        {int(row.value)}
+                      </span>
+                      <span className="mx-2 h-3.5 w-px bg-hairline" aria-hidden="true" />
+                      <span className="w-12 text-right font-normal text-ink-4 tabular">
                         {percent((row.value / Math.max(1, impact.count)) * 100)}
                       </span>
                     </span>
