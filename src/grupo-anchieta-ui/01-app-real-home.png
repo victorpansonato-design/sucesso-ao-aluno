@@ -1,0 +1,22 @@
+# Pacote de referência - Trilha e Calendário Pessoal
+
+Este pacote contém as referências visuais e as instruções funcionais para implementar as funcionalidades **Minhas datas** e **Comece por aqui** no aplicativo Grupo Anchieta.
+
+## Comece por aqui
+
+1. Abra `CLAUDE_IMPLEMENTACAO.md`.
+2. Coloque este pacote dentro do projeto, por exemplo em `docs/ui-references/trilha-calendario/`.
+3. Envie ao Claude Code o conteúdo integral de `CLAUDE_IMPLEMENTACAO.md`.
+4. Mantenha as imagens disponíveis no contexto durante a implementação.
+
+## Estrutura
+
+- `referencias/`: aplicativo real e esboço inicial.
+- `interfaces/minhas-datas/`: fluxo visual do calendário pessoal.
+- `interfaces/comece-por-aqui/`: fluxo visual da trilha inicial.
+- `documentacao/PLANEJAMENTO_ORIGINAL.md`: estudo completo que originou as telas.
+- `CLAUDE_IMPLEMENTACAO.md`: comando e especificação funcional para o Claude Code.
+
+## Regra crítica
+
+As provas individuais exibidas nas imagens são **somente exemplos visuais**. A implementação real deve mostrar apenas os períodos institucionais de avaliações P1 e P2. Leia a seção correspondente em `CLAUDE_IMPLEMENTACAO.md` antes de alterar qualquer código.

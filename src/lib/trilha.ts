@@ -441,9 +441,45 @@ function printedPlace(event: CalendarEvent): string | null {
 }
 
 /** Um rótulo de data é intervalo («01 a 14/12») ou enumeração («27 e 28/11»)? */
-function isPeriod(dateLabel: string): boolean {
+export function isPeriod(dateLabel: string): boolean {
   return /\sa\s/.test(dateLabel);
 }
+
+/**
+ * Esta linha é um PERÍODO INSTITUCIONAL de avaliações, e não uma prova?
+ *
+ * A distinção decide o que a tela pode afirmar, e é a regra mais dura deste
+ * arquivo. O calendário publica «28/09 a 03/10 — Período de aplicação da P1»:
+ * seis dias, para o curso inteiro. O dia da prova de cada disciplina é marcado
+ * pelo professor EM AULA, não está no PDF e não está no sistema.
+ *
+ * Então, para estas linhas, três coisas ficam proibidas:
+ *
+ *   · escolher um dia dentro do intervalo;
+ *   · associar disciplina, professor, sala ou horário;
+ *   · criar lembrete de uma prova individual que não existe como dado.
+ *
+ * Um card que diz «Prova 1 de Economia das Decisões Empresariais, 19/09 às
+ * 19h10» sobre esta linha não é um resumo do calendário — é uma data inventada
+ * com a assinatura da instituição em cima. O período é o que o documento diz, e
+ * é tudo o que a tela pode dizer.
+ */
+export function assessmentPeriodOf(event: CalendarEvent): 'P1' | 'P2' | null {
+  if (event.category !== 'prova') return null;
+  if (!isPeriod(event.dateLabel)) return null;
+  /* «Substitutiva da P1» e «Recuperação da P2» são aplicações datadas de uma
+     prova específica, não o período em que o bimestre inteiro é avaliado. */
+  if (/substitutiva|recupera[çc][ãa]o/i.test(event.title)) return null;
+  if (/\bP1\b|\bprova 1\b/i.test(event.title)) return 'P1';
+  if (/\bP2\b|\bprova 2\b/i.test(event.title)) return 'P2';
+  return null;
+}
+
+/** A frase que devolve a data ao professor, que é quem a tem. */
+const ASSESSMENT_NOTE: Record<'P1' | 'P2', string> = {
+  P1: 'A data de cada disciplina será informada pelo professor durante a aula.',
+  P2: 'Consulte as orientações do professor da disciplina.',
+};
 
 /**
  * A linha imprime dois dias para uma prova e não sabemos a turma?
@@ -468,6 +504,12 @@ function translateTitle(
   const { title, category } = event;
 
   if (category === 'prova') {
+    /* O período institucional vem antes de qualquer outra leitura: enquanto a
+       linha for um intervalo de P1 ou P2, nenhum nome de prova pode sair daqui,
+       porque a prova individual dentro dele não existe como dado. */
+    const period = assessmentPeriodOf(event);
+    if (period) return `Período de avaliações ${period}`;
+
     const assessment = assessmentLabel(title) ?? 'Prova';
     if (discipline) return `${assessment} de ${discipline.name}`;
     if (/digitais? regulares?/i.test(title)) return `${assessment} das disciplinas digitais`;
@@ -582,17 +624,31 @@ function buildItem(
   config: TrilhaConfig,
   today: string,
 ): TimelineItem {
-  const discipline = disciplineFor(event, student);
-  const time = printedTime(event, student);
-  const place = printedPlace(event);
+  /* A ordem importa: o período de avaliações é apurado ANTES da disciplina,
+     do horário e do local, porque ele apaga os três. O PDF imprime «Diurno:
+     07h30. Noturno: 19h30» também nesta linha, mas um horário de início para
+     um intervalo de seis dias, lido como «começa às 19h30», é a mesma falsa
+     precisão de escolher um dia — ele continua visível, literal, no texto
+     oficial que o card carrega embaixo. */
+  const period = assessmentPeriodOf(event);
+  const discipline = period ? undefined : disciplineFor(event, student);
+  const time = period ? null : printedTime(event, student);
+  const place = period ? null : printedPlace(event);
   const ambiguousDay = isAmbiguousDay(event, student);
   const inDays = daysToAnchor(event, today);
 
   const lines: string[] = [];
 
-  const family = familyLine(event, student);
+  if (period) {
+    lines.push(`De ${shortDay(event.start)} a ${shortDay(event.end)}`);
+    lines.push(ASSESSMENT_NOTE[period]);
+  }
 
-  if (discipline) {
+  const family = period ? null : familyLine(event, student);
+
+  if (period) {
+    // Já dito acima, e nada mais pode ser afirmado sobre este intervalo.
+  } else if (discipline) {
     lines.push(`${discipline.name} · ${discipline.teacher}`);
   } else if (family) {
     lines.push(family);
@@ -670,6 +726,56 @@ export const PLACE_LABEL: Record<StepPlace, string> = {
   campus: 'No campus',
   financeiro: 'Financeiro',
 };
+
+/**
+ * Por onde o aluno começa, em cada lugar.
+ *
+ * Só diz ONDE. A tentação aqui é escrever o caminho de cliques inteiro («entre
+ * com o mesmo RA e senha do portal»), e esse é exatamente o tipo de afirmação
+ * que o sistema não tem como sustentar: ninguém aqui sabe se o AVA compartilha
+ * credencial com o portal. Instrução que erra o primeiro passo custa mais
+ * confiança do que instrução curta custa conveniência.
+ */
+const PLACE_OPENING: Record<StepPlace, string> = {
+  portal: 'Abra o Portal do Aluno.',
+  app: 'Abra o App Grupo Anchieta.',
+  ava: 'Abra o AVA.',
+  secretaria: 'Procure a secretaria virtual, no Portal do Aluno.',
+  campus: 'Vá ao campus na data combinada.',
+  financeiro: 'Abra «Cobranças a Pagar», no app.',
+};
+
+/**
+ * Os passos cujo «concluído» nasce de um sinal do sistema.
+ *
+ * É a mesma lista que `evidenceFor`, abaixo, sabe ler — e por isso ela mora
+ * aqui em cima, num lugar só. Os quatro que ficam de fora (boleto, DP, e-book,
+ * extensionista) não têm sinal nenhum, e a tela precisa poder DIZER isso em vez
+ * de oferecer um botão de «marcar como concluído» que não significa nada.
+ */
+const AUTO_DETECTED = new Set([
+  'contrato',
+  'app',
+  'portal',
+  'ava',
+  'horarios',
+  'integracao',
+  'primeira-entrega',
+]);
+
+/** Como a conclusão deste passo será reconhecida, em uma frase. */
+export function recognitionOf(step: TrilhaStep): string {
+  if (step.done && step.evidence) return step.evidence;
+  if (AUTO_DETECTED.has(step.id)) {
+    return 'O app reconhece sozinho assim que isso acontecer. Você não precisa marcar nada.';
+  }
+  return 'Este passo não tem confirmação automática: ele fica em aberto até você resolver.';
+}
+
+/** As instruções curtas e numeradas de um passo. */
+export function stepInstructions(step: TrilhaStep): string[] {
+  return [PLACE_OPENING[step.place], step.action, recognitionOf(step)];
+}
 
 /**
  * Os passos desta faixa e desta modalidade, com `done` vindo de evidência.
@@ -803,8 +909,16 @@ export function countdownPhrase(inDays: number): string {
 /** O rótulo curto do ícone na tela inicial: «Prova 1 · sáb 22». */
 export function nextBadge(item: TimelineItem | undefined): string {
   if (!item) return 'Nada marcado';
-  const dia = weekdayOf(item.start).slice(0, 3);
   const [, , d] = item.start.split('-');
+
+  /* Um período não tem dia da semana para anunciar, e cortar o título no
+     primeiro « de » devolveria «Período» — um chip que não diz nada. O
+     intervalo inteiro não cabe em 402 pontos, então o chip anuncia a abertura
+     e a tela de datas mostra as duas pontas. */
+  const period = item.title.match(/^Período de avaliações (P[12])$/);
+  if (period) return `Avaliações ${period[1]} · a partir de ${d}`;
+
+  const dia = weekdayOf(item.start).slice(0, 3);
   return `${item.title.split(' de ')[0]} · ${dia} ${d}`;
 }
 
