@@ -15,6 +15,7 @@ import type { ShellActions } from '../App';
 import { useApp } from '../state/AppContext';
 import { CALENDARS, CALENDAR_ENTRIES, SEMESTER } from '../data/academicCalendars';
 import { DEFAULT_TRILHA_CONFIG } from '../data/trilhaConfig';
+import { FONO_PREVIEW } from '../data/trilhaPreview';
 import {
   BAND_LABEL,
   buildTrilha,
@@ -99,9 +100,9 @@ export function TrilhaView({
   const { students, toast } = useApp();
 
   const [tab, setTab] = useState<Tab>('trilha');
-  const [query, setQuery] = useState(raParam ?? '');
-  const [ra, setRa] = useState<string | null>(raParam ?? null);
-  const [screen, setScreen] = useState<PhoneScreen>('inicio');
+  const [query, setQuery] = useState(raParam === FONO_PREVIEW.ra ? '' : raParam ?? '');
+  const [ra, setRa] = useState<string | null>(raParam ?? FONO_PREVIEW.ra);
+  const [screen, setScreen] = useState<PhoneScreen>(raParam ? 'inicio' : 'modalidade');
   const [bandChoice, setBandChoice] = useState<'real' | TrilhaBand>('real');
   const [config, setConfig] = useState<TrilhaConfig>(DEFAULT_TRILHA_CONFIG);
 
@@ -111,9 +112,9 @@ export function TrilhaView({
   /* O hash é a verdade sobre qual aluno está aberto, e não o estado local:
      sem isto, o Voltar do navegador mudava a URL e a tela ficava onde estava. */
   useEffect(() => {
-    setRa(raParam ?? null);
-    setQuery(raParam ?? '');
-    setScreen('inicio');
+    setRa(raParam ?? FONO_PREVIEW.ra);
+    setQuery(raParam === FONO_PREVIEW.ra ? '' : raParam ?? '');
+    setScreen(!raParam || raParam === FONO_PREVIEW.ra ? 'modalidade' : 'inicio');
     setBandChoice('real');
     if (raParam) setTab('trilha');
   }, [raParam]);
@@ -128,9 +129,11 @@ export function TrilhaView({
   }, [students, query]);
 
   const student = useMemo(
-    () => (ra ? students.find((s) => s.ra === ra) : undefined),
+    () => ra === FONO_PREVIEW.ra ? FONO_PREVIEW : (ra ? students.find((s) => s.ra === ra) : undefined),
     [students, ra],
   );
+
+  const isPreview = student?.id === FONO_PREVIEW.id;
 
   /* -- Atalhos de exemplo ------------------------------------------------
      Derivados da base, não escritos à mão: um veterano e um calouro do curso em
@@ -163,10 +166,12 @@ export function TrilhaView({
     [student, config, today, bandChoice],
   );
 
+  const phoneModel = model && isPreview ? { ...model, delta: { ...model.delta, simulated: true } } : model;
+
   const open = (value: string) => {
     setRa(value);
-    setQuery(value);
-    setScreen('inicio');
+    setQuery(value === FONO_PREVIEW.ra ? '' : value);
+    setScreen(value === FONO_PREVIEW.ra ? 'modalidade' : 'inicio');
     setBandChoice('real');
     actions.goto('trilha', value);
   };
@@ -211,6 +216,9 @@ export function TrilhaView({
           {/* ---- O campo. Um só. ------------------------------------- */}
           <Card className="print-hide" padded={false}>
             <div className="space-y-4 p-4">
+              <button type="button" onClick={() => open(FONO_PREVIEW.ra)} className="text-[13px] font-medium text-brand-text hover:underline">
+                Prévia: Fonoaudiologia · Ingressante híbrido
+              </button>
               <div className="max-w-md">
                 <SearchInput
                   value={query}
@@ -292,9 +300,9 @@ export function TrilhaView({
                     <div className="flex items-start gap-3">
                       <Avatar initials={student.initials} size="lg" />
                       <div className="min-w-0">
-                        <h2 className="text-[15px] font-semibold text-ink">{student.name}</h2>
+                        <h2 className="text-[15px] font-semibold text-ink">{isPreview ? 'Fonoaudiologia · Ingressante híbrido' : student.name}</h2>
                         <p className="mt-0.5 text-[12px] text-ink-3">
-                          RA {student.ra} · {student.course}
+                          {isPreview ? 'Perfil de demonstração · disciplinas e dispensa ilustrativas · calendário oficial' : `RA ${student.ra} · ${student.course}`}
                         </p>
                         <div className="mt-2 flex flex-wrap items-center gap-1.5">
                           <ModalityBadge modality={student.modality} />
@@ -333,6 +341,7 @@ export function TrilhaView({
                       <Button
                         variant="ghost"
                         icon={<ExternalLink className="h-3.5 w-3.5" />}
+                        disabled={isPreview}
                         onClick={() => actions.openStudent(student.id)}
                       >
                         Dossiê 360°
@@ -366,7 +375,7 @@ export function TrilhaView({
                     glow={model.totalCount === 0 ? 20 : 62}
                     glowTone="var(--brand-3)"
                   >
-                    <AnchietaPhoneApp model={model} screen={screen} onScreen={setScreen} />
+                    <AnchietaPhoneApp model={phoneModel!} screen={screen} onScreen={setScreen} />
                   </IPhone>
                 </div>
 

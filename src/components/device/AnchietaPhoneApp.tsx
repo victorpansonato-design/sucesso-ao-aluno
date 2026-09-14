@@ -19,6 +19,9 @@ import {
   MapPin,
   MessageCircle,
   MoreHorizontal,
+  MonitorPlay,
+  ChevronDown,
+  ExternalLink,
   Rocket,
   Search,
   ScrollText,
@@ -32,7 +35,6 @@ import type {
   Discipline,
   StepPlace,
   TimelineItem,
-  TrilhaBucket,
   TrilhaModel,
   TrilhaStep,
 } from '../../types';
@@ -45,6 +47,7 @@ import {
   bucketsOf,
   countdownPhrase,
   datePhrase,
+  disciplineFor,
   isPeriod,
   nextBadge,
   recognitionOf,
@@ -114,6 +117,7 @@ const SCREEN = {
   warn: '#f5b459',
   crit: '#f4776b',
   vital: '#32d583',
+  exemption: '#c4b5fd',
 } as const;
 
 /** O degradê do cabeçalho. Azul institucional, não o azul do sistema operacional. */
@@ -126,6 +130,7 @@ export type PhoneScreen =
   /** Detalhe de uma data. Precisa de um item escolhido para existir. */
   | 'detalhe'
   | 'trilha'
+  | 'modalidade'
   /** A trilha inteira, em grupos recolhíveis. */
   | 'passos'
   /** Detalhe de uma etapa. Precisa de uma etapa escolhida para existir. */
@@ -153,6 +158,7 @@ const SCREEN_POSITION: Record<PhoneScreen, number> = {
   contratos: 1,
   mais: 1,
   trilha: 1,
+  modalidade: 2,
   horarios: 1,
   datas: 2,
   passos: 2,
@@ -286,12 +292,30 @@ function classesOn(disciplines: Discipline[], isoDate: string): TodayClass[] {
   const [y, m, d] = isoDate.split('-').map(Number);
   const weekday = new Date(Date.UTC(y, m - 1, d)).getUTCDay();
   return disciplines
-    .filter((disc) => scheduleDays(disc.schedule).includes(weekday))
+    .filter((disc) => !disc.exempted && scheduleDays(disc.schedule).includes(weekday))
     .map((discipline) => ({ discipline, time: scheduleTime(discipline.schedule) }));
 }
 
 function capitalize(value: string): string {
   return value.charAt(0).toUpperCase() + value.slice(1);
+}
+
+/** Inclui períodos em andamento e todas as ocorrências até o fim do próximo mês. */
+function inTwoMonths(item: TimelineItem, today: string): boolean {
+  const [year, month] = today.split('-').map(Number);
+  const start = `${today.slice(0, 7)}-01`;
+  const end = new Date(Date.UTC(year, month + 1, 1)).toISOString().slice(0, 10);
+  return isPeriod(item.dateLabel)
+    ? item.start < end && item.end >= start
+    : item.dates.some((date) => date >= start && date < end);
+}
+
+function MoreDates({ expanded, onToggle, count }: { expanded: boolean; onToggle: () => void; count: number }) {
+  return <button type="button" onClick={onToggle} aria-expanded={expanded}
+    className="mt-4 min-h-11 w-full rounded-[14px] px-4 py-3 text-[13px] font-semibold focus-visible:outline-2 focus-visible:outline-offset-2"
+    style={{ backgroundColor: SCREEN.card, color: SCREEN.link }}>
+    {expanded ? 'Mostrar só este mês e o próximo' : `Ver mais: todas as datas (${count})`}
+  </button>;
 }
 
 /* ==========================================================================
@@ -1004,10 +1028,12 @@ function DatesScreen({
   const [mode, setMode] = useState<'proximas' | 'mes'>('proximas');
   const [filter, setFilter] = useState<'tudo' | 'prova' | 'prazo' | 'aula'>('tudo');
   const [selectedDay, setSelectedDay] = useState<string | null>(null);
+  const [expanded, setExpanded] = useState(false);
 
-  const upcoming = [...buckets.agora, ...buckets.guardado];
-  const filtered = upcoming.filter((item) => filter === 'tudo' || item.category === filter);
-  const next = upcoming[0];
+  const upcoming = [...buckets.agora, ...buckets.guardado].sort((a, b) => a.inDays - b.inDays);
+  const personal = model.items.filter((item) => item.bucket !== 'recolhido').sort((a, b) => a.start.localeCompare(b.start));
+  const filtered = personal.filter((item) => (expanded || inTwoMonths(item, model.today)) && (filter === 'tudo' || item.category === filter));
+  const next = upcoming.find((item) => !item.exempted);
 
   /* O mês inclui o que já passou DENTRO dele, e isso é deliberado. `recolhido`
      é curadoria — fica no calendário completo, contado no «N de M». `passado`
@@ -1024,13 +1050,13 @@ function DatesScreen({
     return { first: days[0], last: days[days.length - 1] };
   }, [monthPool]);
 
-  const [cursor, setCursor] = useState(() => monthOf(next?.start ?? model.today));
+  const [cursor, setCursor] = useState(() => monthOf(model.today));
 
   /* O mês aberto segue o ALUNO, e não a montagem do componente.
      A aba troca o RA e a faixa simulada sem desmontar o aparelho, e um cursor
      preso na montagem deixava a grade parada em setembro de um aluno enquanto
      a lista já era de outro — uma tela vazia que parece defeito e não é. */
-  const anchorMonth = next?.start ?? model.today;
+  const anchorMonth = model.today;
   useEffect(() => {
     setCursor(monthOf(anchorMonth));
     setSelectedDay(null);
@@ -1132,7 +1158,7 @@ function DatesScreen({
             </p>
             <p className="mt-2 text-[12px] leading-snug" style={{ color: SCREEN.ink2 }}>
               Suas aulas começam em {longDay(model.delta.classesStart)}. O calendário do seu
-              semestre é publicado perto dessa data — mostrar agora as datas de outro semestre
+              semestre é publicado perto dessa data. Mostrar agora as datas de outro semestre
               seria pior que não mostrar nada. Enquanto isso, a trilha de entrada já tem o que
               você pode resolver hoje.
             </p>
@@ -1148,7 +1174,7 @@ function DatesScreen({
           </div>
         )}
 
-        {upcoming.length > 0 && <>
+        {personal.length > 0 && <>
           <div className="flex rounded-[22px] border p-1" style={{ backgroundColor: SCREEN.card, borderColor: 'rgba(255,255,255,0.16)' }}>
             {([{ value: 'proximas' as const, label: 'Próximas' }, { value: 'mes' as const, label: 'Mês' }]).map((option) => <button key={option.value} type="button" onClick={() => setMode(option.value)} aria-pressed={mode === option.value} className="flex-1 rounded-[18px] py-2.5 text-[14px] font-semibold" style={{ color: SCREEN.ink, background: mode === option.value ? 'linear-gradient(90deg,#087fea,#0670d5)' : 'transparent' }}>{option.label}</button>)}
           </div>
@@ -1174,7 +1200,7 @@ function DatesScreen({
           <section className="min-w-0 overflow-hidden pt-2">
             <h2 className="text-[20px] font-bold" style={{ color: SCREEN.ink }}>
               {mode === 'proximas'
-                ? 'Sua linha do tempo'
+                ? expanded ? 'Suas datas do semestre' : 'Este mês e o próximo'
                 : selectedDay
                   ? capitalize(`${weekdayOf(selectedDay)}, ${longDay(selectedDay)}`)
                   : 'Datas do mês'}
@@ -1191,6 +1217,7 @@ function DatesScreen({
             ) : (
               <TimelineList items={listed} onOpen={onOpenItem} />
             )}
+            {mode === 'proximas' && personal.some((item) => !inTwoMonths(item, model.today)) && <MoreDates expanded={expanded} onToggle={() => setExpanded(!expanded)} count={personal.length} />}
 
             {mode === 'mes' && (
               <p className="mt-4 text-[12px]" style={{ color: SCREEN.ink2 }}>
@@ -1227,7 +1254,7 @@ function DatesScreen({
             style={{ borderColor: SCREEN.line }}
           >
             <p className="text-[14px] leading-snug" style={{ color: SCREEN.ink }}>
-              Você está vendo <strong>{model.shownCount}</strong> das{' '}
+              Nesta lista: <strong>{listed.length}</strong> das{' '}
               <strong>{model.totalCount}</strong> datas do calendário do seu curso.
             </p>
             <span className="mt-2.5 flex items-center gap-1 text-[13px]" style={{ color: SCREEN.link }}>
@@ -1330,11 +1357,13 @@ function EventDetailScreen({
   item,
   onScreen,
   chrome,
+  origin = 'datas',
 }: {
   model: TrilhaModel;
   item: TimelineItem;
   onScreen: (s: PhoneScreen) => void;
   chrome: boolean;
+  origin?: 'datas' | 'completo' | 'modalidade';
 }) {
   type Panel = 'lembrete' | 'agenda' | 'oficial' | 'compartilhar';
   const [panel, setPanel] = useState<Panel | null>(null);
@@ -1353,12 +1382,12 @@ function EventDetailScreen({
       <div className="px-5 pb-6" style={{ backgroundImage: HEADER_BG, paddingTop: chrome ? IOS.safeTop : 18 }}>
         <button
           type="button"
-          onClick={() => onScreen('datas')}
+          onClick={() => onScreen(origin)}
           className="-ml-1.5 mb-3 flex items-center gap-1 text-[15px]"
           style={{ color: SCREEN.ink }}
         >
           <ChevronLeft className="h-[18px] w-[18px]" />
-          Minhas datas
+          {origin === 'completo' ? 'Calendário completo' : origin === 'modalidade' ? 'Sua modalidade' : 'Minhas datas'}
         </button>
         <p className="text-[11px] font-semibold tracking-wide uppercase" style={{ color: 'rgba(255,255,255,0.72)' }}>
           {typeLabel}
@@ -1408,7 +1437,7 @@ function EventDetailScreen({
             <p className="mt-2 text-[12px] leading-snug" style={{ color: SCREEN.ink2 }}>
               O calendário publica o período em que as avaliações acontecem, para o curso
               inteiro. O dia da prova de cada disciplina é marcado pelo professor durante a aula
-              e não está no sistema — por isso esta tela não mostra um dia, uma sala nem um
+              e não está no sistema. Por isso esta tela não mostra um dia, uma sala nem um
               horário para uma disciplina.
             </p>
           </div>
@@ -1451,8 +1480,8 @@ function EventDetailScreen({
                 <>
                   <p style={{ color: SCREEN.ink }}>O lembrete pode marcar:</p>
                   <ul className="mt-2 space-y-1">
-                    <li>· Abertura do período — {shortDayOf(item.start)}</li>
-                    <li>· Encerramento do período — {shortDayOf(item.end)}</li>
+                    <li>· Abertura do período: {shortDayOf(item.start)}</li>
+                    <li>· Encerramento do período: {shortDayOf(item.end)}</li>
                   </ul>
                   <p className="mt-2.5">
                     Não é possível criar um lembrete para a prova de uma disciplina: essa data
@@ -1464,8 +1493,8 @@ function EventDetailScreen({
                 <>
                   <p style={{ color: SCREEN.ink }}>O lembrete pode marcar:</p>
                   <ul className="mt-2 space-y-1">
-                    <li>· Um dia antes — {shortDayOf(shiftDays(item.start, -1))}</li>
-                    <li>· No dia — {shortDayOf(item.start)}</li>
+                    <li>· Um dia antes: {shortDayOf(shiftDays(item.start, -1))}</li>
+                    <li>· No dia: {shortDayOf(item.start)}</li>
                   </ul>
                 </>
               )}
@@ -1549,7 +1578,7 @@ function EventDetailScreen({
               <p className="mt-1 capitalize">{datePhrase(item)}</p>
               {item.lines[0] && <p className="mt-1">{item.lines[0]}</p>}
               <p className="mt-2" style={{ color: SCREEN.ink3 }}>
-                Fonte: {item.sourceName} — «{item.officialTitle}»
+                Fonte: {item.sourceName} · «{item.officialTitle}»
               </p>
             </DetailPanel>
           )}
@@ -1701,6 +1730,13 @@ function TrailScreen({
       </div>
 
       <div className="px-4" style={{ marginTop: -43 }}>
+        <button type="button" onClick={() => onScreen('modalidade')}
+          className="mb-4 flex min-h-11 w-full items-center gap-3 rounded-[20px] p-4 text-left focus-visible:outline-2 focus-visible:outline-offset-2"
+          style={{ backgroundColor: SCREEN.cardHi, color: SCREEN.ink }}>
+          <GraduationCap className="h-6 w-6 shrink-0" style={{ color: SCREEN.link }} />
+          <span className="flex-1"><span className="block text-[16px] font-semibold leading-snug">Entenda como funciona sua modalidade</span><span className="mt-1 block text-[12px]" style={{ color: SCREEN.ink2 }}>Seu formato, suas disciplinas e seus encontros</span></span>
+          <ChevronRight className="h-5 w-5 shrink-0" />
+        </button>
         <div className="rounded-[22px] border p-5" style={{ background: 'linear-gradient(135deg,#202123,#161718)', borderColor: SCREEN.line, boxShadow: '0 16px 34px rgba(0,0,0,0.3)' }}>
           <div className="flex items-baseline justify-between">
             <span className="text-[18px] font-semibold" style={{ color: SCREEN.ink }}>
@@ -1878,6 +1914,92 @@ function TrailScreen({
    O grupo do passo atual abre sozinho. Os outros ficam fechados, com a contagem
    à direita, para que a tela responda «quanto falta» sem precisar rolar.
    ========================================================================== */
+
+function ModalityScreen({ model, onScreen, onOpenItem, chrome }: {
+  model: TrilhaModel; onScreen: (screen: PhoneScreen) => void;
+  onOpenItem: (item: TimelineItem) => void; chrome: boolean;
+}) {
+  const { student, resolution } = model;
+  const hybrid = student.modality === 'Híbrido';
+  const secondStart = resolution.calendar?.events.find((event) => /Início.*1ª disciplina híbrida do segundo bimestre/i.test(event.title));
+  const bimester = secondStart && model.today >= secondStart.start ? 2 : 1;
+  const periodText = bimester === 1 ? 'primeiro bimestre' : 'segundo bimestre';
+  const periodEvents = model.items.filter((item) => item.officialTitle.toLowerCase().includes(periodText));
+  const disciplines = student.academic.disciplines.filter((discipline) => discipline.calendarSlot ? discipline.calendarSlot.bimester === bimester : !hybrid || bimester === 1);
+  const cards = disciplines.map((discipline) => ({
+    id: discipline.id, title: discipline.name, format: discipline.format, exempted: discipline.exempted,
+    events: periodEvents.filter((item) => {
+      const event = resolution.calendar?.events.find((event) => event.id === item.eventId);
+      return event && disciplineFor(event, student)?.id === discipline.id;
+    }),
+  }));
+  // Sem grade nominal, os rótulos vêm do calendário, nunca de matérias inventadas.
+  if (cards.length === 0 && hybrid && resolution.calendar) {
+    for (const ordinal of [1, 2]) {
+      const events = periodEvents.filter((item) => item.officialTitle.includes(`${ordinal}ª disciplina`));
+      if (events.length) cards.push({ id: `hybrid-${ordinal}`, title: `${ordinal}ª disciplina híbrida`, format: 'Híbrida', exempted: undefined, events });
+    }
+    const digital = periodEvents.filter((item) => /disciplina digital|disciplinas digitais regulares/i.test(item.officialTitle));
+    if (digital.length) cards.push({ id: 'digital', title: 'Disciplina digital', format: 'Digital', exempted: undefined, events: digital });
+  }
+  return <ScreenShell chrome={chrome} simulated={model.delta.simulated}>
+    <InnerHeader title={hybrid ? 'Entenda o seu híbrido' : 'Entenda sua modalidade'} subtitle={`${student.course} · ${student.cohort === 'Calouro' ? 'Ingressante' : 'Veterano'}`} onBack={() => onScreen('trilha')} backLabel="Comece por aqui" chrome={chrome} />
+    <div className="space-y-7 px-5 py-5" style={{ color: SCREEN.ink }}>
+      <section aria-label="Como você vai estudar" className="space-y-5">
+        <div className="flex items-start gap-3.5">
+          <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[14px]" style={{ backgroundColor: 'rgba(74,158,255,0.16)', color: SCREEN.link }}><MonitorPlay className="h-6 w-6" /></span>
+          <div><h2 className="text-[19px] font-semibold">Estude no AVA</h2><p className="mt-1 text-[15px] leading-snug" style={{ color: '#bfc5ce' }}>Sua sala de aula on-line, com conteúdos e atividades.</p></div>
+        </div>
+        {student.modality !== 'EaD' && <div className="flex items-start gap-3.5">
+          <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[14px]" style={{ backgroundColor: 'rgba(50,213,131,0.14)', color: SCREEN.vital }}><GraduationCap className="h-6 w-6" /></span>
+          <div><h2 className="text-[19px] font-semibold">Aprenda no campus</h2><p className="mt-1 text-[15px] leading-snug" style={{ color: '#bfc5ce' }}>{hybrid ? 'Encontros com atividades e avaliações presenciais.' : 'Aulas presenciais conforme a sua grade.'}</p></div>
+        </div>}
+        <a href="https://ava.anchieta.br/" target="_blank" rel="noreferrer" className="flex min-h-12 items-center justify-center gap-2 rounded-[14px] bg-[#087fea] px-4 py-3 text-[16px] font-semibold text-white focus-visible:outline-2 focus-visible:outline-offset-2">
+          Acessar o AVA <ExternalLink className="h-4 w-4" /><span className="sr-only"> (abre em nova aba)</span>
+        </a>
+      </section>
+      <section>
+        <div className="flex items-baseline justify-between gap-2"><h2 className="text-[22px] font-semibold">Suas disciplinas</h2><span className="text-[13px]" style={{ color: '#bfc5ce' }}>{bimester}º bimestre</span></div>
+        <p className="mt-1.5 text-[14px]" style={{ color: '#bfc5ce' }}>Toque para entender cada uma.</p>
+        {cards.length === 0 && <p className="mt-4 text-[15px] leading-snug" style={{ color: '#bfc5ce' }}>Consulte suas disciplinas no AVA.</p>}
+        <div className="mt-4 space-y-3">
+          {cards.map((card) => {
+            const digital = card.format === 'Digital';
+            const color = card.exempted ? SCREEN.exemption : digital ? '#67d4e8' : SCREEN.link;
+            const meetings = card.events.filter((item) => /encontros? presencia/i.test(item.officialTitle));
+            const dates = digital ? card.events.filter((item) => item.category === 'prova') : meetings;
+            return <details key={`${bimester}-${card.id}`} className="group overflow-hidden rounded-[16px]" style={{ backgroundColor: SCREEN.card }}>
+              <summary className="flex min-h-24 cursor-pointer list-none items-center gap-3 p-4 focus-visible:outline-2 focus-visible:outline-offset-[-2px] [&::-webkit-details-marker]:hidden">
+                <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[13px]" style={{ backgroundColor: card.exempted ? 'rgba(196,181,253,0.12)' : digital ? 'rgba(103,212,232,0.12)' : 'rgba(74,158,255,0.12)', color }}>{digital ? <MonitorPlay className="h-6 w-6" /> : <BookOpen className="h-6 w-6" />}</span>
+                <span className="min-w-0 flex-1">
+                  <span className="block text-[18px] font-semibold leading-snug">{card.title}</span>
+                  {card.exempted ? <>
+                    <span className="mt-2 inline-flex rounded-full px-2.5 py-1 text-[13px] font-semibold" style={{ color: SCREEN.exemption, backgroundColor: 'rgba(196,181,253,0.12)' }}>Dispensado</span>
+                    <span className="mt-2 block text-[13px] leading-snug" style={{ color: '#bfc5ce' }}>Você não precisa participar dos encontros desta disciplina.</span>
+                  </> : <span className="mt-1.5 block text-[13px]" style={{ color: '#bfc5ce' }}>{digital ? 'Estudo on-line' : card.format === 'Presencial' ? 'Aulas no campus' : 'AVA + encontros no campus'}</span>}
+                </span>
+                <ChevronDown className="h-5 w-5 shrink-0 group-open:rotate-180" style={{ color: '#bfc5ce' }} />
+              </summary>
+              <div className="space-y-4 border-t px-4 py-4" style={{ borderColor: SCREEN.line }}>
+                <p className="text-[15px] leading-relaxed" style={{ color: '#d3d7de' }}>{card.exempted ? 'Você não precisa participar dos encontros nem das avaliações desta disciplina.' : digital ? 'Acesse os materiais, faça as atividades e acompanhe os prazos no AVA.' : card.format === 'Presencial' ? 'Confira seus horários e participe das aulas no campus.' : 'Estude o conteúdo no AVA e participe dos encontros desta disciplina no campus.'}</p>
+                {!card.exempted && dates.length > 0 && <div className="space-y-1">
+                  {dates.sort((a, b) => a.start.localeCompare(b.start)).map((item, index) => <button key={item.id} type="button" onClick={() => onOpenItem(item)} className="flex min-h-12 w-full items-center gap-2 py-2 text-left">
+                    <CalendarDays className="h-4 w-4 shrink-0" style={{ color }} /><span className="flex-1 text-[14px]"><span className="block font-medium">{digital ? 'Avaliação no AVA' : `${index + 1}º encontro`}</span><span style={{ color: '#bfc5ce' }}>{datePhrase(item)}{item.end < model.today ? ' · Data passada' : ''}</span></span><ChevronRight className="h-4 w-4" style={{ color: '#bfc5ce' }} />
+                  </button>)}
+                </div>}
+                {!card.exempted && !dates.length && !digital && <p className="text-[14px]" style={{ color: '#bfc5ce' }}>Confira as datas e os horários no calendário acadêmico.</p>}
+              </div>
+            </details>;
+          })}
+        </div>
+        {disciplines.length === 0 && cards.length > 0 && <p className="mt-3 text-[13px] leading-snug" style={{ color: '#bfc5ce' }}>Os nomes das disciplinas estão na sua grade no AVA.</p>}
+      </section>
+      <div className="space-y-2">
+        <DetailAction icon={<CalendarDays className="h-5 w-5" />} label="Calendário acadêmico" detail="Todas as datas do semestre" onClick={() => onScreen('completo')} />
+      </div>
+    </div>
+  </ScreenShell>;
+}
 
 function StepsScreen({
   model,
@@ -2126,7 +2248,7 @@ function StepDetailScreen({
           {!destination && helpOpen && (
             <DetailPanel>
               {PLACE_LABEL[step.place]} abre fora do App Grupo Anchieta, com o seu RA{' '}
-              {model.student.ra}. Siga os passos acima e volte aqui — o app reconhece o que
+              {model.student.ra}. Siga os passos acima e volte aqui. O app reconhece o que
               puder reconhecer sozinho.
             </DetailPanel>
           )}
@@ -2176,13 +2298,6 @@ function StepDetailScreen({
    Calendário completo — a tela que o contador abre
    ========================================================================== */
 
-const BUCKET_TITLE: Record<string, string> = {
-  agora: 'No seu radar agora',
-  guardado: 'Prazos guardados',
-  passado: 'Já aconteceu',
-  recolhido: 'Não se aplica a você agora',
-};
-
 /** «2026/2» → «2º semestre de 2026». O aluno não lê barra. */
 function semesterLabel(semester: string): string {
   const parts = semester.match(/^(\d{4})\/(\d)$/);
@@ -2203,14 +2318,17 @@ function FullCalendarScreen({
   const calendar = model.resolution.calendar;
   const [query, setQuery] = useState('');
   const [month, setMonth] = useState<string | null>(null);
+  const [expanded, setExpanded] = useState(false);
 
   /* Os meses que este calendário realmente tem. Um filtro que oferece um mês
      vazio é um filtro que ensina o aluno a desconfiar do filtro. */
   const months = useMemo(() => {
     const seen = new Map<string, string>();
     model.items.forEach((item) => {
-      const { year, month: m } = monthOf(item.start);
-      seen.set(monthKey(year, m), MONTH_NAMES[m - 1]);
+      markedDays(item).forEach((date) => {
+        const { year, month: m } = monthOf(date);
+        seen.set(monthKey(year, m), MONTH_NAMES[m - 1]);
+      });
     });
     return [...seen.entries()].sort(([a], [b]) => a.localeCompare(b));
   }, [model.items]);
@@ -2221,9 +2339,9 @@ function FullCalendarScreen({
   const normalized = deaccent(query.trim());
   const results = model.items.filter((item) => {
     if (month) {
-      const { year, month: m } = monthOf(item.start);
-      if (monthKey(year, m) !== month) return false;
+      if (!markedDays(item).some((date) => date.slice(0, 7) === month)) return false;
     }
+    if (!month && !normalized && !expanded && !inTwoMonths(item, model.today)) return false;
     if (normalized === '') return true;
     const haystack = deaccent(
       `${item.title} ${item.lines.join(' ')} ${item.officialTitle} ${item.dateLabel}`,
@@ -2232,10 +2350,8 @@ function FullCalendarScreen({
   });
 
   const grouped = useMemo(() => {
-    const order: TrilhaBucket[] = ['agora', 'guardado', 'recolhido', 'passado'];
-    return order
-      .map((key) => ({ key, list: results.filter((item) => item.bucket === key) }))
-      .filter((group) => group.list.length > 0);
+    const keys = [...new Set(results.map((item) => item.start.slice(0, 7)))].sort();
+    return keys.map((key) => ({ key, list: results.filter((item) => item.start.startsWith(key)).sort((a, b) => a.start.localeCompare(b.start)) }));
   }, [results]);
 
   return (
@@ -2334,7 +2450,7 @@ function FullCalendarScreen({
                   backgroundColor: month === null ? 'rgba(8,127,234,0.32)' : SCREEN.card,
                 }}
               >
-                Todos
+                {expanded ? 'Todos' : 'Este mês e o próximo'}
               </button>
               {months.map(([key, label]) => (
                 <button
@@ -2360,8 +2476,7 @@ function FullCalendarScreen({
 
             {results.length === 0 ? (
               <p className="text-[13px] leading-snug" style={{ color: SCREEN.ink2 }}>
-                Nada encontrado com estes termos. O calendário tem {model.totalCount} datas —
-                tente outra palavra ou limpe o filtro de mês.
+                {normalized || month ? 'Nenhuma data encontrada. Tente outra palavra ou limpe o filtro de mês.' : 'Nenhuma data neste mês e no próximo. Abra todas as datas para consultar o semestre.'}
               </p>
             ) : (
               grouped.map(({ key, list }) => (
@@ -2370,7 +2485,7 @@ function FullCalendarScreen({
                     className="mb-2 flex items-baseline justify-between text-[13px] font-semibold tracking-wide uppercase"
                     style={{ color: SCREEN.ink3 }}
                   >
-                    {BUCKET_TITLE[key]}
+                    {!expanded && !month && !normalized && key < model.today.slice(0, 7) ? 'Em andamento' : monthLabel(monthOf(`${key}-01`))}
                     <span className="text-[11px] normal-case">{list.length}</span>
                   </h3>
                   <div className="space-y-1.5">
@@ -2405,11 +2520,9 @@ function FullCalendarScreen({
                             <span className="mt-0.5 block truncate text-[11px]" style={{ color: SCREEN.ink2 }}>
                               {item.lines[0] ?? datePhrase(item)}
                             </span>
-                            {/* Recolher não é apagar, e o motivo fica escrito
-                                na linha em vez de num rodapé que ninguém lê. */}
-                            {item.hiddenReason && (
+                            {item.bucket === 'passado' && (
                               <span className="mt-0.5 block truncate text-[11px] italic" style={{ color: SCREEN.ink3 }}>
-                                {item.hiddenReason}
+                                Já aconteceu
                               </span>
                             )}
                           </span>
@@ -2423,6 +2536,8 @@ function FullCalendarScreen({
             )}
           </>
         )}
+
+        {!month && !normalized && model.items.some((item) => !inTwoMonths(item, model.today)) && <MoreDates expanded={expanded} onToggle={() => setExpanded(!expanded)} count={model.totalCount} />}
 
         {/* ---- A fonte -----------------------------------------------------
             Sem carimbo de «atualizado em»: o modelo não guarda a data da última
@@ -2733,8 +2848,10 @@ export function AnchietaPhoneApp({ model, screen, onScreen, chrome = true }: Anc
      um objeto guardado congelaria a tela num item que já não existe. */
   const [openItemId, setOpenItemId] = useState<string | null>(null);
   const [openStepId, setOpenStepId] = useState<string | null>(null);
+  const [itemOrigin, setItemOrigin] = useState<'datas' | 'completo' | 'modalidade'>('datas');
 
   const openItem = (item: TimelineItem) => {
+    setItemOrigin(screen === 'completo' || screen === 'modalidade' ? screen : 'datas');
     setOpenItemId(item.id);
     onScreen('detalhe');
   };
@@ -2767,12 +2884,14 @@ export function AnchietaPhoneApp({ model, screen, onScreen, chrome = true }: Anc
          simulada trocou o modelo debaixo da tela. */
       case 'detalhe':
         return openedItem ? (
-          <EventDetailScreen model={model} item={openedItem} onScreen={onScreen} chrome={chrome} />
+          <EventDetailScreen model={model} item={openedItem} onScreen={onScreen} chrome={chrome} origin={itemOrigin} />
         ) : (
           <DatesScreen model={model} onScreen={onScreen} onOpenItem={openItem} chrome={chrome} />
         );
       case 'trilha':
         return <TrailScreen model={model} onScreen={onScreen} onOpenStep={openStep} chrome={chrome} />;
+      case 'modalidade':
+        return <ModalityScreen model={model} onScreen={onScreen} onOpenItem={openItem} chrome={chrome} />;
       case 'passos':
         return <StepsScreen model={model} onScreen={onScreen} onOpenStep={openStep} chrome={chrome} />;
       case 'passo':

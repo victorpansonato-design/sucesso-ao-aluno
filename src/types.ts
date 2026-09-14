@@ -104,6 +104,10 @@ export interface Discipline {
   absenceLimit: number;
   pendingActivities: number;
   schedule: string;
+  /** Dispensa confirmada pela secretaria. Ausência do campo não confirma dispensa. */
+  exempted?: boolean;
+  /** Posição oficial no bimestre, preservada mesmo quando há dispensa. */
+  calendarSlot?: { bimester: 1 | 2; ordinal: 1 | 2 };
   status: 'Em curso' | 'Em risco' | 'Dependência' | 'Aprovado';
 }
 
@@ -718,6 +722,8 @@ export interface DeltaInfo {
  * duas divergirem, a tela mostra as duas e o PDF ganha.
  */
 export interface TimelineItem {
+  /** Dispensa confirmada da disciplina vinculada a este evento. */
+  exempted?: boolean;
   id: string;
   eventId: string;
   /** Datas resolvidas do evento, ISO, na ordem do rótulo. */

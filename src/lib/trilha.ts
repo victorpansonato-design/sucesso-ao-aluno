@@ -337,9 +337,16 @@ function bimesterOf(title: string): 1 | 2 | null {
  *   · duas candidatas para o ordinal → não sabe
  *   · ordinal que a grade não tem    → não sabe
  */
-function disciplineFor(event: CalendarEvent, student: Student): Discipline | undefined {
+export function disciplineFor(event: CalendarEvent, student: Student): Discipline | undefined {
   const grade = student.academic.disciplines;
   if (grade.length === 0) return undefined;
+  const ordinal = /\b1[ªa]\s+disciplina|disciplina h[ií]brida 1\b/i.test(event.title) ? 1 : /\b2[ªa]\s+disciplina|disciplina h[ií]brida 2\b/i.test(event.title) ? 2 : null;
+  if (ordinal && grade.some((d) => d.calendarSlot)) {
+    const bimester = bimesterOf(event.title);
+    if (!bimester) return undefined;
+    const matches = grade.filter((d) => d.format === 'Híbrida' && d.calendarSlot?.bimester === bimester && d.calendarSlot.ordinal === ordinal);
+    return matches.length === 1 ? matches[0] : undefined;
+  }
   if (bimesterOf(event.title) === 2) return undefined;
 
   const hibridas = grade.filter((d) => d.format === 'Híbrida');
@@ -353,8 +360,8 @@ function disciplineFor(event: CalendarEvent, student: Student): Discipline | und
   if (/digitais? regulares?|disciplina digital/i.test(title)) {
     return digitais.length === 1 ? digitais[0] : undefined;
   }
-  if (/\b1[ªa]\s+disciplina/i.test(title)) return hibridas[0];
-  if (/\b2[ªa]\s+disciplina/i.test(title)) return hibridas[1];
+  if (ordinal === 1) return hibridas[0];
+  if (ordinal === 2) return hibridas[1];
 
   return undefined;
 }
@@ -374,7 +381,7 @@ function familyLine(event: CalendarEvent, student: Student): string | null {
   const title = event.title;
 
   const names = (format: Discipline['format']) =>
-    grade.filter((d) => d.format === format).map((d) => d.name);
+    grade.filter((d) => d.format === format && !d.exempted).map((d) => d.name);
 
   const join = (list: string[]) =>
     list.length === 1 ? list[0] : `${list.slice(0, -1).join(', ')} e ${list[list.length - 1]}`;
@@ -650,10 +657,11 @@ function buildItem(
     // Já dito acima, e nada mais pode ser afirmado sobre este intervalo.
   } else if (discipline) {
     lines.push(`${discipline.name} · ${discipline.teacher}`);
+    if (discipline.exempted) lines.push('Disciplina dispensada. Você não precisa participar dos encontros nem das avaliações desta disciplina.');
   } else if (family) {
     lines.push(family);
   } else if (event.category === 'prova' && student.academic.disciplines.length === 0) {
-    lines.push('Confirme a disciplina no Portal do Aluno — a sua grade não está no sistema.');
+    lines.push('Confirme a disciplina no Portal do Aluno. Sua grade não está no sistema.');
   } else if (event.category === 'prova' && bimesterOf(event.title) === 2) {
     lines.push('A grade do segundo bimestre ainda não está definida no sistema.');
   }
@@ -664,7 +672,7 @@ function buildItem(
   if (ambiguousDay) {
     lines.push(
       `O calendário imprime ${event.dates.map(shortDay).join(' e ')} para esta prova, um dia por turma. ` +
-        'O sistema não tem a sua turma — confirme com a coordenação qual é o seu dia.',
+        'Confirme com a coordenação qual é o dia da sua turma.',
     );
   }
 
@@ -691,7 +699,8 @@ function buildItem(
     start: event.start,
     end: event.end,
     dateLabel: event.dateLabel,
-    title: translateTitle(event, discipline),
+    title: discipline?.exempted ? `Dispensada: ${translateTitle(event, discipline)}` : translateTitle(event, discipline),
+    exempted: discipline?.exempted === true,
     lines,
     consequence: consequenceOf(event),
     category: event.category,
@@ -872,7 +881,7 @@ export function buildTrilha(
     items,
     shownCount: shown.length,
     totalCount: items.length,
-    next: items.find((i) => i.bucket === 'agora' && i.inDays >= 0),
+    next: items.find((i) => i.bucket === 'agora' && i.inDays >= 0 && !i.exempted),
     today,
   };
 }
