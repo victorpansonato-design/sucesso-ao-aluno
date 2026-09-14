@@ -530,6 +530,18 @@ Duas sub-abas. Não três.
 
 - **Um campo: RA.** Aceitando nome também, com `searchKey` de `lib/format`, como
   `StudentPushPanel` já faz. Um campo, não um formulário.
+- **Cinco perfis de demonstração**, em `data/trilhaPreview.ts`, acima do campo: híbrido
+  ingressante (quinzenal de ingressantes), híbrido veterano (quinzenal de veteranos),
+  presencial ingressante, presencial veterano **com duas disciplinas dispensadas** e Direito
+  híbrido (sextas e sábados). Não são alunos da base e não entram nela; o **calendário de cada
+  um é o PDF real** que o curso e a coorte resolveriam, e só a grade nominal é ilustrativa. São
+  atalho, nunca estado: o perfil aberto aparece marcado na fileira e o cabeçalho carrega um
+  **«Trocar de aluno»** que esvazia a seleção e devolve o cursor ao campo de RA.
+- **Exemplos da base**, quando não há aluno aberto: alunos reais, um por calendário
+  publicado, e só quem resolve `exata` **com grade cadastrada**. Curso sem documento, coorte
+  resolvida pela vizinha e oferta encerrada (a híbrida de Gestão de RH) ficam de fora do
+  atalho — continuam resolvidos ao digitar o RA e contados na Configuração, mas a tela não os
+  empurra para quem só quer ver a trilha funcionando.
 - **Cabeçalho resolvido**, que é onde a confiança se ganha ou se perde: curso, modalidade,
   turno, coorte, calendário aplicável com link para o PDF, e **Δ em dias, escrito**
   («matriculado 37 dias depois do início das aulas»). Se `calendarForStudent` devolver

@@ -44,6 +44,7 @@ import { longDay, shiftDays, shortDay as shortDayOf, weekdayOf } from '../../lib
 import {
   CONSEQUENCE_LABEL,
   PLACE_LABEL,
+  assessmentPeriodOf,
   bucketsOf,
   countdownPhrase,
   datePhrase,
@@ -1915,7 +1916,188 @@ function TrailScreen({
    à direita, para que a tela responda «quanto falta» sem precisar rolar.
    ========================================================================== */
 
-function ModalityScreen({ model, onScreen, onOpenItem, chrome }: {
+/* ==========================================================================
+   Entenda sua modalidade
+   --------------------------------------------------------------------------
+   Duas telas, porque são duas perguntas. O híbrido pergunta «quando eu vou ao
+   campus», e a resposta é uma lista curta de encontros datados que cabe dentro
+   de dois ou três cards abertos. O presencial pergunta «como o meu semestre é
+   avaliado», porque ir ao campus é a rotina dele e o calendário não imprime uma
+   linha por disciplina: imprime a JANELA em que o curso inteiro faz P1 e P2.
+
+   Mandar as duas pela mesma tela era o que estava acontecendo, e custava caro
+   no presencial: seis acordeões de 96 pontos de altura, cada um abrindo para
+   «confira as datas no calendário acadêmico» — um chevron que promete um
+   destino que não existe. Aqui a lista do presencial encolhe para uma linha por
+   disciplina, sem seta, e as duas janelas de avaliação fecham a tela.
+   ========================================================================== */
+
+function ModalityScreen(props: {
+  model: TrilhaModel; onScreen: (screen: PhoneScreen) => void;
+  onOpenItem: (item: TimelineItem) => void; chrome: boolean;
+}) {
+  return props.model.student.modality === 'Presencial'
+    ? <CampusModalityScreen model={props.model} onScreen={props.onScreen} chrome={props.chrome} />
+    : <HybridModalityScreen {...props} />;
+}
+
+/* -- Presencial ------------------------------------------------------------
+   O PDF do presencial não nomeia disciplina em lugar nenhum. Tudo o que esta
+   tela afirma sobre a grade sai do cadastro do aluno, e tudo o que ela afirma
+   sobre data sai das duas linhas de período do calendário — nenhuma das duas
+   coisas é composta com a outra, que é exatamente a tentação a evitar aqui. */
+
+function CampusModalityScreen({ model, onScreen, chrome }: {
+  model: TrilhaModel; onScreen: (screen: PhoneScreen) => void; chrome: boolean;
+}) {
+  const { student, resolution } = model;
+  const disciplines = student.academic.disciplines;
+  const exempted = disciplines.filter((discipline) => discipline.exempted);
+  const inCourse = disciplines.length - exempted.length;
+
+  /* As duas janelas institucionais, na ordem do semestre. `assessmentPeriodOf`
+     é a mesma função que impede o motor de escolher um dia dentro do intervalo,
+     e usá-la aqui garante que a tela e o card de detalhe digam a mesma coisa. */
+  const periods = (['P1', 'P2'] as const)
+    .map((key) => ({
+      key,
+      item: model.items.find((item) => {
+        const event = resolution.calendar?.events.find((candidate) => candidate.id === item.eventId);
+        return event ? assessmentPeriodOf(event) === key : false;
+      }),
+    }))
+    .filter((row): row is { key: 'P1' | 'P2'; item: TimelineItem } => Boolean(row.item));
+
+  return <ScreenShell chrome={chrome} simulated={model.delta.simulated}>
+    <InnerHeader title="Entenda sua modalidade" subtitle={`${student.course} · ${student.cohort === 'Calouro' ? 'Ingressante' : 'Veterano'}`} onBack={() => onScreen('trilha')} backLabel="Comece por aqui" chrome={chrome} />
+    <div className="space-y-7 px-5 py-5" style={{ color: SCREEN.ink }}>
+      <section aria-label="Como você vai estudar" className="space-y-5">
+        <div className="flex items-start gap-3.5">
+          <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[14px]" style={{ backgroundColor: 'rgba(50,213,131,0.14)', color: SCREEN.vital }}><GraduationCap className="h-6 w-6" /></span>
+          <div><h2 className="text-[19px] font-semibold">Suas aulas são no campus</h2><p className="mt-1 text-[15px] leading-snug" style={{ color: '#bfc5ce' }}>Nos dias e horários da sua grade do turno {student.shift.toLowerCase()}.</p></div>
+        </div>
+        <div className="flex items-start gap-3.5">
+          <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[14px]" style={{ backgroundColor: 'rgba(74,158,255,0.16)', color: SCREEN.link }}><MonitorPlay className="h-6 w-6" /></span>
+          <div><h2 className="text-[19px] font-semibold">O AVA completa a carga</h2><p className="mt-1 text-[15px] leading-snug" style={{ color: '#bfc5ce' }}>Materiais, atividades on-line e a parte a distância das disciplinas presenciais.</p></div>
+        </div>
+        <a href="https://ava.anchieta.br/" target="_blank" rel="noreferrer" className="flex min-h-12 items-center justify-center gap-2 rounded-[14px] bg-[#087fea] px-4 py-3 text-[16px] font-semibold text-white focus-visible:outline-2 focus-visible:outline-offset-2">
+          Acessar o AVA <ExternalLink className="h-4 w-4" /><span className="sr-only"> (abre em nova aba)</span>
+        </a>
+      </section>
+
+      <section>
+        <div className="flex items-baseline justify-between gap-2">
+          <h2 className="text-[22px] font-semibold">Suas disciplinas</h2>
+          <span className="text-[13px]" style={{ color: '#bfc5ce' }}>{inCourse} em curso{exempted.length > 0 ? ` · ${exempted.length} dispensada${exempted.length > 1 ? 's' : ''}` : ''}</span>
+        </div>
+
+        {disciplines.length === 0 ? (
+          <p className="mt-4 text-[15px] leading-snug" style={{ color: '#bfc5ce' }}>Consulte suas disciplinas no Portal do Aluno.</p>
+        ) : (
+          <div className="mt-3.5 overflow-hidden rounded-[16px]" style={{ backgroundColor: SCREEN.card }}>
+            {disciplines.map((discipline, index) => {
+              const digital = discipline.format === 'Digital';
+              const color = discipline.exempted ? SCREEN.exemption : digital ? '#67d4e8' : SCREEN.link;
+              return (
+                <div key={discipline.id} className="flex items-center gap-3 px-3.5 py-3"
+                  style={index > 0 ? { borderTop: `1px solid ${SCREEN.line}` } : undefined}>
+                  <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[11px]"
+                    style={{ backgroundColor: discipline.exempted ? 'rgba(196,181,253,0.12)' : digital ? 'rgba(103,212,232,0.12)' : 'rgba(74,158,255,0.12)', color }}>
+                    {digital ? <MonitorPlay className="h-[18px] w-[18px]" /> : <BookOpen className="h-[18px] w-[18px]" />}
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block text-[15px] leading-snug font-semibold">{discipline.name}</span>
+                    <span className="mt-0.5 block truncate text-[12px]" style={{ color: '#bfc5ce' }}>
+                      {discipline.exempted ? 'Você não precisa cursar esta disciplina' : discipline.schedule}
+                    </span>
+                  </span>
+                  {discipline.exempted && (
+                    <span className="shrink-0 rounded-full px-2 py-0.5 text-[11px] font-semibold"
+                      style={{ color: SCREEN.exemption, backgroundColor: 'rgba(196,181,253,0.12)' }}>Dispensada</span>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        {/* As duas janelas do calendário, no fim da lista: é o que o documento
+            diz sobre avaliação, e é tudo o que ele diz. O dia de cada prova
+            dentro do intervalo é marcado pelo professor e não existe como dado. */}
+        {periods.length > 0 && (
+          <div className="mt-4 rounded-[16px] p-4" style={{ backgroundColor: SCREEN.card }}>
+            <p className="text-[12px] font-semibold tracking-wide uppercase" style={{ color: '#bfc5ce' }}>
+              Avaliações previstas no calendário
+            </p>
+            <div className="mt-3 space-y-3">
+              {periods.map(({ key, item }) => (
+                <div key={key} className="flex items-start gap-3">
+                  <CalendarDays className="mt-0.5 h-[18px] w-[18px] shrink-0" style={{ color: SCREEN.link }} />
+                  <span className="min-w-0 flex-1">
+                    <span className="block text-[15px] leading-snug font-semibold">Período de provas {key}</span>
+                    <span className="block text-[13px]" style={{ color: '#bfc5ce' }}>
+                      {datePhrase(item)}{item.end < model.today ? ' · já aconteceu' : ''}
+                    </span>
+                  </span>
+                </div>
+              ))}
+            </div>
+            <p className="mt-3.5 border-t pt-3 text-[12px] leading-snug" style={{ borderColor: SCREEN.line, color: '#bfc5ce' }}>
+              A data de cada disciplina dentro da janela é informada pelo professor durante a aula.
+            </p>
+          </div>
+        )}
+      </section>
+
+      <div className="space-y-2">
+        <DetailAction icon={<CalendarDays className="h-5 w-5" />} label="Calendário acadêmico" detail="Todas as datas do semestre" onClick={() => onScreen('completo')} />
+      </div>
+    </div>
+  </ScreenShell>;
+}
+
+/* -- Híbrido e EaD --------------------------------------------------------- */
+
+const MEETING_ORDINAL: Record<string, number> = {
+  primeiro: 1, segundo: 2, terceiro: 3, quarto: 4, quinto: 5,
+};
+
+/**
+ * Como chamar um encontro na lista de uma disciplina.
+ *
+ * O PDF numera os encontros por extenso, e a lista da tela raramente tem todos:
+ * o calendário dos sábados imprime primeiro, terceiro e quarto da mesma
+ * disciplina, e o quinzenal imprime só dois. Contar pela posição na lista
+ * rebatizava o terceiro encontro de «2º», que é inventar um dado que o
+ * documento contradiz na linha de baixo. Quando o PDF escreve o ordinal, ele
+ * manda; a contagem só entra onde não há ordinal impresso.
+ */
+function meetingLabel(item: TimelineItem, index: number): string {
+  const printed = item.officialTitle.match(/^(primeiro|segundo|terceiro|quarto|quinto)\s+encontro/i);
+  if (printed) return `${MEETING_ORDINAL[printed[1].toLowerCase()]}º encontro`;
+  /* «Encontros presenciais da disciplina híbrida 1» reúne quatro datas numa
+     linha só, e chamá-la de «1º encontro» seria contar quatro como um. */
+  if (/^encontros\s/i.test(item.officialTitle)) {
+    return item.dates.length > 1 ? `${item.dates.length} encontros` : 'Encontro presencial';
+  }
+  return `${index + 1}º encontro`;
+}
+
+/**
+ * O mesmo cuidado na lista da disciplina digital.
+ *
+ * A janela do AVA e a substitutiva daquela mesma disciplina caem na mesma
+ * lista, e a substitutiva do calendário de Direito é presencial, com hora
+ * marcada antes da aula. Chamar as duas de «Avaliação no AVA» mandava o aluno
+ * para o lugar errado numa delas.
+ */
+function digitalDateLabel(item: TimelineItem): string {
+  if (/substitutiva/i.test(item.officialTitle)) return 'Prova substitutiva';
+  if (/recupera[çc][ãa]o/i.test(item.officialTitle)) return 'Prova de recuperação';
+  return 'Avaliação no AVA';
+}
+
+function HybridModalityScreen({ model, onScreen, onOpenItem, chrome }: {
   model: TrilhaModel; onScreen: (screen: PhoneScreen) => void;
   onOpenItem: (item: TimelineItem) => void; chrome: boolean;
 }) {
@@ -1950,9 +2132,9 @@ function ModalityScreen({ model, onScreen, onOpenItem, chrome }: {
           <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[14px]" style={{ backgroundColor: 'rgba(74,158,255,0.16)', color: SCREEN.link }}><MonitorPlay className="h-6 w-6" /></span>
           <div><h2 className="text-[19px] font-semibold">Estude no AVA</h2><p className="mt-1 text-[15px] leading-snug" style={{ color: '#bfc5ce' }}>Sua sala de aula on-line, com conteúdos e atividades.</p></div>
         </div>
-        {student.modality !== 'EaD' && <div className="flex items-start gap-3.5">
+        {hybrid && <div className="flex items-start gap-3.5">
           <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[14px]" style={{ backgroundColor: 'rgba(50,213,131,0.14)', color: SCREEN.vital }}><GraduationCap className="h-6 w-6" /></span>
-          <div><h2 className="text-[19px] font-semibold">Aprenda no campus</h2><p className="mt-1 text-[15px] leading-snug" style={{ color: '#bfc5ce' }}>{hybrid ? 'Encontros com atividades e avaliações presenciais.' : 'Aulas presenciais conforme a sua grade.'}</p></div>
+          <div><h2 className="text-[19px] font-semibold">Aprenda no campus</h2><p className="mt-1 text-[15px] leading-snug" style={{ color: '#bfc5ce' }}>Encontros com atividades e avaliações presenciais.</p></div>
         </div>}
         <a href="https://ava.anchieta.br/" target="_blank" rel="noreferrer" className="flex min-h-12 items-center justify-center gap-2 rounded-[14px] bg-[#087fea] px-4 py-3 text-[16px] font-semibold text-white focus-visible:outline-2 focus-visible:outline-offset-2">
           Acessar o AVA <ExternalLink className="h-4 w-4" /><span className="sr-only"> (abre em nova aba)</span>
@@ -1974,7 +2156,7 @@ function ModalityScreen({ model, onScreen, onOpenItem, chrome }: {
                 <span className="min-w-0 flex-1">
                   <span className="block text-[18px] font-semibold leading-snug">{card.title}</span>
                   {card.exempted ? <>
-                    <span className="mt-2 inline-flex rounded-full px-2.5 py-1 text-[13px] font-semibold" style={{ color: SCREEN.exemption, backgroundColor: 'rgba(196,181,253,0.12)' }}>Dispensado</span>
+                    <span className="mt-2 inline-flex rounded-full px-2.5 py-1 text-[13px] font-semibold" style={{ color: SCREEN.exemption, backgroundColor: 'rgba(196,181,253,0.12)' }}>Dispensada</span>
                     <span className="mt-2 block text-[13px] leading-snug" style={{ color: '#bfc5ce' }}>Você não precisa participar dos encontros desta disciplina.</span>
                   </> : <span className="mt-1.5 block text-[13px]" style={{ color: '#bfc5ce' }}>{digital ? 'Estudo on-line' : card.format === 'Presencial' ? 'Aulas no campus' : 'AVA + encontros no campus'}</span>}
                 </span>
@@ -1984,7 +2166,7 @@ function ModalityScreen({ model, onScreen, onOpenItem, chrome }: {
                 <p className="text-[15px] leading-relaxed" style={{ color: '#d3d7de' }}>{card.exempted ? 'Você não precisa participar dos encontros nem das avaliações desta disciplina.' : digital ? 'Acesse os materiais, faça as atividades e acompanhe os prazos no AVA.' : card.format === 'Presencial' ? 'Confira seus horários e participe das aulas no campus.' : 'Estude o conteúdo no AVA e participe dos encontros desta disciplina no campus.'}</p>
                 {!card.exempted && dates.length > 0 && <div className="space-y-1">
                   {dates.sort((a, b) => a.start.localeCompare(b.start)).map((item, index) => <button key={item.id} type="button" onClick={() => onOpenItem(item)} className="flex min-h-12 w-full items-center gap-2 py-2 text-left">
-                    <CalendarDays className="h-4 w-4 shrink-0" style={{ color }} /><span className="flex-1 text-[14px]"><span className="block font-medium">{digital ? 'Avaliação no AVA' : `${index + 1}º encontro`}</span><span style={{ color: '#bfc5ce' }}>{datePhrase(item)}{item.end < model.today ? ' · Data passada' : ''}</span></span><ChevronRight className="h-4 w-4" style={{ color: '#bfc5ce' }} />
+                    <CalendarDays className="h-4 w-4 shrink-0" style={{ color }} /><span className="flex-1 text-[14px]"><span className="block font-medium">{digital ? digitalDateLabel(item) : meetingLabel(item, index)}</span><span style={{ color: '#bfc5ce' }}>{datePhrase(item)}{item.end < model.today ? ' · Data passada' : ''}</span></span><ChevronRight className="h-4 w-4" style={{ color: '#bfc5ce' }} />
                   </button>)}
                 </div>}
                 {!card.exempted && !dates.length && !digital && <p className="text-[14px]" style={{ color: '#bfc5ce' }}>Confira as datas e os horários no calendário acadêmico.</p>}

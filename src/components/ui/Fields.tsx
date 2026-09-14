@@ -1,5 +1,5 @@
 import { useId } from 'react';
-import type { InputHTMLAttributes, ReactNode, SelectHTMLAttributes, TextareaHTMLAttributes } from 'react';
+import type { InputHTMLAttributes, ReactNode, RefObject, SelectHTMLAttributes, TextareaHTMLAttributes } from 'react';
 import { motion } from 'motion/react';
 import { ChevronDown, Search, X } from 'lucide-react';
 import { spring } from '../../lib/motion';
@@ -105,17 +105,21 @@ export function SearchInput({
   placeholder = 'Buscar…',
   className = '',
   autoFocus,
+  inputRef,
 }: {
   value: string;
   onValueChange: (v: string) => void;
   placeholder?: string;
   className?: string;
   autoFocus?: boolean;
+  /** Para quem precisa devolver o cursor ao campo depois de uma ação na tela. */
+  inputRef?: RefObject<HTMLInputElement | null>;
 }) {
   return (
     <div className={`relative ${className}`}>
       <Search className="pointer-events-none absolute top-1/2 left-3 h-3.5 w-3.5 -translate-y-1/2 text-ink-4" />
       <input
+        ref={inputRef}
         type="search"
         value={value}
         autoFocus={autoFocus}
