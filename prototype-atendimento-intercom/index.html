@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Atendimento · UniAnchieta</title>
+    <meta name="description" content="Central de atendimento UniAnchieta — protótipo estático." />
+
+    <meta name="theme-color" content="#f3f4f6" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#0c0d0f" media="(prefers-color-scheme: dark)" />
+
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500;600&display=swap"
+      rel="stylesheet"
+    />
+
+    <!-- Pré-pintura do tema (DESIGN_SYSTEM §9): sem isto o app pisca a paleta errada. -->
+    <script>
+      (function () {
+        try {
+          var stored = localStorage.getItem('atendimento.v1.theme');
+          var theme = stored === 'dark' || stored === '"dark"' ? 'dark' : 'light';
+          document.documentElement.classList.toggle('dark', theme === 'dark');
+          document.documentElement.style.colorScheme = theme;
+        } catch (e) {
+          /* storage indisponível — cai no claro */
+        }
+      })();
+    </script>
+
+    <link rel="stylesheet" href="styles.css" />
+    <link
+      rel="icon"
+      href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='8' fill='%2300509d'/><text x='16' y='22' font-family='system-ui' font-size='17' font-weight='600' fill='white' text-anchor='middle'>A</text></svg>"
+    />
+  </head>
+
+  <body>
+    <a class="skip-link" href="#main">Pular para o conteúdo</a>
+
+    <div class="app" id="app">
+      <!-- ============================ RAIL ============================ -->
+      <nav class="rail" aria-label="Navegação principal">
+        <div class="rail__nav" id="rail-nav"></div>
+
+        <div class="rail__foot" id="rail-foot"></div>
+      </nav>
+
+      <!-- ====================== COLUNA DE VIEWS ====================== -->
+      <aside class="col-views" id="col-views" aria-label="Caixas e visões"></aside>
+
+      <!-- ========================== SLAB ============================= -->
+      <main class="slab" id="main" tabindex="-1"></main>
+    </div>
+
+    <!-- ========================= OVERLAYS ========================== -->
+    <div id="overlay-root"></div>
+    <div class="toasts" id="toasts" role="status" aria-live="polite"></div>
+    <div id="tooltip-root"></div>
+
+    <script src="icons.js"></script>
+    <script src="brand.js"></script>
+    <script src="data.js"></script>
+    <script src="app.js"></script>
+  </body>
+</html>
