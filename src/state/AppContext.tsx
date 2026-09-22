@@ -8,6 +8,7 @@ import {
   useState,
 } from 'react';
 import type { ReactNode } from 'react';
+import { flushSync } from 'react-dom';
 import type {
   AppNotification,
   Case,
@@ -179,7 +180,9 @@ interface AppState {
 
   /* Theme */
   theme: 'light' | 'dark';
-  toggleTheme: () => void;
+  /** `origin` e o ponto da tela (coordenadas de viewport) de onde o circulo de
+   *  revelacao cresce — normalmente o centro do botao que disparou a troca. */
+  toggleTheme: (origin?: { x: number; y: number }) => void;
 }
 
 const Ctx = createContext<AppState | null>(null);
@@ -326,7 +329,52 @@ export function AppProvider({ children }: { children: ReactNode }) {
     save(KEYS.theme, theme);
   }, [theme]);
 
-  const toggleTheme = useCallback(() => setTheme((t) => (t === 'light' ? 'dark' : 'light')), []);
+  // A troca de tema e revelada por um circulo que cresce a partir do botao, com
+  // o tema novo pintado por cima do antigo. Usa a View Transitions API; onde ela
+  // nao existe — ou quando o usuario pediu menos movimento — a troca e seca.
+  const toggleTheme = useCallback((origin?: { x: number; y: number }) => {
+    const root = document.documentElement;
+    const next: 'light' | 'dark' = root.classList.contains('dark') ? 'light' : 'dark';
+
+    const apply = () => {
+      setTheme(next);
+      root.classList.toggle('dark', next === 'dark');
+      root.style.colorScheme = next;
+    };
+
+    const start = document.startViewTransition?.bind(document);
+    const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    if (!start || reduced) {
+      apply();
+      return;
+    }
+
+    const x = origin?.x ?? window.innerWidth - 48;
+    const y = origin?.y ?? window.innerHeight - 48;
+    // Raio ate o canto mais distante: o circulo tem de cobrir a tela inteira.
+    const radius = Math.hypot(
+      Math.max(x, window.innerWidth - x),
+      Math.max(y, window.innerHeight - y),
+    );
+
+    const transition = start(() => {
+      flushSync(apply);
+    });
+
+    void transition.ready.then(() => {
+      root.animate(
+        {
+          clipPath: [`circle(0px at ${x}px ${y}px)`, `circle(${radius}px at ${x}px ${y}px)`],
+        },
+        {
+          duration: 700,
+          easing: 'cubic-bezier(0.22, 1, 0.36, 1)',
+          pseudoElement: '::view-transition-new(root)',
+        },
+      );
+    });
+  }, []);
 
   /* -- Toasts ----------------------------------------------------------- */
 

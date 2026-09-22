@@ -1,7 +1,6 @@
 import type { BandSlice, CensusAggregate, CensusScope, SignalKey } from '../data/institution';
 import {
   DAILY_INTERVENTION_RATE,
-  JOURNEY_STAGES,
   SIGNALS,
   aggregate,
   bandSlices,
@@ -242,10 +241,17 @@ function interventionsBetween(
 }
 
 /* -- Desfechos ------------------------------------------------------------
-   Uma única partição alimenta os dois blocos da quinta linha. Se "concluídas"
-   e "estabilizados" viessem de contas separadas, um bloco poderia dizer 69 e o
-   outro somar 71 — e a taxa de estabilização, que é a métrica que importa,
-   viraria opinião. */
+   Uma única partição alimenta todos os blocos que falam de desfecho. Se
+   "concluídas" e "estabilizados" viessem de contas separadas, um bloco poderia
+   dizer 69 e o outro somar 71.
+
+   O que esta partição é, e o que ela deixou de ser: é a COMPOSIÇÃO do que a
+   equipe registrou ao encerrar — descrição, não placar. A taxa de
+   estabilização (estabilizados ÷ apurados) foi removida do produto: sem janela
+   de observação declarada e sem grupo de controle, ela credita à operação a
+   melhora de alunos que melhorariam sozinhos, e era lida na diretoria como
+   resultado atribuível. A composição continua porque cada linha dela é um
+   registro do especialista, não uma inferência. */
 
 export type OutcomeKey =
   | 'estabilizado'
@@ -303,10 +309,10 @@ export const OUTCOMES: {
 const OUTCOME_SHARE = [0.596, 0.16, 0.065, 0.075, 0.104];
 
 /**
- * Quanto cada família de sinal estabiliza acima ou abaixo da média. Não é
- * enfeite: repactuar uma parcela resolve o problema de vez, enquanto uma queda
- * de acesso costuma ser sintoma de algo que a ligação não alcança. Mostrar isso
- * é metade do valor de medir desfecho por sinal.
+ * Quanto cada família de sinal encerra acima ou abaixo da média na primeira
+ * faixa. Não é enfeite: repactuar uma parcela resolve o problema de vez,
+ * enquanto uma queda de acesso costuma ser sintoma de algo que a ligação não
+ * alcança. Mostrar isso é metade do valor de medir desfecho por sinal.
  */
 const SIGNAL_STABILISATION: Record<SignalKey, number> = {
   acesso: 0.92,
@@ -318,10 +324,9 @@ const SIGNAL_STABILISATION: Record<SignalKey, number> = {
 
 export interface OutcomeBreakdown {
   received: number;
-  /** Casos com desfecho apurado — o denominador da taxa de estabilização. */
+  /** Casos com desfecho apurado. Os em acompanhamento ficam de fora. */
   settled: number;
   counts: Record<OutcomeKey, number>;
-  rate: number;
 }
 
 export function outcomesOf(received: number, signal?: SignalKey): OutcomeBreakdown {
@@ -333,7 +338,7 @@ export function outcomesOf(received: number, signal?: SignalKey): OutcomeBreakdo
     'risco-mantido': 0,
   } as Record<OutcomeKey, number>;
 
-  if (received <= 0) return { received: 0, settled: 0, counts, rate: 0 };
+  if (received <= 0) return { received: 0, settled: 0, counts };
 
   let shares = OUTCOME_SHARE;
   if (signal) {
@@ -354,18 +359,59 @@ export function outcomesOf(received: number, signal?: SignalKey): OutcomeBreakdo
   });
 
   const settled = OUTCOMES.reduce((sum, o, i) => sum + (o.settled ? split[i] : 0), 0);
-  return {
-    received,
-    settled,
-    counts,
-    rate: settled > 0 ? (counts.estabilizado / settled) * 100 : 0,
-  };
+  return { received, settled, counts };
 }
 
-/* -- Operação ------------------------------------------------------------- */
+/* -- Operação -------------------------------------------------------------
 
-/** Aderência ao SLA sobre os casos já concluídos. */
+   A aderência ao prazo de primeiro contato virou o indicador protagonista do
+   Dashboard quando a taxa de estabilização saiu, e a troca é de natureza, não
+   de gosto: a estabilização precisava de um contrafactual que a operação não
+   tem, enquanto o prazo é a única promessa que o sistema registra de ponta a
+   ponta — o caso foi aberto aqui e o primeiro contato foi carimbado aqui. É o
+   indicador que sobrevive à troca do censo por dados reais sem mudar de
+   definição.
+
+   Por isso ela deixou de ser uma constante. Um protagonista precisa de série
+   diária e de comparação com o período anterior, e uma constante devolve uma
+   reta e uma variação de 0,0 p.p. em toda janela — o que é pior do que não
+   mostrar variação nenhuma, porque parece medida. A oscilação usa a mesma
+   máquina determinística das outras séries: mesmo escopo e mesmo dia devolvem
+   sempre o mesmo valor. */
+
+/** Aderência média ao prazo de primeiro contato. Âncora da oscilação diária. */
 const SLA_ADHERENCE = 0.887;
+
+/** Aderência do dia, em [0, 1]. Determinística por escopo e data. */
+export function slaAdherenceAt(key: string, day: number): number {
+  const value = SLA_ADHERENCE + wave(key + ':sla', day) * 0.06;
+  return Math.min(0.99, Math.max(0.62, value));
+}
+
+/**
+ * Aderência de uma janela, em [0, 1]: média das aderências diárias PONDERADA
+ * pelo volume de cada dia, e não a aderência de hoje repetida para trás. Um dia
+ * de pico com aderência baixa precisa pesar mais que um sábado com dois casos —
+ * senão a janela de 90 dias diria exatamente o mesmo que a de 7.
+ *
+ * É a mesma função para a janela atual e para a anterior, de propósito: uma
+ * comparação entre duas contas diferentes não é uma comparação.
+ */
+export function slaAdherenceBetween(
+  agg: CensusAggregate,
+  key: string,
+  fromDay: number,
+  toDay: number,
+): number {
+  let weighted = 0;
+  let weight = 0;
+  for (let d = fromDay; d <= toDay; d += 1) {
+    const volume = interventionsAt(agg, key, d);
+    weighted += slaAdherenceAt(key, d) * volume;
+    weight += volume;
+  }
+  return weight > 0 ? weighted / weight : slaAdherenceAt(key, toDay);
+}
 
 export interface OperationBucket {
   /** Rótulo curto do eixo x. */
@@ -410,7 +456,9 @@ export function operationsFor(
 
   const concluded = outcomes.settled;
   const pending = received - concluded;
-  const inSla = Math.round(concluded * SLA_ADHERENCE);
+
+  const windowAdherence = slaAdherenceBetween(agg, key, -(days - 1), 0);
+  const inSla = Math.round(concluded * windowAdherence);
   const outSla = concluded - inSla;
 
   /* Um único dia não desenha gráfico, então "Hoje" mostra as duas semanas que
@@ -426,7 +474,9 @@ export function operationsFor(
       for (let d = start; d <= end; d += 1) sum += interventionsAt(agg, key, d);
       const from = dateAt(start);
       const to = dateAt(end);
-      const inWindow = Math.round(sum * SLA_ADHERENCE * (concluded / Math.max(1, received)));
+      const inWindow = Math.round(
+        sum * slaAdherenceAt(key, end) * (concluded / Math.max(1, received)),
+      );
       buckets.push({
         label: dayFmt.format(from),
         full: 'Semana de ' + dayFmt.format(from) + ' a ' + dayFmt.format(to),
@@ -440,7 +490,7 @@ export function operationsFor(
       const sum = interventionsAt(agg, key, d);
       const date = dateAt(d);
       const settledHere = Math.round(sum * (concluded / Math.max(1, received)));
-      const inWindow = Math.round(settledHere * SLA_ADHERENCE);
+      const inWindow = Math.round(settledHere * slaAdherenceAt(key, d));
       buckets.push({
         label: chartDays <= 14 ? weekdayFmt.format(date).replace('.', '') : dayFmt.format(date),
         full: fullFmt.format(date),
@@ -486,14 +536,14 @@ export function focusLabel(focus: CockpitFocus): string | null {
 /* -- Indicadores ---------------------------------------------------------- */
 
 export interface Kpi {
-  key: 'monitorados' | 'atencao' | 'alto-risco' | 'intervencoes' | 'estabilizacao';
+  key: 'monitorados' | 'atencao' | 'alto-risco' | 'intervencoes';
   label: string;
   value: number;
   /** Valor no período anterior, para a comparação. `null` = sem base de comparação. */
   previous: number | null;
   /** Variação percentual. `null` quando o anterior é zero ou inexistente. */
   deltaPercent: number | null;
-  /** Uma queda é boa notícia em "alto risco" e má em "estabilização". */
+  /** Uma queda é boa notícia em "alto risco" e má em "alunos monitorados". */
   goodDirection: 'up' | 'down';
   suffix?: string;
   decimals?: number;
@@ -505,19 +555,6 @@ function deltaOf(value: number, previous: number | null): number | null {
   return ((value - previous) / previous) * 100;
 }
 
-/* -- Jornada -------------------------------------------------------------- */
-
-export interface JourneyStage {
-  key: string;
-  label: string;
-  gate: string;
-  track: 'entrada' | 'base';
-  count: number;
-  cleared: number;
-  completion: number;
-  attention: number;
-}
-
 /* -- Sinais --------------------------------------------------------------- */
 
 export interface SignalRow {
@@ -527,20 +564,6 @@ export interface SignalRow {
   count: number;
   percent: number;
   highRisk: number;
-}
-
-/* -- Automação ------------------------------------------------------------ */
-
-export interface AutomationSplit {
-  freshmen: number;
-  auto: number;
-  pending: number;
-  human: number;
-  autoPercent: number;
-  pendingPercent: number;
-  humanPercent: number;
-  /** Automático + pendência: tudo que a régua ainda resolve sem uma pessoa. */
-  handledWithoutHuman: number;
 }
 
 /* -- O modelo completo da página ----------------------------------------- */
@@ -559,9 +582,13 @@ export interface CockpitSnapshot {
   bands: BandSlice[];
   retention: number;
   signals: SignalRow[];
-  journey: JourneyStage[];
   operations: Operations;
-  automation: AutomationSplit;
+  /**
+   * Aderência ao prazo no período anterior, 0–100. É a base de comparação do
+   * indicador protagonista, e vem daqui em vez de ser recalculada na camada de
+   * leitura para que as duas janelas saiam da mesma conta.
+   */
+  previousSlaAdherence: number;
 }
 
 export function cockpitSnapshot(
@@ -590,7 +617,8 @@ export function cockpitSnapshot(
 
   const operations = operationsFor(cases, key, period, signalKey);
   const prevReceived = interventionsBetween(cases, key, -(backDays + meta.days - 1), -backDays);
-  const prevOutcomes = outcomesOf(prevReceived, signalKey);
+  const previousSlaAdherence =
+    slaAdherenceBetween(cases, key, -(backDays + meta.days - 1), -backDays) * 100;
 
   const kpis: Kpi[] = [
     {
@@ -627,21 +655,7 @@ export function cockpitSnapshot(
       previous: prevReceived,
       deltaPercent: deltaOf(operations.received, prevReceived),
       goodDirection: 'up',
-      hint: 'Contatos humanos abertos na janela. Volume não é resultado — a linha de baixo é.',
-    },
-    {
-      key: 'estabilizacao',
-      label: 'Taxa de estabilização',
-      value: operations.outcomes.rate,
-      previous: prevOutcomes.settled > 0 ? prevOutcomes.rate : null,
-      deltaPercent:
-        prevOutcomes.settled > 0
-          ? operations.outcomes.rate - prevOutcomes.rate
-          : null,
-      goodDirection: 'up',
-      suffix: '%',
-      decimals: 0,
-      hint: 'Casos cujo sinal parou de aparecer, sobre os casos com desfecho apurado.',
+      hint: 'Contatos humanos abertos na janela. Volume é esforço, não resultado.',
     },
   ];
 
@@ -654,30 +668,6 @@ export function cockpitSnapshot(
     highRisk: cases.highRiskSignals[i],
   }));
 
-  const journey: JourneyStage[] = JOURNEY_STAGES.map((stage, i) => ({
-    key: stage.key,
-    label: stage.label,
-    gate: stage.gate,
-    track: stage.track,
-    count: base.stageCount[i],
-    cleared: base.stageCleared[i],
-    completion: base.stageCount[i] > 0 ? (base.stageCleared[i] / base.stageCount[i]) * 100 : 0,
-    attention: cases.stageAttention[i],
-  }));
-
-  const [auto, pendingRuler, human] = base.automation;
-  const freshmen = base.freshmen;
-  const automation: AutomationSplit = {
-    freshmen,
-    auto,
-    pending: pendingRuler,
-    human,
-    autoPercent: freshmen > 0 ? (auto / freshmen) * 100 : 0,
-    pendingPercent: freshmen > 0 ? (pendingRuler / freshmen) * 100 : 0,
-    humanPercent: freshmen > 0 ? (human / freshmen) * 100 : 0,
-    handledWithoutHuman: auto + pendingRuler,
-  };
-
   return {
     scope,
     period,
@@ -689,9 +679,8 @@ export function cockpitSnapshot(
     bands: bandSlices(base),
     retention: cases.retention,
     signals,
-    journey,
     operations,
-    automation,
+    previousSlaAdherence,
   };
 }
 

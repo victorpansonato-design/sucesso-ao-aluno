@@ -1,6 +1,6 @@
 import type { RouteName } from './router';
 import type { CockpitSnapshot, Kpi } from './cockpit';
-import { dateAt, interventionsAt, outcomesOf, periodMeta, snapshotAt } from './cockpit';
+import { dateAt, interventionsAt, periodMeta, slaAdherenceAt, snapshotAt } from './cockpit';
 import { focusOnSignal, scopeKey } from '../data/institution';
 import { SCORE_BANDS, STATUS_SLUG } from './healthScore';
 import { decimal, int } from './format';
@@ -422,9 +422,9 @@ export function signalMovement(snapshot: CockpitSnapshot): SignalMovement[] {
  * — `snapshotAt` para estoque, `interventionsAt` para fluxo —, então o último
  * ponto de cada série vale exatamente o número impresso ao lado dela.
  *
- * `estabilizacao` fica de fora de propósito: reconstruir a taxa dia a dia
- * exigiria reparticionar desfechos em janelas de um dia, e uma taxa sobre três
- * casos apurados oscila entre 0% e 100% sem informar nada.
+ * A aderência ao prazo não aparece aqui porque ela é o protagonista da dobra de
+ * cima, com a própria série em colunas — repeti-la como sparkline de 14 dias
+ * seria mostrar o mesmo dado duas vezes na mesma tela.
  */
 export function kpiSparks(
   snapshot: CockpitSnapshot,
@@ -461,14 +461,14 @@ export function kpiSparks(
 export interface HeroColumn {
   /** Rótulo curto do dia, para o leitor de tela e o tooltip. */
   label: string;
-  /** A taxa de estabilização daquele dia, 0–100. */
+  /** A aderência ao prazo de primeiro contato daquele dia, 0–100. */
   value: number;
-  /** `true` no último dia — o valor que o cartão imprime em corpo grande. */
+  /** `true` no último dia — o dia mais recente da série. */
   current: boolean;
 }
 
 /**
- * A taxa de estabilização, dia a dia, na mesma janela de leitura.
+ * A aderência ao prazo de primeiro contato, dia a dia.
  *
  * Existe porque o cartão protagonista do Dashboard desenha COLUNAS atrás do
  * vidro, e uma coluna precisa ser um dado. A alternativa — barras decorativas
@@ -476,26 +476,21 @@ export interface HeroColumn {
  * de um painel institucional, e o custo disso não é estético: é que a próxima
  * pessoa a olhar a tela acredita nele.
  *
- * A conta é a MESMA do hero, aplicada a cada dia: o volume de intervenções
- * daquele dia passa pela partição de desfechos do escopo, e a taxa sai do
- * mesmo `outcomesOf`. Por isso a última coluna coincide, por construção, com o
- * número em corpo grande ao lado dela — e não por coincidência de
- * arredondamento.
+ * A conta é a MESMA do hero, aplicada a um dia em vez de à janela: o número em
+ * corpo grande é a média ponderada destes pontos ao longo da janela escolhida,
+ * e não um sexto valor calculado por outro caminho.
  */
 export function heroSeries(snapshot: CockpitSnapshot, days = 12): HeroColumn[] {
   const key =
     scopeKey(snapshot.scope) +
     '#' +
     (snapshot.focus.kind === 'signal' ? snapshot.focus.key : snapshot.focus.kind);
-  const signal = snapshot.focus.kind === 'signal' ? snapshot.focus.key : undefined;
 
   const out: HeroColumn[] = [];
   for (let d = -(days - 1); d <= 0; d += 1) {
-    const received = interventionsAt(snapshot.cases, key, d);
-    const outcomes = outcomesOf(received, signal);
     out.push({
       label: dateAt(d).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }),
-      value: outcomes.rate,
+      value: slaAdherenceAt(key, d) * 100,
       current: d === 0,
     });
   }
@@ -508,19 +503,26 @@ export function pulseModel(snapshot: CockpitSnapshot): PulseModel {
   const { trend, percent } = readTrend(attentionKpi?.deltaPercent ?? null);
   const priority = priorityOf(snapshot);
   const outcomes = snapshot.operations.outcomes;
-  const stabilisation = snapshot.kpis.find((k) => k.key === 'estabilizacao');
+  const operations = snapshot.operations;
 
+  /* O protagonista é a aderência ao prazo de primeiro contato, e a escolha é de
+     dado. Ela é genuinamente 0–100 (então a altura da coluna é honesta), o
+     denominador é auditável e — o ponto que decidiu — os dois lados da fração
+     são registros do próprio sistema: o caso foi aberto aqui e o primeiro
+     contato foi carimbado aqui. Nenhuma integração pendente, nenhum
+     contrafactual, nenhuma atribuição de mérito. */
   const hero: PulseHero = {
-    label: 'Taxa de estabilização',
-    value: outcomes.rate,
-    numerator: outcomes.counts.estabilizado,
-    denominator: outcomes.settled,
-    numeratorLabel: 'casos estabilizados',
+    label: 'Contato dentro do prazo',
+    value: operations.slaAdherence,
+    numerator: operations.inSla,
+    denominator: operations.concluded,
+    numeratorLabel: 'contatados no prazo',
     denominatorLabel: 'casos com desfecho apurado',
-    deltaPP: stabilisation?.deltaPercent ?? null,
+    deltaPP:
+      operations.concluded > 0 ? operations.slaAdherence - snapshot.previousSlaAdherence : null,
     comparison: meta.compare,
     definition:
-      'Casos cujo sinal de origem deixou de aparecer nos ciclos seguintes, sobre os casos com desfecho apurado. Os casos em acompanhamento ficam fora do denominador até fechar — incluí-los faria a taxa cair só porque a operação abriu contatos novos.',
+      'Casos cujo primeiro contato humano aconteceu dentro do SLA do radar que os abriu, sobre os casos com desfecho apurado na janela. O prazo é contado em horas úteis e definido por radar em Governança. É a única promessa que a operação faz para fora, e o sistema registra os dois lados da conta.',
   };
 
   const tone: PulseModel['tone'] =
@@ -530,7 +532,7 @@ export function pulseModel(snapshot: CockpitSnapshot): PulseModel {
 
   const summary = [
     headlineOf(trend, percent, priority),
-    `Na janela "${meta.label}", ${int(snapshot.operations.received)} intervenções foram abertas e ${int(outcomes.settled)} tiveram desfecho apurado, das quais ${int(outcomes.counts.estabilizado)} estabilizaram — taxa de ${decimal(outcomes.rate, 1)}%.`,
+    `Na janela "${meta.label}", ${int(operations.received)} intervenções foram abertas e ${int(outcomes.settled)} tiveram desfecho apurado, das quais ${int(operations.inSla)} tiveram o primeiro contato dentro do prazo — ${decimal(operations.slaAdherence, 1)}%.`,
     `${int(funnel[1].count)} alunos estão na faixa de atenção ou pior por Health Score, e ${int(snapshot.cases.attention)} casos estão com uma pessoa responsável. As duas medidas descrevem a mesma base de ${int(snapshot.base.monitored)} alunos de formas diferentes.`,
   ].join(' ');
 

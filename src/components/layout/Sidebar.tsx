@@ -232,7 +232,11 @@ export function Sidebar({
 
         <div className={`flex gap-1.5 ${collapsed ? 'flex-col' : ''}`}>
           <button
-            onClick={toggleTheme}
+            onClick={(e) => {
+              // O circulo de revelacao nasce no centro do proprio botao.
+              const r = e.currentTarget.getBoundingClientRect();
+              toggleTheme({ x: r.left + r.width / 2, y: r.top + r.height / 2 });
+            }}
             title={theme === 'dark' ? 'Tema claro' : 'Tema escuro'}
             className="flex h-8 flex-1 items-center justify-center gap-1.5 rounded-full bg-surface-2 text-[12px] font-medium text-ink-3 transition-colors hover:bg-surface-3 hover:text-ink"
           >

@@ -1,30 +1,32 @@
 import { useMemo } from 'react';
-import { motion } from 'motion/react';
-import { ArrowRight, Bot, Info, Timer } from 'lucide-react';
-import { useApp } from '../../state/AppContext';
-import { OUTCOMES, periodMeta } from '../../lib/cockpit';
-import type { CockpitPeriod, Operations, AutomationSplit } from '../../lib/cockpit';
+import { ArrowRight, Timer } from 'lucide-react';
+import { periodMeta } from '../../lib/cockpit';
+import type { CockpitPeriod, Operations } from '../../lib/cockpit';
 import { Card, CardHeader } from '../ui/Surfaces';
 import { LinkButton } from '../ui/Button';
 import { AnimatedNumber } from '../ui/Charts';
 import { StackedColumns } from '../ui/Plot';
 import type { StackBucket } from '../ui/Plot';
-import { AUTOMATION_COLOR, SLA_COLOR, outcomeColor } from './palette';
-import { emphasis } from '../../lib/motion';
-import { decimal, int } from '../../lib/format';
+import { SLA_COLOR } from './palette';
+import { decimal } from '../../lib/format';
 
 /* ==========================================================================
-   Quinta linha — a operação
+   A operação — volume e prazo
    --------------------------------------------------------------------------
-   Dois blocos que precisam concordar, e é por isso que leem a MESMA partição:
-   "concluídas" no bloco de intervenções é literalmente a soma dos desfechos
-   apurados no bloco de resultado. Se viessem de contas separadas, um painel
-   diria 70 e o outro somaria 72, e a taxa de estabilização — que é a métrica
-   que decide se a operação funciona — viraria discussão.
+   O que este arquivo mede é esforço e pontualidade: quantos contatos foram
+   abertos na janela, quantos já têm desfecho apurado e quantos alcançaram o
+   aluno dentro do prazo. Nada aqui afirma resultado.
 
-   E é a taxa, não o volume, que ganha o corpo maior. Duzentos atendimentos com
-   40% de estabilização é uma equipe ocupada tratando o sintoma errado; oitenta
-   com 71% é a operação fazendo o que existe para fazer.
+   O arquivo tinha três painéis e perdeu dois:
+
+     · `OutcomePanel` e `AutomationPanel` já não eram renderizados por tela
+       nenhuma — a composição de desfechos vive em `dashboard/OutcomeComposition`
+       e o bloco de automação saiu do produto.
+     · O bloco de automação × humano saiu porque media uma régua que depende de
+       data de matrícula, turma e presença no primeiro dia — dados que nenhum
+       sistema da instituição entrega hoje. Um percentual de "resolvido sem
+       humano" calculado sobre uma régua que ainda não roda é uma afirmação
+       sobre o futuro apresentada como medição.
    ========================================================================== */
 
 /* -- Números lado a lado, divididos por fio ------------------------------- */
@@ -109,7 +111,7 @@ export function InterventionsPanel({
         <Figure
           label="concluídas"
           value={operations.concluded}
-          hint="Casos com desfecho apurado. É o denominador da taxa de estabilização."
+          hint="Casos com desfecho apurado. É o denominador da aderência ao prazo."
         />
         <Figure
           label="pendentes"
@@ -160,230 +162,6 @@ export function InterventionsPanel({
         </div>
         <StackedColumns buckets={buckets} height={156} totalLabel="Recebidas" />
       </div>
-    </Card>
-  );
-}
-
-/* -- Resultado das intervenções ------------------------------------------ */
-
-export function OutcomePanel({
-  operations,
-  period,
-}: {
-  operations: Operations;
-  period: CockpitPeriod;
-}) {
-  const { theme } = useApp();
-  const dark = theme === 'dark';
-  const meta = periodMeta(period);
-  const { outcomes } = operations;
-
-  const rows = OUTCOMES.map((outcome) => ({
-    ...outcome,
-    count: outcomes.counts[outcome.key],
-    percent: outcomes.received > 0 ? (outcomes.counts[outcome.key] / outcomes.received) * 100 : 0,
-    color: outcomeColor(outcome.key, dark),
-  }));
-
-  return (
-    <Card>
-      <CardHeader
-        title="Resultado das intervenções"
-        subtitle={`Desfecho dos ${int(outcomes.received)} contatos abertos ${meta.inline}.`}
-      />
-
-      {outcomes.received === 0 ? (
-        <p className="py-14 text-center text-[12px] text-ink-4">
-          Nenhuma intervenção na janela selecionada.
-        </p>
-      ) : (
-        <>
-          {/* A métrica que importa, com a conta à vista. Um número grande sem a
-              sua fórmula é uma opinião com tipografia boa. */}
-          <div className="mt-4 rounded-lg bg-surface-2 p-4">
-            <p className="text-[12px] font-medium text-ink-3">Taxa de estabilização</p>
-            <p className="mt-1.5 font-mono text-[38px] leading-none font-medium tracking-tight text-ink">
-              <AnimatedNumber value={outcomes.rate} decimals={0} format={false} resetOnChange />
-              <span className="text-[24px] text-ink-3">%</span>
-            </p>
-            <p className="mt-2.5 text-[11.5px] leading-relaxed text-ink-3">
-              <span className="font-mono font-medium text-ink">
-                {int(outcomes.counts.estabilizado)}
-              </span>{' '}
-              estabilizados ÷{' '}
-              <span className="font-mono font-medium text-ink">{int(outcomes.settled)}</span> com
-              desfecho apurado. Os{' '}
-              <span className="font-mono font-medium text-ink">
-                {int(outcomes.counts.acompanhamento)}
-              </span>{' '}
-              em acompanhamento ficam fora da conta até fechar.
-            </p>
-          </div>
-
-          <div className="mt-4 space-y-0.5">
-            {rows.map((row, i) => (
-              <div
-                key={row.key}
-                title={row.meaning}
-                className="rounded-md px-2 py-2 transition-colors hover:bg-surface-2"
-              >
-                <div className="flex items-baseline gap-2">
-                  <span
-                    className="h-1.5 w-1.5 shrink-0 translate-y-[-2px] rounded-full"
-                    style={{ backgroundColor: row.color }}
-                  />
-                  <span className="min-w-0 flex-1 truncate text-[13px] font-medium text-ink-2">
-                    {row.label}
-                  </span>
-                  {!row.settled && (
-                    <span className="shrink-0 text-[10.5px] text-ink-4">sem desfecho</span>
-                  )}
-                  <span className="shrink-0 font-mono text-[13px] font-medium text-ink">
-                    {int(row.count)}
-                  </span>
-                  <span className="w-10 shrink-0 text-right font-mono text-[11px] text-ink-4">
-                    {decimal(row.percent, 0)}%
-                  </span>
-                </div>
-                <div className="mt-1.5 ml-4 h-1.5 overflow-hidden rounded-full bg-track">
-                  <motion.div
-                    className="h-full rounded-full"
-                    style={{ backgroundColor: row.color }}
-                    initial={{ width: 0 }}
-                    animate={{ width: decimal(row.percent, 2) + '%' }}
-                    transition={{ duration: 0.7, ease: emphasis, delay: i * 0.05 }}
-                  />
-                </div>
-              </div>
-            ))}
-          </div>
-
-          <p className="mt-3 flex items-start gap-1.5 border-t border-hairline pt-3 text-[11.5px] leading-relaxed text-ink-4">
-            <Info className="mt-px h-3.5 w-3.5 shrink-0" />
-            Volume de atendimento não é resultado. Um caso só conta como
-            estabilizado quando o sinal que o abriu deixa de aparecer nos ciclos seguintes.
-          </p>
-        </>
-      )}
-    </Card>
-  );
-}
-
-/* -- Automação × intervenção humana -------------------------------------- */
-
-export function AutomationPanel({
-  automation,
-  onOpenOnboarding,
-}: {
-  automation: AutomationSplit;
-  onOpenOnboarding: () => void;
-}) {
-  const segments = [
-    {
-      key: 'auto',
-      label: 'Automático concluído',
-      value: automation.auto,
-      percent: automation.autoPercent,
-      color: AUTOMATION_COLOR.auto,
-      note: 'A régua rodou até o fim sem nenhuma pessoa envolvida.',
-    },
-    {
-      key: 'pending',
-      label: 'Pendência na régua',
-      value: automation.pending,
-      percent: automation.pendingPercent,
-      color: AUTOMATION_COLOR.pending,
-      note: 'Pré-checagem falhou — contrato, documento, login. A automação reagenda.',
-    },
-    {
-      key: 'human',
-      label: 'Intervenção humana',
-      value: automation.human,
-      percent: automation.humanPercent,
-      color: AUTOMATION_COLOR.human,
-      note: 'Virou exceção e está com um especialista. É a atenção de calouro do funil.',
-    },
-  ];
-
-  return (
-    <Card>
-      <CardHeader
-        eyebrow={
-          <>
-            <Bot className="h-3.5 w-3.5" />
-            Régua de pós-venda
-          </>
-        }
-        title="Automação × intervenção humana"
-        subtitle="Automatizar o normal, detectar o desvio, humanizar a exceção — medido."
-        action={
-          <LinkButton onClick={onOpenOnboarding} iconRight={<ArrowRight className="h-3.5 w-3.5" />}>
-            Ver onboarding
-          </LinkButton>
-        }
-      />
-
-      {automation.freshmen === 0 ? (
-        <p className="py-12 text-center text-[12px] text-ink-4">
-          Nenhum ingressante no escopo selecionado. A régua de onboarding só existe dentro da janela
-          de 90 dias.
-        </p>
-      ) : (
-        <>
-          <div className="mt-5 flex items-baseline gap-2">
-            <span className="font-mono text-[30px] leading-none font-medium tracking-tight text-ink">
-              <AnimatedNumber value={automation.freshmen} resetOnChange />
-            </span>
-            <span className="text-[12.5px] text-ink-3">ingressantes na régua</span>
-          </div>
-
-          <div className="mt-4 flex h-2.5 w-full overflow-hidden rounded-full bg-track">
-            {segments.map((segment, i) => (
-              <motion.div
-                key={segment.key}
-                title={`${segment.label}: ${int(segment.value)} (${decimal(segment.percent, 1)}%)`}
-                style={{ backgroundColor: segment.color }}
-                initial={{ width: 0 }}
-                animate={{ width: decimal(segment.percent, 2) + '%' }}
-                transition={{ duration: 0.8, ease: emphasis, delay: i * 0.08 }}
-              />
-            ))}
-          </div>
-
-          <div className="mt-4 space-y-3">
-            {segments.map((segment) => (
-              <div key={segment.key} className="flex items-start gap-2.5">
-                <span
-                  className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full"
-                  style={{ backgroundColor: segment.color }}
-                />
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-baseline gap-2">
-                    <span className="min-w-0 flex-1 truncate text-[13px] font-medium text-ink-2">
-                      {segment.label}
-                    </span>
-                    <span className="shrink-0 font-mono text-[13px] font-medium text-ink">
-                      {int(segment.value)}
-                    </span>
-                    <span className="w-11 shrink-0 text-right font-mono text-[11px] text-ink-4">
-                      {decimal(segment.percent, 1)}%
-                    </span>
-                  </div>
-                  <p className="mt-0.5 text-[11px] leading-relaxed text-ink-4">{segment.note}</p>
-                </div>
-              </div>
-            ))}
-          </div>
-
-          <p className="mt-4 border-t border-hairline pt-3 text-[12.5px] leading-relaxed text-ink-2">
-            <span className="font-mono font-medium text-ink">
-              {decimal(100 - automation.humanPercent, 1)}%
-            </span>{' '}
-            da régua segue sem uma pessoa. Cada ponto que sai desta conta é uma ligação que a equipe
-            não precisou fazer.
-          </p>
-        </>
-      )}
     </Card>
   );
 }

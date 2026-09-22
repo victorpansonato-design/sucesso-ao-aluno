@@ -52,14 +52,7 @@ const BAND_TONE: Record<string, WidgetTone> = {
 };
 
 /** O que o aparelho pode pedir para o Dashboard abrir, sem sair da aba. */
-export type DrillKey =
-  | 'estabilizacao'
-  | 'alto-risco'
-  | 'atencao'
-  | 'retencao'
-  | 'sla'
-  | 'intervencoes'
-  | 'automacao';
+export type DrillKey = 'alto-risco' | 'atencao' | 'retencao' | 'sla' | 'intervencoes';
 
 type Board = 'risco' | 'operacao';
 
@@ -94,7 +87,7 @@ export function PulsePhoneApp({
   chrome = true,
 }: PulsePhoneAppProps) {
   const [board, setBoard] = useState<Board>('risco');
-  const { cases, base, operations, automation } = snapshot;
+  const { cases, base, operations } = snapshot;
 
   /* -- A aba Risco: uma pizza, não quatro copos --------------------------
      Os quatro widgets de líquido respondiam quatro perguntas soltas — uma
@@ -130,8 +123,8 @@ export function PulsePhoneApp({
   const rails: RailSpec[] = useMemo(
     () => [
       {
-        key: 'estabilizacao',
-        label: 'Estabilização',
+        key: 'sla',
+        label: 'Contato no prazo',
         value: decimal(pulse.hero.value, 1),
         suffix: '%',
         tone: 'vital',
@@ -147,11 +140,16 @@ export function PulsePhoneApp({
         value: int(cases.highRisk),
         tone: 'crit',
       },
+      /* Era "Retenção projetada", com uma casa decimal e um sinal de porcentagem.
+         `snapshot.retention` é uma CONTAGEM — os casos de alto risco roteados
+         para a fila especializada —, então o aparelho imprimia "11,0%" para um
+         número que significa onze casos, sob um rótulo que prometia projeção. O
+         funil da mesma página sempre chamou isso de "Roteados para Retenção", e
+         é esse o nome correto. */
       {
         key: 'retencao',
-        label: 'Retenção projetada',
-        value: decimal(snapshot.retention, 1),
-        suffix: '%',
+        label: 'Roteados para Retenção',
+        value: int(snapshot.retention),
         tone: 'info',
       },
     ],
@@ -184,7 +182,7 @@ export function PulsePhoneApp({
         },
         {
           key: 'sla',
-          label: 'Aderência ao SLA',
+          label: 'Contato no prazo',
           value: operations.slaAdherence,
           decimals: 1,
           suffix: '%',
@@ -192,19 +190,22 @@ export function PulsePhoneApp({
           tone: operations.slaAdherence >= 90 ? 'vital' : 'warn',
           foot: `${int(operations.inSla)} no prazo`,
         },
+        /* Era "Resolvido sem pessoa", a fatia da régua de ingressantes que
+           terminava sem contato humano. Saiu junto com o bloco de automação do
+           Dashboard: a régua depende de data de matrícula, turma e presença no
+           primeiro dia, e nenhum desses dados existe nos sistemas hoje. No lugar
+           entrou um estoque que o próprio sistema conta. */
         {
-          key: 'automacao',
-          label: 'Resolvido sem pessoa',
-          value: 100 - automation.humanPercent,
-          decimals: 1,
-          suffix: '%',
-          fill: 100 - automation.humanPercent,
-          tone: 'vital',
-          foot: `${int(automation.freshmen)} na régua`,
+          key: 'atencao',
+          label: 'Em atenção humana',
+          value: cases.attention,
+          fill: (cases.attention / Math.max(1, base.monitored)) * 100,
+          tone: 'info',
+          foot: `de ${int(base.monitored)} monitorados`,
         },
       ],
     };
-  }, [operations, automation]);
+  }, [operations, cases.attention, base.monitored]);
 
   const widgets = boards.operacao;
 

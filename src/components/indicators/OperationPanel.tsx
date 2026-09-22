@@ -156,7 +156,7 @@ export function OperationPanel({
           />
           <div className="mt-5">
             <ColumnChart
-              data={model.radars.map((r) => ({
+              data={model.radarVolume.map((r) => ({
                 label: r.label,
                 value: r.totalCases,
                 color: r.key === 'evasao' ? 'var(--crit)' : 'var(--ink-3)',
@@ -166,7 +166,7 @@ export function OperationPanel({
           <p className="mt-3 border-t border-hairline pt-3 text-[11px] leading-relaxed text-ink-4">
             Total de{' '}
             <span className="font-mono tabular">
-              {int(model.radars.reduce((s, r) => s + r.totalCases, 0))}
+              {int(model.radarVolume.reduce((s, r) => s + r.totalCases, 0))}
             </span>{' '}
             casos atribuídos a um radar. Vermelho marca o radar de evasão, que é o único cuja
             presença já é um alerta.

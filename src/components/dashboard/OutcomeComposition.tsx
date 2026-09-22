@@ -19,12 +19,19 @@ import { decimal, int } from '../../lib/format';
      1. COMPARAÇÃO DE FATIAS PEQUENAS. "Encaminhados" (3) e "sem contato" (3)
         eram dois slivers indistinguíveis num arco; numa barra são dois
         segmentos com rótulo e número.
-     2. A LINHA DO DENOMINADOR. A taxa de estabilização é `estabilizados ÷
-        apurados`, e os casos em acompanhamento ficam FORA do denominador. Numa
-        barra é possível marcar visualmente onde termina o que foi apurado; num
-        donut de 360° isso não tem onde ser dito.
+     2. A LINHA DO APURADO. Os casos em acompanhamento ainda não terminaram.
+        Numa barra é possível marcar visualmente onde termina o que já foi
+        apurado; num donut de 360° isso não tem onde ser dito.
      3. VÃO DE 2px ENTRE SEGMENTOS. Fatias coladas de matizes próximos leem como
         um bloco; o vão na cor da superfície separa sem acrescentar traço.
+
+   O QUE ESTE CARTÃO DEIXOU DE AFIRMAR. Ele terminava com a taxa de
+   estabilização — estabilizados ÷ apurados — em corpo destacado, e era o número
+   que a diretoria levava da tela. Ela saiu do produto: sem janela de observação
+   declarada e sem grupo de controle, a taxa credita à operação a melhora de
+   alunos que melhorariam de todo jeito, e o erro é de direção, não de precisão.
+   A composição ficou porque cada linha dela é um registro que o especialista
+   fez ao encerrar o caso. Descrição do que foi registrado, não placar.
 
    A cor segue `outcomeColor`, que é a escala semântica que o resto do app já
    usa: verde só em "estabilizado", âmbar em "sem resposta", vermelho em "não
@@ -57,12 +64,12 @@ export function OutcomeComposition({
         title="Resultado das intervenções"
         subtitle={`Desfecho dos ${int(total)} contatos abertos ${windowInline}.`}
         action={
-          <Hint label="a taxa de estabilização" align="right">
-            Um caso conta como <strong className="font-semibold text-ink">estabilizado</strong>
-            quando o sinal que o abriu deixa de aparecer nos ciclos seguintes. Os casos{' '}
-            <strong className="font-semibold text-ink">em acompanhamento</strong> ficam fora do
-            denominador até fechar: incluí-los faria a taxa cair só porque a operação abriu contatos
-            novos, o que puniria exatamente o comportamento desejado.
+          <Hint label="a composição dos desfechos" align="right">
+            Cada faixa é o que o especialista <strong className="font-semibold text-ink">registrou
+            ao encerrar</strong> o caso, e a soma é o total de contatos abertos na janela. Os casos{' '}
+            <strong className="font-semibold text-ink">em acompanhamento</strong> ainda não
+            terminaram e por isso ficam fora do que está apurado. Esta é a distribuição do que foi
+            registrado — nenhuma das faixas mede quanto do desfecho se deve à intervenção.
           </Hint>
         }
       />
@@ -146,19 +153,23 @@ export function OutcomeComposition({
 
           <div className="mt-4 border-t border-hairline pt-3.5">
             <Denominator
-              numerator={int(outcomes.counts.estabilizado)}
-              numeratorLabel="estabilizados"
-              denominator={int(outcomes.settled)}
-              denominatorLabel="com desfecho apurado"
+              numerator={int(outcomes.settled)}
+              numeratorLabel="com desfecho apurado"
+              denominator={int(total)}
+              denominatorLabel="contatos abertos na janela"
             />
             <p className="mt-1.5 text-[11.5px] leading-relaxed text-ink-3">
-              Taxa de estabilização de{' '}
+              Os <span className="font-mono tabular">{int(outcomes.counts.acompanhamento)}</span> em
+              acompanhamento entram na composição quando fecharem. As duas faixas que pedem decisão
+              são{' '}
               <span className="font-mono font-medium text-ink tabular">
-                {decimal(outcomes.rate, 1)}%
-              </span>
-              . Os{' '}
-              <span className="font-mono tabular">{int(outcomes.counts.acompanhamento)}</span> em
-              acompanhamento entram na conta quando fecharem.
+                {int(outcomes.counts['sem-contato'])}
+              </span>{' '}
+              sem contato e{' '}
+              <span className="font-mono font-medium text-ink tabular">
+                {int(outcomes.counts['risco-mantido'])}
+              </span>{' '}
+              com risco mantido.
             </p>
           </div>
         </>

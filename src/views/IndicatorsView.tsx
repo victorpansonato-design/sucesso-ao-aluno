@@ -21,7 +21,6 @@ import { ExecutivePanel } from '../components/indicators/ExecutivePanel';
 import { BaseHealthPanel } from '../components/indicators/BaseHealthPanel';
 import { OperationPanel } from '../components/indicators/OperationPanel';
 import { RetentionPanel } from '../components/indicators/RetentionPanel';
-import { RadarQualityPanel } from '../components/indicators/RadarQualityPanel';
 import { TeamPanel } from '../components/indicators/TeamPanel';
 import { int } from '../lib/format';
 
@@ -34,13 +33,12 @@ import { int } from '../lib/format';
    porque comparar exige ver duas coisas ao mesmo tempo — e a rolagem garante
    que você nunca veja.
 
-   Virou um workspace de seis abas, e a aba mora na URL:
+   Virou um workspace de cinco abas, e a aba mora na URL:
 
      #/indicadores/visao-executiva
      #/indicadores/saude-da-base
      #/indicadores/operacao
      #/indicadores/retencao
-     #/indicadores/radares
      #/indicadores/equipe
 
    O roteador do projeto já entende `#/rota/:param` — é o mesmo mecanismo com
@@ -86,18 +84,29 @@ import { int } from '../lib/format';
    quem está lendo um relatório — e quem lê esta tela é a gestão.
 
    Agora o aprofundamento acontece em `ui/MetricSheet`, sobre o mesmo modelo que
-   o painel já calculou. Sobrou UMA saída, e ela sobra por ser de outra
-   natureza: o botão que abre a configuração de radares em Governança, porque
-   recalibrar um gatilho é uma tarefa, não uma leitura.
+   o painel já calculou. A última saída que restava — o botão para a configuração
+   de radares em Governança — foi embora junto com a aba que a hospedava.
 
-   Nenhum indicador foi removido em nenhuma reorganização. O que mudou:
+   -- A poda -------------------------------------------------------------
 
-     · o bloco de exportações virou um menu `Exportar`, com o RECORTE de cada
-       arquivo declarado (recorte atual × base completa);
-     · toda taxa ganhou denominador visível;
-     · `Health Score médio` nunca mais imprime `0` por ausência de amostra;
-     · contagem e percentual passaram a ser colunas, não texto vizinho;
-     · `sem verdicto` virou `amostra insuficiente`, que é o que ele é.
+   As reorganizações anteriores nunca tiravam indicador; esta tirou dois, e o
+   critério não foi espaço na tela:
+
+     · A ABA QUALIDADE DOS RADARES saiu inteira. A precisão de um radar é
+       `confirmados ÷ julgados`, e julgar cada alerta como confirmado ou
+       descartado é hoje uma ação lateral que ninguém executa — a métrica morava
+       permanentemente em "amostra insuficiente". Um indicador que estrutura não
+       alimenta não melhora com redesenho. Quando o julgamento virar campo
+       obrigatório do encerramento do caso, a aba volta com sentido; até lá, o
+       volume de casos por radar continua em Operação, que é o que o sistema
+       mede sozinho.
+     · RECEITA PRESERVADA saiu da Visão executiva e da Retenção. Ver
+       `lib/indicators.ts` para a fórmula e o motivo.
+
+   O que as reorganizações anteriores já tinham feito, e continua valendo: o
+   bloco de exportações virou um menu `Exportar` com o RECORTE de cada arquivo
+   declarado; toda taxa tem denominador visível; `Health Score médio` nunca
+   imprime `0` por ausência de amostra; contagem e percentual são colunas.
    ========================================================================== */
 
 interface TabSpec {
@@ -128,11 +137,6 @@ const TABS = [
     value: 'retencao',
     label: 'Retenção',
     display: 'Retenção',
-  },
-  {
-    value: 'radares',
-    label: 'Qualidade dos radares',
-    display: 'Qualidade dos radares',
   },
   {
     value: 'equipe',
@@ -315,15 +319,6 @@ export function IndicatorsView({
         {tab === 'retencao' && (
           <Reveal>
             <RetentionPanel model={model} />
-          </Reveal>
-        )}
-
-        {tab === 'radares' && (
-          <Reveal>
-            <RadarQualityPanel
-              model={model}
-              onNavigate={(route, param) => actions.goto(route, param)}
-            />
           </Reveal>
         )}
 

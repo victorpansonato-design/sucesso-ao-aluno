@@ -90,6 +90,31 @@ toda curva **termina exatamente** no número que o indicador ao lado mostra. Um 
 último ponto discorda do KPI vizinho destrói a confiança na tela inteira, e é o erro mais comum
 em painel mockado.
 
+### Um indicador só entra se o sistema produzir os dois lados da conta
+É o critério que define o que aparece em **Dashboard** e **Indicadores**, as duas telas que a
+diretoria lê. Um número entra quando o próprio sistema registra o numerador e o denominador, e
+quando ele não atribui mérito por correlação. Por esse critério, quatro indicadores saíram:
+
+| Saiu | Por quê |
+|---|---|
+| **Taxa de estabilização** | Creditava à operação a melhora de alunos sem janela de observação declarada e sem grupo de controle. Aluno sinalizado no pior momento melhora em parte sozinho. Era a protagonista do Dashboard, e foi substituída por **Contato dentro do prazo** |
+| **Receita preservada** | `mensalidade × 6 × períodos restantes` presumia que todo caso retido sairia com certeza e concluiria o curso inteiro. Com meia dúzia de casos, um caso movia o total em centenas de milhares — e um valor em reais numa aba executiva é lido como caixa |
+| **Precisão por radar** (aba inteira) | Exige julgar cada alerta como confirmado ou descartado. Enquanto isso for ação lateral e não campo obrigatório do encerramento, a métrica vive em "amostra insuficiente" |
+| **Automação × humano** e **funil de jornada** | Medem a régua de ingressantes, que depende de data de matrícula, turma e presença no primeiro dia — dados que hoje não existem em nenhum sistema (ver `docs/comportamentos-do-aluno.md`) |
+
+Os dois últimos não sumiram do produto: a régua dos 90 dias continua inteira em `#/onboarding` e
+o volume de casos por radar continua em **Indicadores → Operação**. O que saiu foi a afirmação,
+na tela da diretoria, de que aquilo já está medido. Cada um volta no dia em que a sua fonte de
+dado existir — e o retorno é uma decisão de produto, não um `git revert`.
+
+O que ficou de pé em Indicadores é o que o sistema gera sozinho: casos abertos e encerrados, SLA
+estourado, aderência ao prazo, tempo até o primeiro contato, reaberturas, follow-ups, carga por
+especialista, volume por radar, taxa de reversão e motivos de evasão.
+
+**O que ainda falta:** nenhum destes indicadores tem meta nem dono declarados em Governança
+(`GovernanceSettings` guarda SLA, pesos e janelas, e nenhum campo de alvo). Indicador sem meta e
+sem dono não diz se 88% de aderência é bom.
+
 ### Regra dos 90 dias
 Calouro em adaptação e aluno em evasão não são o mesmo problema. Alunos dentro da janela de
 onboarding ficam **fora do Radar de Evasão** e são acompanhados por uma régua própria com marcos
@@ -129,14 +154,14 @@ hipóteses de causa-raiz e uma lista de **o que não fazer**. Geração determin
 | Rota | Tela | Para quê |
 |---|---|---|
 | `#/cockpit` | Cockpit | O turno do atendente, sem rolar a página: 4 números seus, duas pizzas e quem precisa de você agora |
-| `#/dashboard` | Dashboard (Gestão) | Índices executivos, evolução por nível de atenção, quatro pizzas, jornada, operação e automação × humano |
+| `#/dashboard` | Dashboard (Gestão) | Contato dentro do prazo, evolução por nível de atenção, funil de atenção, ranking de sinais, desfechos e operação |
 | `#/fila` | Fila de Atendimento | Lista em largura cheia; clicar abre o caso em tela cheia com anterior/próximo |
 | `#/alunos` | Base de Alunos | Diretório com ordenação, filtros compostos, paginação e export |
 | `#/alunos/:id` | Dossiê 360° | Identidade, score explicável, alertas, linha do tempo (aberto pela Base) |
 | `#/radares/:radar` | Radares | Definição, gatilhos, diretriz e precisão medida de cada radar |
 | `#/onboarding` | Onboarding 90 dias | Régua de acolhimento com funil de marcos |
 | `#/jornada` | Jornada por Modalidade | Funis e perfis de peso de Presencial / Híbrido / EaD |
-| `#/indicadores` | Indicadores | Tabelas executivas e as exportações em CSV / relatório |
+| `#/indicadores` | Indicadores | Cinco abas de tabelas executivas e as exportações em CSV / relatório |
 | `#/equipe` | Equipe | Estrutura matricial, carga real e roteamento por fila |
 | `#/playbook` | Playbook | Protocolos por radar com roteiro e "não fazer" |
 | `#/governanca` | Governança | Pesos, SLAs, janela de onboarding, freio, LGPD |

@@ -45,13 +45,23 @@ import { decimal, int } from '../../lib/format';
      · NENHUMA CHAMADA SAI DA ABA. Elas abriam a Fila de Atendimento, que é a
        ferramenta do atendente. Agora abrem o detalhe do indicador aqui mesmo.
 
-   O indicador protagonista continua sendo a TAXA DE ESTABILIZAÇÃO, e a escolha
-   é de dado, não de gosto: é o número que todos os outros da tela existem para
-   explicar, é genuinamente 0–100 (então a altura da coluna é honesta) e tem
-   denominador auditável. O Health Score médio seria o candidato óbvio e foi
-   descartado de propósito — o censo guarda FAIXAS, não uma média, e publicar
-   uma estimativa com o peso de uma medição é o começo de todo painel em que
-   ninguém confia.
+   O indicador protagonista é o CONTATO DENTRO DO PRAZO, e a escolha é de dado,
+   não de gosto: é genuinamente 0–100 (então a altura da coluna é honesta), tem
+   denominador auditável e — o critério que decidiu — os dois lados da fração
+   são registros do próprio sistema, o caso aberto aqui e o primeiro contato
+   carimbado aqui. Ele continua significando a mesma coisa no dia em que o censo
+   for substituído por dados reais.
+
+   Ele substituiu a TAXA DE ESTABILIZAÇÃO, que ocupava este lugar. A troca não
+   foi de forma: a estabilização creditava à operação a melhora de alunos sem
+   janela de observação declarada e sem grupo de controle, e alunos sinalizados
+   no pior momento melhoram em parte sozinhos. Um protagonista que atribui
+   mérito por correlação é o pior lugar possível para um erro desse tipo, porque
+   é o número que sai da tela e entra no slide.
+
+   O Health Score médio seria o candidato óbvio e segue descartado de propósito
+   — o censo guarda FAIXAS, não uma média, e publicar uma estimativa com o peso
+   de uma medição é o começo de todo painel em que ninguém confia.
    ========================================================================== */
 
 export function PulseHero({
@@ -61,13 +71,18 @@ export function PulseHero({
   device,
 }: {
   pulse: PulseModel;
-  /** A série diária da taxa de estabilização — as colunas atrás do vidro. */
+  /** A série diária da aderência ao prazo — as colunas atrás do vidro. */
   series: HeroColumn[];
   onOpenDrill: (key: DrillKey) => void;
   /** O aparelho. Injetado para que o hero não conheça o mockup. */
   device: React.ReactNode;
 }) {
   const { hero } = pulse;
+
+  /* Sem nenhum caso apurado na janela, a fração não existe. Imprimir "0,0%" aí
+     não é "não sei": é "nenhum contato chegou no prazo", que é uma acusação
+     contra a equipe fabricada por um denominador vazio. */
+  const hasSample = hero.denominator > 0;
 
   /* `items-stretch` e não `items-start`: o aparelho tem altura fixa (898pt) e a
      coluna da esquerda precisa acompanhá-la, senão sobram ~200px de vazio ao
@@ -84,13 +99,17 @@ export function PulseHero({
             <CrystalGlassCard
               columns={series}
               meterLabel={hero.label}
-              meterText={`${decimal(hero.value, 1)}% — ${int(hero.numerator)} de ${int(hero.denominator)} ${hero.denominatorLabel}`}
+              meterText={
+                hasSample
+                  ? `${decimal(hero.value, 1)}% — ${int(hero.numerator)} de ${int(hero.denominator)} ${hero.denominatorLabel}`
+                  : 'Sem caso apurado na janela selecionada'
+              }
               seriesLabel={`${hero.label} dia a dia nos últimos ${series.length} dias`}
               minHeight={392}
               className="h-full"
               footer={
                 <>
-                  <GlassPill onClick={() => onOpenDrill('estabilizacao')}>
+                  <GlassPill onClick={() => onOpenDrill('sla')}>
                     Do que ela é feita
                     <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
                   </GlassPill>
@@ -102,21 +121,42 @@ export function PulseHero({
             >
               <div className="flex items-start justify-between gap-2">
                 <GlassLabel>{hero.label}</GlassLabel>
-                <Hint label="a taxa de estabilização" align="right">
+                <Hint label="o contato dentro do prazo" align="right">
                   {hero.definition}
                 </Hint>
               </div>
 
-              <p className="mt-3 flex items-baseline gap-1">
-                <GlassValue>
-                  <AnimatedNumber value={hero.value} decimals={1} format={false} countUp={false} />
-                </GlassValue>
-                <span className="font-mono text-[22px] leading-none font-medium text-ink-2">%</span>
-              </p>
+              {hasSample ? (
+                <>
+                  <p className="mt-3 flex items-baseline gap-1">
+                    <GlassValue>
+                      <AnimatedNumber
+                        value={hero.value}
+                        decimals={1}
+                        format={false}
+                        countUp={false}
+                      />
+                    </GlassValue>
+                    <span className="font-mono text-[22px] leading-none font-medium text-ink-2">
+                      %
+                    </span>
+                  </p>
 
-              <p className="mt-3">
-                <HeroDelta deltaPP={hero.deltaPP} comparison={hero.comparison} />
-              </p>
+                  <p className="mt-3">
+                    <HeroDelta deltaPP={hero.deltaPP} comparison={hero.comparison} />
+                  </p>
+                </>
+              ) : (
+                <>
+                  <p className="mt-3">
+                    <GlassValue>—</GlassValue>
+                  </p>
+                  <p className="mt-3 text-[12px] leading-relaxed text-ink-3">
+                    Nenhum caso com desfecho apurado neste recorte. A taxa volta a existir quando o
+                    primeiro caso fechar.
+                  </p>
+                </>
+              )}
             </CrystalGlassCard>
 
             {/* `flex-1` em cada item para as três dividirem a altura do objeto
@@ -299,7 +339,7 @@ function priorityDrill(pulse: PulseModel): DrillKey {
     case 'fila':
       return 'intervencoes';
     default:
-      return 'estabilizacao';
+      return 'sla';
   }
 }
 
@@ -312,6 +352,6 @@ function priorityLabel(pulse: PulseModel): string {
     case 'fila':
       return 'Analisar as intervenções';
     default:
-      return 'Analisar a estabilização';
+      return 'Analisar o prazo de 1º contato';
   }
 }

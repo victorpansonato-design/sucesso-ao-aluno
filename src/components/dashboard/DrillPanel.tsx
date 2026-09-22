@@ -4,7 +4,7 @@ import type { PulseModel, SignalMovement } from '../../lib/pulse';
 import type { DrillKey } from './PulsePhoneApp';
 import { MetricSheet } from '../ui/MetricSheet';
 import type { MetricSheetContent } from '../ui/MetricSheet';
-import { outcomeColor, AUTOMATION_COLOR } from '../cockpit/palette';
+import { outcomeColor } from '../cockpit/palette';
 import { decimal, int, percent } from '../../lib/format';
 
 /* ==========================================================================
@@ -50,48 +50,9 @@ function buildDrill(
   pulse: PulseModel,
   signals: SignalMovement[],
 ): MetricSheetContent {
-  const { cases, base, operations, automation, bands } = snapshot;
+  const { cases, base, operations, bands } = snapshot;
 
   switch (key) {
-    case 'estabilizacao': {
-      const o = operations.outcomes;
-      const total = Math.max(1, o.received);
-      return {
-        eyebrow: `Taxa de estabilização · ${pulse.windowLabel.toLowerCase()}`,
-        title: 'Do que a estabilização é feita',
-        value: `${decimal(pulse.hero.value, 1)}%`,
-        denominator: (
-          <>
-            <span className="font-mono font-semibold text-ink tabular">
-              {int(pulse.hero.numerator)}
-            </span>{' '}
-            {pulse.hero.numeratorLabel} ÷{' '}
-            <span className="font-mono font-semibold text-ink tabular">
-              {int(pulse.hero.denominator)}
-            </span>{' '}
-            {pulse.hero.denominatorLabel}. Casos ainda em acompanhamento ficam fora do
-            denominador — eles não terminaram.
-          </>
-        ),
-        rowsLabel: 'Composição dos desfechos',
-        rows: OUTCOMES.map((out) => ({
-          key: out.key,
-          label: out.label,
-          value: o.counts[out.key],
-          percent: (o.counts[out.key] / total) * 100,
-          color: outcomeColor(out.key, false),
-          meaning: out.meaning,
-        })),
-        reading: (
-          <>
-            A taxa mede o que a operação CONSEGUIU RESOLVER, não o quanto ela trabalhou. Volume
-            alto com estabilização baixa significa que a equipe está ocupada com casos que voltam
-            — e o lugar de olhar é a linha "Risco mantido", não o total de intervenções.
-          </>
-        ),
-      };
-    }
-
     case 'alto-risco': {
       const total = Math.max(1, cases.highRisk);
       return {
@@ -202,20 +163,21 @@ function buildDrill(
 
     case 'sla': {
       return {
-        eyebrow: 'Prazo de primeiro contato',
-        title: 'Aderência ao SLA na janela',
+        eyebrow: `Contato dentro do prazo · ${pulse.windowLabel.toLowerCase()}`,
+        title: 'Do que a aderência é feita',
         value: `${decimal(operations.slaAdherence, 1)}%`,
         denominator: (
           <>
             <span className="font-mono font-semibold text-ink tabular">
               {int(operations.inSla)}
             </span>{' '}
-            no prazo ÷{' '}
+            contatados no prazo ÷{' '}
             <span className="font-mono font-semibold text-ink tabular">
-              {int(operations.received)}
+              {int(operations.concluded)}
             </span>{' '}
-            casos recebidos. O prazo é contado em horas úteis e varia por radar, conforme
-            Governança.
+            casos com desfecho apurado. O prazo é contado em horas úteis e varia por radar,
+            conforme Governança. Os <span className="font-mono tabular">{int(operations.pending)}</span>{' '}
+            ainda em acompanhamento ficam fora do denominador — o prazo deles não venceu.
           </>
         ),
         rowsLabel: `Recebidos por ${operations.granularity === 'diária' ? 'dia' : 'semana'}`,
@@ -256,8 +218,8 @@ function buildDrill(
             <span className="font-mono font-semibold text-ink tabular">
               {int(operations.pending)}
             </span>{' '}
-            ainda em acompanhamento. O resultado da operação é a taxa de estabilização, não este
-            total.
+            ainda em acompanhamento. Este total é esforço: ele mede quantos contatos a equipe
+            abriu, e nada sobre o que aconteceu depois.
           </>
         ),
         rowsLabel: 'Desfecho de cada intervenção',
@@ -272,64 +234,8 @@ function buildDrill(
         reading: (
           <>
             Este é o indicador mais fácil de melhorar e o menos útil de comemorar: basta abrir mais
-            casos. Ele só ganha significado ao lado da estabilização — subir os dois é operação
-            escalando; subir só este é equipe ocupada.
-          </>
-        ),
-      };
-    }
-
-    case 'automacao': {
-      const total = Math.max(1, automation.freshmen);
-      return {
-        eyebrow: 'Régua de ingressantes',
-        title: 'Quanto a régua resolve sem uma pessoa',
-        value: `${decimal(100 - automation.humanPercent, 1)}%`,
-        denominator: (
-          <>
-            <span className="font-mono font-semibold text-ink tabular">
-              {int(automation.handledWithoutHuman)}
-            </span>{' '}
-            de{' '}
-            <span className="font-mono font-semibold text-ink tabular">
-              {int(automation.freshmen)}
-            </span>{' '}
-            ingressantes na janela de 90 dias seguem sem intervenção humana. Cada ponto que sai
-            desta conta é uma ligação que a equipe não precisou fazer.
-          </>
-        ),
-        rowsLabel: 'Como a régua terminou',
-        rows: [
-          {
-            key: 'auto',
-            label: 'Automático concluído',
-            value: automation.auto,
-            percent: (automation.auto / total) * 100,
-            color: AUTOMATION_COLOR.auto,
-            meaning: 'A régua cumpriu o ciclo e o aluno não precisou de contato humano.',
-          },
-          {
-            key: 'pending',
-            label: 'Pendência na régua',
-            value: automation.pending,
-            percent: (automation.pending / total) * 100,
-            color: AUTOMATION_COLOR.pending,
-            meaning: 'Ainda dentro da janela, com passo automático em aberto.',
-          },
-          {
-            key: 'human',
-            label: 'Intervenção humana',
-            value: automation.human,
-            percent: (automation.human / total) * 100,
-            color: AUTOMATION_COLOR.human,
-            meaning: 'A automação não resolveu e o caso escalou para uma pessoa.',
-          },
-        ],
-        reading: (
-          <>
-            Automatizar o normal, detectar o desvio, humanizar a exceção. A fatia que a operação
-            quer MENOR é a última — mas zero não é a meta: uma régua que nunca escala é uma régua
-            que não está detectando nada.
+            casos. Ele existe como denominador e como medida de carga da equipe — não como
+            resultado. A composição abaixo diz onde esse esforço foi parar.
           </>
         ),
       };

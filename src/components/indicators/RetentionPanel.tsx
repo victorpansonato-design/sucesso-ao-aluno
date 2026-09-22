@@ -59,7 +59,15 @@ export function RetentionPanel({ model }: { model: IndicatorsModel }) {
 
   return (
     <div className="space-y-5">
-      <div className="grid gap-3 sm:grid-cols-2">
+      {/* Um indicador, não dois. O segundo era "Receita preservada", em reais:
+          mensalidade × 6 parcelas × períodos restantes de cada caso retido. Ele
+          presumia que todo retido sairia com certeza e concluiria o curso
+          inteiro, sobre um punhado de casos — e, em reais numa aba executiva,
+          era lido como caixa por quem vê o número fora da tela. Retenção volta a
+          ser medida em casos e pessoas, que é a unidade que a operação produz.
+          A conversão para dinheiro é trabalho do financeiro, com as premissas
+          dele. */}
+      <div className="grid gap-3">
         <RateStat
           label="Taxa de reversão"
           value={model.reversionRate}
@@ -95,32 +103,6 @@ export function RetentionPanel({ model }: { model: IndicatorsModel }) {
           }
         />
 
-        <RateStat
-          label="Receita preservada"
-          value={model.preservedRevenue}
-          format="money"
-          emptyReason="nenhum caso retido no ciclo"
-          denominator={
-            <>
-              exposição evitada em{' '}
-              <span className="font-mono font-medium text-ink tabular">
-                {int(model.preservedRevenueBasis)}
-              </span>{' '}
-              caso(s) retido(s)
-            </>
-          }
-          definition={
-            <>
-              <strong className="font-semibold text-ink">
-                Estimativa de exposição evitada, não caixa realizado.
-              </strong>{' '}
-              Para cada caso retido: mensalidade × 6 parcelas × períodos restantes até a formatura.
-              O número responde "quanto deixaríamos de faturar se estes alunos saíssem agora" —
-              não "quanto entrou no caixa". Ele não considera inadimplência futura, bolsas,
-              transferência interna nem reajuste.
-            </>
-          }
-        />
       </div>
 
       <div className="grid gap-5 lg:grid-cols-[minmax(0,340px)_minmax(0,1fr)]">

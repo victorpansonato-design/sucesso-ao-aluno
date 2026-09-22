@@ -13,7 +13,7 @@ import { Hint } from '../ui/Hint';
 import { PieCard } from '../cockpit/PieCard';
 import { RateStat } from './shared';
 import { Reveal, RevealGroup, RevealItem } from '../ui/Reveal';
-import { decimal, int, money, percent } from '../../lib/format';
+import { decimal, int, percent } from '../../lib/format';
 
 /* ==========================================================================
    Visão executiva
@@ -44,7 +44,16 @@ import { decimal, int, money, percent } from '../../lib/format';
    (`IndicatorsHeader`), onde é lido antes do primeiro número em vez de depois.
    ========================================================================== */
 
-type Sheet = 'reversao' | 'sla' | 'health' | 'receita' | 'risco';
+/**
+ * As gavetas que esta tela abre.
+ *
+ * Eram cinco — `reversao`, `sla`, `health`, `receita` e `risco` —, e três delas
+ * não tinham nenhum caminho de abertura: só a placa de vidro da taxa de reversão
+ * e o ranking de cursos chamavam `setSheet`. Os outros três `case` eram ramos
+ * inalcançáveis do `switch`, com conteúdo escrito e mantido para uma gaveta que
+ * ninguém conseguia abrir. Saíram junto com o indicador de receita preservada.
+ */
+type Sheet = 'reversao' | 'risco';
 
 export function ExecutivePanel({ model, dark }: { model: IndicatorsModel; dark: boolean }) {
   const [sheet, setSheet] = useState<Sheet | null>(null);
@@ -248,30 +257,42 @@ export function ExecutivePanel({ model, dark }: { model: IndicatorsModel; dark: 
             }
           />
 
+          {/* Este slot era a "Receita preservada", em reais. Ela saiu: a fórmula
+              — mensalidade × 6 parcelas × períodos restantes — presumia que todo
+              caso retido sairia com certeza e concluiria o curso inteiro, e com
+              um punhado de casos no denominador um único caso movia o total em
+              centenas de milhares. Um valor em reais numa aba executiva é lido
+              como caixa por quem o vê fora desta tela, e nenhuma nota de rodapé
+              desfaz isso.
+
+              No lugar entrou o tempo até o primeiro contato, que estava escondido
+              como detalhe do cartão de SLA. Ele merece o posto: é a medida mais
+              acionável desta faixa — aderência diz se o prazo foi cumprido,
+              enquanto a média em horas diz com que folga, e é ela que avisa que
+              o SLA vai estourar antes de estourar. */}
           <RateStat
-            label="Receita preservada"
-            value={model.preservedRevenue}
-            format="money"
-            emptyReason="nenhum caso retido no ciclo"
+            label="Tempo até o 1º contato"
+            value={model.avgFirstContactHours}
+            suffix=" h"
+            decimals={1}
+            emptyReason="nenhum caso com primeiro contato registrado no recorte"
             denominator={
               <>
-                exposição evitada de{' '}
+                média de{' '}
                 <span className="font-mono font-medium text-ink tabular">
-                  {int(model.preservedRevenueBasis)}
+                  {int(model.firstContactSample)}
                 </span>{' '}
-                caso(s) retido(s)
+                caso(s) com primeiro contato registrado
               </>
             }
             definition={
               <>
-                <strong className="font-semibold text-ink">
-                  Estimativa de exposição evitada, não caixa realizado.
-                </strong>{' '}
-                Fórmula: mensalidade do aluno × 6 parcelas por período × períodos restantes até a
-                formatura, somada sobre os casos encerrados como acordo firmado. A conta fica
-                declarada porque um número institucional só é útil quando pode ser defendido em
-                reunião — e porque ele responde "quanto deixaríamos de faturar se estes alunos
-                saíssem", não "quanto entrou".
+                Horas <strong className="font-semibold text-ink">úteis</strong> entre a abertura do
+                caso e o primeiro contato humano registrado. Casos sem contato registrado ficam
+                fora da média — eles não têm tempo a medir, e incluí-los como zero faria a operação
+                parecer mais rápida justamente quando falhou em alcançar o aluno. Leia junto da
+                aderência acima: a aderência diz se o prazo foi cumprido, este número diz com que
+                folga.
               </>
             }
           />
@@ -466,132 +487,6 @@ function buildSheet(sheet: Sheet, model: IndicatorsModel): MetricSheetContent {
           </>
         ),
       };
-
-    case 'sla':
-      return {
-        eyebrow: 'Aderência ao SLA',
-        title: 'Onde o prazo está sendo perdido',
-        value: model.slaAdherence === null ? '—' : `${decimal(model.slaAdherence, 1)}%`,
-        denominator: (
-          <>
-            <span className="font-mono font-semibold text-ink tabular">
-              {int(model.slaDenominator - model.breached.length)}
-            </span>{' '}
-            no prazo ÷{' '}
-            <span className="font-mono font-semibold text-ink tabular">
-              {int(model.slaDenominator)}
-            </span>{' '}
-            casos do recorte. O prazo é contado em horas úteis e varia por radar.
-          </>
-        ),
-        rowsLabel: 'Estouros por radar',
-        rows: model.radars
-          .filter((r) => r.totalCases > 0)
-          .map((r) => ({
-            key: r.key,
-            label: `${r.label} · SLA ${r.slaHours}h`,
-            value: r.totalCases,
-            percent: (r.openCases / Math.max(1, r.totalCases)) * 100,
-            color: 'var(--warn)',
-            meaning: `${int(r.openCases)} em aberto de ${int(r.totalCases)} casos`,
-          })),
-        emptyRows: 'Nenhum radar com caso na amostra.',
-        reading: (
-          <>
-            Aderência é uma TAXA, e um radar com dois casos e um estouro aparece pior que um radar
-            com quarenta e três. A leitura útil é cruzar esta lista com a aba Qualidade dos radares:
-            radar com SLA curto e precisão baixa gera estouro por desenho, não por falta de gente —
-            e o conserto é o prazo em Governança, não a escala do turno.
-          </>
-        ),
-      };
-
-    case 'health':
-      return {
-        eyebrow: 'Health Score médio',
-        title: 'A distribuição por trás da média',
-        value: model.avgHealthScore === null ? '—' : int(model.avgHealthScore),
-        denominator: (
-          <>
-            Média aritmética de{' '}
-            <span className="font-mono font-semibold text-ink tabular">
-              {int(model.sampleSize)}
-            </span>{' '}
-            alunos da amostra no recorte atual. É a média da AMOSTRA, não da instituição — o censo
-            guarda faixas, não uma média.
-          </>
-        ),
-        rowsLabel: 'Alunos por faixa de Health Score',
-        rows: model.distribution.map((d) => ({
-          key: d.status,
-          label: `${d.label} (${d.range[0]}–${d.range[1]})`,
-          value: d.count,
-          percent: d.percent,
-          color: d.hex(false),
-        })),
-        emptyRows: 'Sem alunos da amostra neste recorte.',
-        reading: (
-          <>
-            Uma média esconde a forma da distribuição, e é a forma que decide a ação. Duas amostras
-            com a mesma média de 68 pedem trabalhos opostos: uma concentrada em torno de 68 é uma
-            base homogênea que sobe com programa geral; uma dividida entre 90 e 40 é duas
-            populações no mesmo relatório, e tratá-las com a mesma régua desperdiça as duas.
-          </>
-        ),
-      };
-
-    case 'receita':
-      return {
-        eyebrow: 'Receita preservada',
-        title: 'A exposição que deixou de acontecer',
-        value: money(model.preservedRevenue),
-        denominator: (
-          <>
-            Somatório sobre{' '}
-            <span className="font-mono font-semibold text-ink tabular">
-              {int(model.preservedRevenueBasis)}
-            </span>{' '}
-            caso(s) encerrado(s) como acordo firmado. Fórmula: mensalidade × 6 parcelas por período
-            × períodos restantes até a formatura.
-          </>
-        ),
-        rowsLabel: 'Motivos registrados nos casos encerrados',
-        /* `EvasionRow` é uma linha de EXPORTAÇÃO: ela vem quebrada por curso,
-           campus, modalidade e motivo, sem percentual. Agregar por motivo aqui
-           é o que a torna legível como composição — e o percentual é calculado
-           sobre o total agregado, não sobre o total de casos, porque um caso
-           sem motivo registrado não pertence a este denominador. */
-        rows: (() => {
-          const byReason = new Map<string, number>();
-          for (const row of model.evasion) {
-            byReason.set(row.reason, (byReason.get(row.reason) ?? 0) + row.count);
-          }
-          const total = Math.max(
-            1,
-            [...byReason.values()].reduce((sum, n) => sum + n, 0),
-          );
-          return [...byReason.entries()]
-            .sort((a, b) => b[1] - a[1])
-            .map(([reason, count]) => ({
-              key: reason,
-              label: reason,
-              value: count,
-              percent: (count / total) * 100,
-              color: 'var(--risk)',
-            }));
-        })(),
-        emptyRows: 'Nenhum caso encerrado com motivo registrado.',
-        reading: (
-          <>
-            <strong className="font-semibold text-ink">Este número não é caixa.</strong> Ele é a
-            exposição que a instituição deixou de correr, e por isso vale para dimensionar o retorno
-            do Centro de Sucesso — nunca para projetar faturamento. Apresentá-lo como receita numa
-            reunião de orçamento é o caminho mais curto para o indicador ser desqualificado inteiro
-            na reunião seguinte.
-          </>
-        ),
-      };
-
     case 'risco':
       return {
         eyebrow: 'Concentração de risco',

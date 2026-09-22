@@ -23,17 +23,26 @@ import type { EvasionRow } from './exporters';
    métrica. Uma taxa de reversão que muda de valor conforme a aba é o fim da
    utilidade de um painel executivo.
 
-   Duas correções de fundo entraram nesta extração, e as duas são sobre não
-   apresentar ausência de medida como medida:
+   A regra de fundo do módulo é não apresentar ausência de medida como medida:
+   `avgHealthScore` é `number | null` porque era `0` quando o escopo não tinha
+   aluno, e a tela imprimia `Health Score médio 0/100` — que não é "não sei", é
+   "a base está no chão". Onde não há amostra, o modelo devolve `null` e a tela
+   escreve "sem amostra no recorte".
 
-     1. `avgHealthScore` é `number | null`. Era `0` quando o escopo não tinha
-        aluno, e a tela imprimia `Health Score médio 0/100` — que não é "não
-        sei", é "a base está no chão". Onde não há amostra, o modelo devolve
-        `null` e a tela escreve "sem amostra no recorte".
-     2. `precision` de radar já era `null` sem julgamento, mas a tela chamava
-        isso de "sem verdicto", o que lê como falha do radar. É amostra
-        insuficiente, e o modelo agora carrega essa distinção em
-        `precisionState` para que a tela não precise inferi-la.
+   DOIS INDICADORES SAÍRAM DAQUI, e o motivo não é técnico:
+
+     · PRECISÃO DOS RADARES (`confirmados ÷ julgados`) dependia de o especialista
+       julgar cada alerta como confirmado ou descartado. Enquanto esse julgamento
+       for uma ação lateral, e não um campo obrigatório do encerramento, a base
+       julgada fica em punhado — a métrica vivia permanentemente em "amostra
+       insuficiente" e a aba inteira que a exibia foi removida. Quando o
+       julgamento entrar no fluxo de fechar o caso, ela volta com sentido.
+     · RECEITA PRESERVADA era `mensalidade × 6 × períodos restantes` dos casos
+       retidos. Presumia que cada retido sairia com certeza e concluiria todos os
+       períodos que faltam, sobre um punhado de casos — um caso a mais movia o
+       número em centenas de milhares. Em reais, numa aba executiva, isso é lido
+       como caixa. Retenção continua medida em casos e pessoas, que é a unidade
+       que a operação de fato produz.
 
    Um ponto que o modelo deixa explícito de propósito, porque era a maior
    inconsistência real do produto: TODA MÉTRICA DAQUI VEM DA AMOSTRA
@@ -44,22 +53,14 @@ import type { EvasionRow } from './exporters';
    Score médio" é a média da instituição.
    ========================================================================== */
 
-export interface RadarStat {
+/**
+ * Volume de casos por radar. É o que sobrou da antiga `RadarStat` depois que a
+ * precisão saiu: contagem de casos, que o sistema produz sozinho, sem nenhum
+ * campo que dependa de alguém julgar alerta por alerta.
+ */
+export interface RadarVolume {
   key: RadarKey;
   label: string;
-  slaHours: number;
-  alerts: number;
-  confirmed: number;
-  rejected: number;
-  judged: number;
-  pending: number;
-  /** `null` quando nenhum alerta foi julgado. Nunca 0 por ausência de dado. */
-  precision: number | null;
-  /**
-   * Por que a precisão está ausente ou o que ela significa. Existe para que a
-   * tela não trate "ninguém julgou ainda" como "o radar errou".
-   */
-  precisionState: 'ok' | 'insufficient';
   openCases: number;
   closedCases: number;
   totalCases: number;
@@ -125,11 +126,9 @@ export interface IndicatorsModel {
   reversionDenominator: number;
   caseEndings: OutcomeRow[];
   evasion: EvasionRow[];
-  preservedRevenue: number;
-  preservedRevenueBasis: number;
 
   /* -- Radares ----------------------------------------------------------- */
-  radars: RadarStat[];
+  radarVolume: RadarVolume[];
 
   /* -- Equipe ------------------------------------------------------------ */
   team: TeamRow[];
@@ -186,7 +185,14 @@ export function indicatorsModel({
 
   const openCases = scopedCases.filter((c) => isOpen(c.status));
   const closedCases = scopedCases.filter((c) => isTerminal(c.status));
-  const breached = openCases.filter((c) => slaStatus(c, now).state === 'breach');
+  /* A janela de atendimento vem de Governança, e não do padrão do módulo de SLA.
+     Passar `settings.businessHours` aqui é o que faz a configuração valer também
+     para a contagem de estouros desta tela: sem isso, um gestor que estreitasse
+     a janela veria o SLA da fila mudar e o indicador de "SLA estourado" ficar
+     parado, medindo uma jornada que a instituição não pratica mais. */
+  const breached = openCases.filter(
+    (c) => slaStatus(c, now, settings.businessHours).state === 'breach',
+  );
   const reopened = cases.filter((c) => c.reopenCount > 0);
 
   const slaDenominator = openCases.length + closedCases.length;
@@ -267,42 +273,14 @@ export function indicatorsModel({
     percent: cases.length > 0 ? (row.value / cases.length) * 100 : 0,
   }));
 
-  /* Receita preservada: mensalidade × 6 parcelas × períodos restantes dos
-     retidos. A fórmula fica declarada porque um número institucional só é útil
-     quando pode ser defendido em reunião — e porque ele é EXPOSIÇÃO EVITADA,
-     não caixa realizado. `preservedRevenueBasis` é quantos casos entraram na
-     conta, para que o valor nunca apareça sem o seu denominador. */
-  let preservedRevenue = 0;
-  let preservedRevenueBasis = 0;
-  for (const c of retained) {
-    const student = students.find((s) => s.id === c.studentId);
-    if (!student) continue;
-    const remainingPeriods = Math.max(1, student.totalPeriods - student.period + 1);
-    preservedRevenue += student.financial.monthlyFee * 6 * remainingPeriods;
-    preservedRevenueBasis += 1;
-  }
-
   /* -- Radares ----------------------------------------------------------- */
 
-  const radars: RadarStat[] = RADAR_ORDER.map((key) => {
-    const alerts = students.flatMap((s) => s.alerts.filter((a) => a.radar === key));
-    const confirmed = alerts.filter((a) => a.review === 'confirmado').length;
-    const rejected = alerts.filter((a) => a.review === 'descartado').length;
-    const judged = confirmed + rejected;
+  const radarVolume: RadarVolume[] = RADAR_ORDER.map((key) => {
     const openForRadar = cases.filter((c) => c.radar === key && isOpen(c.status)).length;
     const closedForRadar = cases.filter((c) => c.radar === key && isTerminal(c.status)).length;
-
     return {
       key,
       label: RADARS[key].shortLabel,
-      slaHours: settings.slaHours[key],
-      alerts: alerts.length,
-      confirmed,
-      rejected,
-      judged,
-      pending: alerts.length - judged,
-      precision: judged > 0 ? (confirmed / judged) * 100 : null,
-      precisionState: judged > 0 ? 'ok' : 'insufficient',
       openCases: openForRadar,
       closedCases: closedForRadar,
       totalCases: openForRadar + closedForRadar,
@@ -349,9 +327,7 @@ export function indicatorsModel({
     reversionDenominator,
     caseEndings,
     evasion: evasionBreakdown(cases, students),
-    preservedRevenue,
-    preservedRevenueBasis,
-    radars,
+    radarVolume,
     team,
   };
 }

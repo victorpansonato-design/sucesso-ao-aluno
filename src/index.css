@@ -1513,3 +1513,35 @@
     display: none;
   }
 }
+
+/* ---------------------------------------------------------------------------
+ * Troca de tema: revelacao circular
+ *
+ * O snapshot do tema novo entra por cima do antigo e e recortado por um circulo
+ * que cresce a partir do botao de tema (a animacao do clip-path e montada em
+ * AppContext, que conhece as coordenadas do clique). O cross-fade padrao da
+ * View Transitions API e desligado: a borda do circulo tem de ser limpa, sem
+ * dissolvencia por baixo.
+ * ------------------------------------------------------------------------ */
+
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation: none;
+  mix-blend-mode: normal;
+}
+
+::view-transition-old(root) {
+  z-index: 0;
+}
+
+::view-transition-new(root) {
+  z-index: 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-group(root),
+  ::view-transition-old(root),
+  ::view-transition-new(root) {
+    animation: none !important;
+  }
+}

@@ -30,10 +30,7 @@ import { AttentionFunnel } from '../components/dashboard/AttentionFunnel';
 import { SignalRanking } from '../components/dashboard/SignalRanking';
 import { OutcomeComposition } from '../components/dashboard/OutcomeComposition';
 import { EvolutionPanel } from '../components/cockpit/EvolutionPanel';
-import { JourneyPanel } from '../components/cockpit/JourneyPanel';
 import { InterventionsPanel } from '../components/cockpit/OperationPanels';
-import { PieCard } from '../components/cockpit/PieCard';
-import { AUTOMATION_COLOR } from '../components/cockpit/palette';
 import { decimal, int } from '../lib/format';
 
 /* ==========================================================================
@@ -56,7 +53,7 @@ import { decimal, int } from '../lib/format';
                       pergunta que ninguém fez (ver `KpiStrip`).
      NÚCLEO           uma visualização dominante (evolução) e três módulos
                       auxiliares que trocaram donut por forma adequada.
-     ABAIXO DA DOBRA  operação e automação, que são leitura de apoio.
+     ABAIXO DA DOBRA  a operação, que é leitura de apoio.
 
    A REGRA QUE GOVERNA ESTA TELA NESTA VERSÃO: NADA SAI DA ABA.
 
@@ -72,8 +69,8 @@ import { decimal, int } from '../lib/format';
    que o abriu. As duas únicas exceções são a Base de Alunos e o botão de
    limpar filtros, que não são aprofundamento e sim outra tarefa.
 
-   Nenhum indicador foi removido em nenhuma das reorganizações. O que mudou foi
-   peso, forma e nome — e três nomes mudaram porque estavam errados:
+   Até esta versão, nenhuma reorganização tinha REMOVIDO indicador: mudavam peso,
+   forma e nome. Três nomes mudaram porque estavam errados, e continuam assim:
 
      · "Em atenção" virou "Casos em atenção humana", porque 163 são casos e
        1.741 são alunos numa faixa de score, e a tela mostrava os dois sem
@@ -82,6 +79,22 @@ import { decimal, int } from '../lib/format';
        chamada "Alto risco" tem 605 alunos e o indicador tinha 30 casos.
      · O donut de sinais virou ranking de variação, porque cinco arcos de
        tamanho parecido não respondem "o que mudou?".
+
+   -- O QUE ESTA VERSÃO TIROU ---------------------------------------------
+
+   O critério foi um só: um indicador fica se o próprio sistema produz os dois
+   lados da conta e se ele não atribui mérito por correlação.
+
+     · A TAXA DE ESTABILIZAÇÃO deixou de ser a protagonista e saiu do produto.
+       No lugar entrou CONTATO DENTRO DO PRAZO — ver `PulseHero` para o
+       argumento inteiro.
+     · O FUNIL DE JORNADA e a pizza AUTOMAÇÃO × INTERVENÇÃO HUMANA saíram da
+       tela. Os dois medem a régua de ingressantes, que depende de data de
+       matrícula, turma e presença no primeiro dia — dados que hoje não existem
+       em nenhum sistema da instituição (ver `docs/comportamentos-do-aluno.md`).
+       Eles não foram apagados do produto: a régua dos 90 dias continua inteira
+       em `#/onboarding`, que é a tela de quem opera o acolhimento. O que saiu
+       foi a promessa, na aba da diretoria, de que aquilo já está medido.
    ========================================================================== */
 
 /** Tradução de um degrau do funil para o painel que o explica. */
@@ -338,33 +351,14 @@ export function DashboardView(_props: { actions: ShellActions }) {
       definition: (
         <>
           Contatos humanos abertos na janela{' '}
-          <strong className="font-semibold text-ink">{meta.label.toLowerCase()}</strong>. Volume não
-          é resultado: {int(snapshot.operations.concluded)} tiveram desfecho apurado e{' '}
-          {int(snapshot.operations.pending)} seguem em acompanhamento. A taxa de
-          estabilização no alto da página é o resultado.
+          <strong className="font-semibold text-ink">{meta.label.toLowerCase()}</strong>. Volume é
+          esforço, não resultado: {int(snapshot.operations.concluded)} tiveram desfecho apurado e{' '}
+          {int(snapshot.operations.pending)} seguem em acompanhamento. O indicador no alto da
+          página diz quantos desses contatos chegaram dentro do prazo.
         </>
       ),
     },
   ];
-
-  const automationSlices = useMemo(() => {
-    const a = snapshot.automation;
-    return [
-      { key: 'auto', label: 'Automático concluído', value: a.auto, color: AUTOMATION_COLOR.auto },
-      {
-        key: 'pending',
-        label: 'Pendência na régua',
-        value: a.pending,
-        color: AUTOMATION_COLOR.pending,
-      },
-      {
-        key: 'human',
-        label: 'Intervenção humana',
-        value: a.human,
-        color: AUTOMATION_COLOR.human,
-      },
-    ];
-  }, [snapshot.automation]);
 
   return (
     <motion.div
@@ -477,50 +471,16 @@ export function DashboardView(_props: { actions: ShellActions }) {
             </div>
           </Reveal>
 
-          {/* 4 — Jornada. Os dois trilhos abrem o painel correspondente: o de
-              entrada é a régua de ingressantes, o da base é a composição. */}
-          <Reveal>
-            <JourneyPanel
-              stages={snapshot.journey}
-              focusLabel={activeFocus}
-              onOpenTrack={(track) => openDrill(track === 'entrada' ? 'automacao' : 'atencao')}
-            />
-          </Reveal>
-
-          {/* 5 — Leitura de apoio, abaixo da dobra. */}
+          {/* 4 — Leitura de apoio, abaixo da dobra. */}
           <Reveal>
             <div className="space-y-3">
-              <SectionLabel>Operação e automação</SectionLabel>
-              <div className="grid items-start gap-5 xl:grid-cols-[minmax(0,1fr)_360px]">
-                <InterventionsPanel
-                  operations={snapshot.operations}
-                  period={period}
-                  actionLabel="Ver os desfechos"
-                  onOpenQueue={() => openDrill('intervencoes')}
-                />
-
-                <PieCard
-                  title="Automação × intervenção humana"
-                  subtitle="Automatizar o normal, detectar o desvio, humanizar a exceção — medido."
-                  slices={automationSlices}
-                  centerValue={snapshot.automation.freshmen}
-                  centerLabel="ingressantes"
-                  emptyMessage="Nenhum ingressante no escopo. A régua só existe dentro da janela de 90 dias."
-                  footer={
-                    <>
-                      <span className="font-mono font-medium text-ink tabular">
-                        {decimal(100 - snapshot.automation.humanPercent, 1)}%
-                      </span>{' '}
-                      da régua segue sem uma pessoa, sobre{' '}
-                      <span className="font-mono tabular">
-                        {int(snapshot.automation.freshmen)}
-                      </span>{' '}
-                      ingressantes na janela. Cada ponto que sai desta conta é uma ligação que a
-                      equipe não precisou fazer.
-                    </>
-                  }
-                />
-              </div>
+              <SectionLabel>Operação</SectionLabel>
+              <InterventionsPanel
+                operations={snapshot.operations}
+                period={period}
+                actionLabel="Ver os desfechos"
+                onOpenQueue={() => openDrill('intervencoes')}
+              />
             </div>
           </Reveal>
 

@@ -61,18 +61,3 @@ export const SIGNAL_COLOR = {
   idle: 'var(--ink-3)',
   active: 'var(--brand)',
 } as const;
-
-/**
- * Régua de onboarding: automático → pendência → humano.
- *
- * A fatia "humano" era azul institucional, e isso gastava o azul num sliver de
- * 6% enquanto a tela já tinha o seu único elemento azul no indicador de
- * estabilização. Aqui a rampa é a mesma dos outros gráficos — tinta para o caso
- * normal, âmbar para "a automação ainda está tentando", vermelho para "escalou
- * para uma pessoa". Não é juízo moral: é a fatia que a operação quer menor.
- */
-export const AUTOMATION_COLOR = {
-  auto: 'var(--ink-3)',
-  pending: 'var(--warn)',
-  human: 'var(--crit)',
-} as const;
