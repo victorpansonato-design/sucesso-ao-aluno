@@ -6,8 +6,7 @@
     <title>Atendimento · UniAnchieta</title>
     <meta name="description" content="Central de atendimento UniAnchieta — protótipo estático." />
 
-    <meta name="theme-color" content="#f3f4f6" media="(prefers-color-scheme: light)" />
-    <meta name="theme-color" content="#0c0d0f" media="(prefers-color-scheme: dark)" />
+    <meta name="theme-color" content="#f3f4f6" id="theme-color" />
 
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -16,17 +15,26 @@
       rel="stylesheet"
     />
 
-    <!-- Pré-pintura do tema (DESIGN_SYSTEM §9): sem isto o app pisca a paleta errada. -->
+    <!-- Pré-pintura do tema (DESIGN_SYSTEM §9): sem isto o app pisca a paleta errada.
+         Temas: claro · nevoa · grafite · marinho. O valor antigo "dark" vira grafite. -->
     <script>
       (function () {
+        var CANVAS = { claro: '#f3f4f6', nevoa: '#d9e1ec', grafite: '#121315', marinho: '#0d1522' };
+        var theme = 'claro';
         try {
-          var stored = localStorage.getItem('atendimento.v1.theme');
-          var theme = stored === 'dark' || stored === '"dark"' ? 'dark' : 'light';
-          document.documentElement.classList.toggle('dark', theme === 'dark');
-          document.documentElement.style.colorScheme = theme;
+          var stored = (localStorage.getItem('atendimento.v1.theme') || '').replace(/"/g, '');
+          if (stored === 'dark') stored = 'grafite';
+          if (CANVAS[stored]) theme = stored;
         } catch (e) {
           /* storage indisponível — cai no claro */
         }
+        var dark = theme === 'grafite' || theme === 'marinho';
+        var root = document.documentElement;
+        root.classList.toggle('dark', dark);
+        root.setAttribute('data-theme', theme);
+        root.style.colorScheme = dark ? 'dark' : 'light';
+        var meta = document.getElementById('theme-color');
+        if (meta) meta.setAttribute('content', CANVAS[theme]);
       })();
     </script>
 

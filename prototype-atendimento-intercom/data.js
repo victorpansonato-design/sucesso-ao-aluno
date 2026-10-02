@@ -17,6 +17,16 @@
   function ahead(min) {
     return NOW + min * 60000;
   }
+  /** n dias úteis à frente, no fim do expediente — prazo de Ouvidoria. */
+  function aheadBusiness(n) {
+    var d = new Date(NOW);
+    while (n > 0) {
+      d.setDate(d.getDate() + 1);
+      if (d.getDay() !== 0 && d.getDay() !== 6) n--;
+    }
+    d.setHours(18, 0, 0, 0);
+    return d.getTime();
+  }
 
   /* ======================================================================
      Equipe
@@ -40,6 +50,7 @@
     { id: 'a-thiago', name: 'Thiago Nunes Prado', initials: 'TP', role: 'Suporte digital', team: 'Suporte', presence: 'ausente', open: 3, capacity: 8, frt: 5.6 },
     { id: 'a-juliane', name: 'Juliane Okamoto', initials: 'JO', role: 'Pós-graduação e EAD', team: 'Pós & EAD', presence: 'online', open: 6, capacity: 8, frt: 7.9 },
     { id: 'a-rafael', name: 'Rafael Antunes Lima', initials: 'RL', role: 'Coordenação de curso', team: 'Coordenação', presence: 'offline', open: 2, capacity: 6, frt: 18.3 },
+    { id: 'a-helena', name: 'Helena Martins Castro', initials: 'HC', role: 'Ouvidoria', team: 'Ouvidoria', presence: 'online', open: 4, capacity: 8, frt: 9.2 },
   ];
   ME.open = 6;
   ME.capacity = 10;
@@ -58,7 +69,12 @@
     { id: 'pos-ead', name: 'Pós & EAD', icon: 'bookOpen' },
     { id: 'coordenacao', name: 'Coordenação', icon: 'graduationCap' },
     { id: 'suporte', name: 'Suporte digital', icon: 'smartphone' },
+    { id: 'ouvidoria', name: 'Ouvidoria', icon: 'megaphone' },
   ];
+
+  /* Etapas de uma manifestação de ouvidoria — a régua que o atendente mostra
+     ao aluno quando ele pergunta "em que pé está?". */
+  var OUV_STAGES = ['Registrada', 'Em análise no setor', 'Resposta ao manifestante', 'Concluída'];
 
   var CHANNELS = [
     { id: 'app', name: 'App do aluno', icon: 'smartphone' },
@@ -71,6 +87,7 @@
     'Boleto', 'Rematrícula', 'Equivalência', 'Transferência', 'Documentos',
     'Estágio', 'DP/ADAP', 'EAD', 'Híbrido', 'Notas', 'Calendário', 'Acesso',
     'Bolsa', 'Negociação', 'Colação', 'Trancamento', 'Reclamação', 'Retenção',
+    'Ouvidoria', 'Estorno', 'Acessibilidade', 'TCC', 'Elogio',
   ];
 
   var MACROS = [
@@ -138,6 +155,14 @@
       body:
         'Fico à disposição! Se surgir qualquer outra dúvida, é só chamar por aqui mesmo que eu retomo do ponto onde paramos.\n\nBons estudos. :)',
     },
+    {
+      id: 'm-ouvidoria',
+      shortcut: 'ouvidoria',
+      title: 'Retorno de manifestação da Ouvidoria',
+      category: 'Ouvidoria',
+      body:
+        'Oi, {nome}! Estou acompanhando o seu protocolo junto à Ouvidoria e quero te dar uma posição concreta.\n\nO setor responsável já analisou o seu caso e eu te passo aqui as datas e o próximo passo. Se algo não ficar claro, me chama por aqui mesmo — a manifestação só é concluída quando você confirmar que o assunto foi resolvido.',
+    },
   ];
 
   /* ======================================================================
@@ -186,7 +211,27 @@
     s({ id: 'e24', name: 'Lucas Ferrarezi Bueno', ra: '2618033', cpf: '175.904.663-11', phone: '(11) 97829-4408', email: 'lucas.bueno@aluno.anchieta.br', course: 'Superior de Tecnologia em Big Data e Inteligência Analítica', type: 'Tecnólogo', modality: 'EAD', unit: 'Graduação EAD', shift: 'EAD', period: 3, dps: 0, balance: 0, financial: 'adimplente', academic: 'regular', firstContact: ago(60 * 24 * 130), tags: ['EAD'] }),
     s({ id: 'e25', name: 'Renan Kobayashi Muniz', ra: '2401556', cpf: '338.712.005-88', phone: '(11) 99461-7730', email: 'renan.muniz@aluno.anchieta.br', course: 'Bacharelado em Engenharia Elétrica', type: 'Graduação', modality: 'Presencial', unit: 'Campus Jundiaí — Dr. Cavalcanti', shift: 'Noturno', period: 8, dps: 0, balance: 0, financial: 'adimplente', academic: 'formando', firstContact: ago(60 * 24 * 820), tags: ['Colação'] }),
     s({ id: 'e26', name: 'Aline Peçanha Torres', ra: '2513670', cpf: '250.997.314-46', phone: '(11) 98613-2298', email: 'aline.torres@aluno.anchieta.br', course: 'Bacharelado em Administração', type: 'Graduação', modality: 'Híbrido', unit: 'Polo Várzea Paulista', shift: 'Híbrido', period: 5, dps: 0, balance: 0, financial: 'adimplente', academic: 'regular', firstContact: ago(60 * 24 * 260), tags: ['Rematrícula'] }),
+    /* Alunos com manifestação aberta na Ouvidoria */
+    s({ id: 'e27', name: 'Mariana Albuquerque Siqueira', ra: '2408815', cpf: '512.330.871-09', phone: '(11) 98450-3317', email: 'mariana.siqueira@aluno.anchieta.br', course: 'Bacharelado em Farmácia', type: 'Graduação', modality: 'Presencial', unit: 'Campus Jundiaí — Anchieta', shift: 'Noturno', period: 5, dps: 0, balance: 0, financial: 'adimplente', academic: 'regular', firstContact: ago(60 * 24 * 480), tags: ['Ouvidoria', 'Estorno'] }),
+    s({ id: 'e28', name: 'Carlos Eduardo Fagundes', ra: '2209447', cpf: '284.117.650-32', phone: '(11) 99208-6641', email: 'carlos.fagundes@aluno.anchieta.br', course: 'Bacharelado em Engenharia Civil', type: 'Graduação', modality: 'Presencial', unit: 'Campus Jundiaí — Dr. Cavalcanti', shift: 'Noturno', period: 10, dps: 0, balance: 0, financial: 'adimplente', academic: 'formando', firstContact: ago(60 * 24 * 1300), tags: ['Ouvidoria', 'TCC'] }),
+    s({ id: 'e29', name: 'Beatriz Lacerda Monteiro', ra: '2511362', cpf: '603.428.115-74', phone: '(11) 97314-5520', email: 'beatriz.monteiro@aluno.anchieta.br', course: 'Bacharelado em Design Gráfico', type: 'Graduação', modality: 'Presencial', unit: 'Campus Jundiaí — Anchieta', shift: 'Diurno', period: 3, dps: 0, balance: 0, financial: 'adimplente', academic: 'regular', firstContact: ago(60 * 24 * 230), tags: ['Ouvidoria', 'Acessibilidade'] }),
+    s({ id: 'e30', name: 'Fernando Rocha Quintana', ra: '2615209', cpf: '177.902.348-61', phone: '(11) 98821-0476', email: 'fernando.quintana@aluno.anchieta.br', course: 'Superior de Tecnologia em Gestão de Recursos Humanos', type: 'Tecnólogo', modality: 'EAD', unit: 'Graduação EAD', shift: 'EAD', period: 2, dps: 0, balance: 0, financial: 'adimplente', academic: 'regular', firstContact: ago(60 * 24 * 150), tags: ['Ouvidoria', 'Elogio'] }),
   ];
+
+  /* Foto de perfil, como o desk real puxa do WhatsApp. Alguns alunos ficam sem
+     foto de propósito — no canal de verdade muita gente não tem, e a interface
+     precisa ficar bonita com as iniciais também. Se a imagem não carregar
+     (sem internet, por exemplo), o avatar volta sozinho para as iniciais. */
+  var PHOTOS = {
+    e01: 'women/44', e02: 'men/32', e03: 'women/65', e04: 'men/46', e05: 'women/68',
+    e07: 'women/17', e08: 'men/75', e09: 'women/90', e10: 'men/21', e11: 'women/50',
+    e12: 'men/52', e14: 'men/64', e15: 'women/29', e16: 'men/41', e17: 'women/12',
+    e19: 'women/57', e20: 'men/18', e21: 'women/33', e23: 'women/79', e24: 'men/85',
+    e26: 'women/8', e27: 'women/24', e28: 'men/36', e29: 'women/91', e30: 'men/11',
+  };
+  STUDENTS.forEach(function (st) {
+    st.photo = PHOTOS[st.id] ? 'https://randomuser.me/api/portraits/' + PHOTOS[st.id] + '.jpg' : null;
+  });
 
   /* Matrículas e observações internas — só onde agregam ao atendimento. */
   var EXTRA = {
@@ -222,6 +267,21 @@
     },
     e01: {
       alerts: [{ tone: 'warn', text: 'Mensalidade de setembro vencida há 6 dias.' }],
+    },
+    e27: {
+      notes: [
+        { author: 'a-ana', at: ago(60 * 24 * 7), text: 'Aluna já veio duas vezes pelo estorno da taxa de rematrícula. Os comprovantes estão no protocolo FIN-7712 — não pedir de novo.' },
+      ],
+      alerts: [{ tone: 'warn', text: 'Ouvidoria OUV-2026-0412 aberta — terceiro contato sobre o mesmo assunto.' }],
+    },
+    e28: {
+      alerts: [{ tone: 'crit', text: 'Formando: nota de TCC divergente bloqueia a colação de dezembro.' }],
+    },
+    e29: {
+      notes: [
+        { author: 'a-carla', at: ago(60 * 24 * 21), text: 'Aluna com deficiência auditiva. Comunicação sempre por texto — não oferecer ligação. Ela prefere mensagens objetivas, com datas.' },
+      ],
+      alerts: [{ tone: 'warn', text: 'Atendimento prioritário (acessibilidade). Ouvidoria OUV-2026-0398 em andamento.' }],
     },
   };
 
@@ -502,17 +562,17 @@
     },
     {
       id: 'c19', studentId: 'e18', subject: 'Comprovante de matrícula para o exército',
-      channel: 'app', queue: 'secretaria', status: 'encerrado', assignee: 'a-carla',
+      channel: 'app', queue: 'secretaria', status: 'encerrado', assignee: 'a-amanda',
       priority: 'normal', tags: ['Documentos'], unread: 0, starred: false, mentioned: false,
       slaDue: ago(60 * 4), firstResponseAt: ago(60 * 7), closedAt: ago(200), rating: 10,
       aiIntent: 'Comprovante de matrícula',
       aiSummary: 'Comprovante de matrícula emitido e enviado em PDF. Atendimento encerrado com nota 10.',
       messages: [
         msg('aluno', 'e18', 'Bom dia, preciso de um comprovante de matrícula para apresentar no serviço militar.', 430),
-        msg('agente', 'a-carla', 'Bom dia, Kauê! Já emiti aqui. Vou anexar o PDF com assinatura digital.', 420),
-        msg('agente', 'a-carla', 'Segue o comprovante. Ele tem validade de 90 dias e o QR code confirma a autenticidade.', 418, { attachment: 'comprovante-matricula-2519077.pdf' }),
+        msg('agente', 'a-amanda', 'Bom dia, Kauê! Já emiti aqui. Vou anexar o PDF com assinatura digital.', 420),
+        msg('agente', 'a-amanda', 'Segue o comprovante. Ele tem validade de 90 dias e o QR code confirma a autenticidade.', 418, { attachment: 'comprovante-matricula-2519077.pdf' }),
         msg('aluno', 'e18', 'Perfeito, muito obrigado!', 410),
-        msg('agente', 'a-carla', 'Por nada! Qualquer coisa é só chamar. Bons estudos.', 405),
+        msg('agente', 'a-amanda', 'Por nada! Qualquer coisa é só chamar. Bons estudos.', 405),
       ],
     },
     {
@@ -528,6 +588,112 @@
         msg('aluno', 'e19', 'segue o atestado', 660, { attachment: 'atestado-medico.jpg' }),
         msg('agente', 'a-amanda', 'Recebido! Requerimento aberto e deferido pela coordenação. Sua segunda chamada ficou para o dia 28, às 19h, na sala 204.', 340),
         msg('aluno', 'e19', 'maravilha, muito obrigada!!', 325),
+      ],
+    },
+
+    /* -- Ouvidoria: manifestações que chegaram ao canal de atendimento ----
+       Cada uma carrega o protocolo e a linha do tempo completa, em ordem
+       cronológica: os contatos anteriores do aluno, o registro na Ouvidoria,
+       a triagem, o retorno do setor. É isso que o Copilot resume. */
+    {
+      id: 'c21', studentId: 'e27', subject: 'Ouvidoria: estorno da taxa de rematrícula paga em duplicidade',
+      channel: 'whatsapp', queue: 'ouvidoria', status: 'aberto', assignee: 'a-amanda',
+      priority: 'alta', tags: ['Ouvidoria', 'Reclamação', 'Estorno'], unread: 2, starred: false, mentioned: false,
+      slaDue: ahead(14), firstResponseAt: null, botHandled: false,
+      aiIntent: 'Cobrança de posição sobre estorno — manifestação de ouvidoria',
+      aiSummary: 'A aluna pagou a taxa de rematrícula (R$ 389,00) duas vezes — boleto e cartão no portal — e espera o estorno desde 15/09. Foi ao Financeiro duas vezes sem solução e registrou ouvidoria em 26/09. O Financeiro confirmou a duplicidade ontem: o estorno entra no lote bancário de sexta (03/10) e cai em até 2 dias úteis.',
+      ouvidoria: {
+        protocol: 'OUV-2026-0412', type: 'Reclamação', sector: 'Financeiro', stage: 2,
+        origin: 'Formulário da Ouvidoria (site)', openedAt: ago(60 * 24 * 5), deadline: aheadBusiness(5),
+        deadlineRule: '10 dias úteis a partir do registro',
+        events: [
+          { at: ago(60 * 24 * 16), kind: 'contato', title: 'Primeiro contato com o Financeiro', ref: 'h11', text: 'Aluna informa pagamento em duplicidade da taxa de rematrícula. Protocolo FIN-7712 aberto; prometido estorno em até 5 dias úteis.' },
+          { at: ago(60 * 24 * 7), kind: 'contato', title: 'Segundo contato — estorno não caiu', ref: 'h12', text: 'Financeiro responde que o estorno está "em processamento", sem data. Aluna demonstra insatisfação.' },
+          { at: ago(60 * 24 * 5), kind: 'ouvidoria', title: 'Manifestação registrada na Ouvidoria', text: 'Reclamação: "Paguei duas vezes e ninguém me dá uma data para devolver o dinheiro."' },
+          { at: ago(60 * 24 * 4), kind: 'setor', title: 'Triagem da Ouvidoria', text: 'Encaminhada ao Financeiro com prazo interno de 5 dias úteis. Responsável: Helena Martins Castro.' },
+          { at: ago(60 * 24 * 1), kind: 'setor', title: 'Financeiro confirma a duplicidade', text: 'Estorno de R$ 389,00 aprovado. Entra no lote bancário de 03/10; crédito em até 2 dias úteis na conta de origem.' },
+          { at: ago(40), kind: 'aluno', title: 'Aluna cobra posição no canal', text: 'Terceira vez que ela fala sobre o assunto. Pede uma resposta concreta.' },
+        ],
+      },
+      messages: [
+        msg('nota', 'a-helena', 'Financeiro confirmou a duplicidade. Estorno de R$ 389,00 aprovado, entra no lote bancário de sexta (03/10) e cai em até 2 dias úteis na conta de origem. Pode passar essas datas para a aluna e me avisar quando ela confirmar o recebimento — aí eu concluo a manifestação.', 60 * 20),
+        msg('aluno', 'e27', 'Boa tarde. Abri uma ouvidoria semana passada (protocolo OUV-2026-0412) porque paguei a taxa de rematrícula duas vezes e até agora não recebi o estorno. Já é a terceira vez que falo com vocês sobre isso.', 40),
+        msg('aluno', 'e27', 'Preciso desse dinheiro, é quase 400 reais. Alguém pode me dar uma resposta concreta?', 38),
+      ],
+    },
+    {
+      id: 'c22', studentId: 'e29', subject: 'Ouvidoria: intérprete de Libras e reposição de aulas práticas',
+      channel: 'whatsapp', queue: 'ouvidoria', status: 'aberto', assignee: 'a-amanda',
+      priority: 'alta', tags: ['Ouvidoria', 'Acessibilidade'], unread: 1, starred: false, mentioned: false,
+      slaDue: ahead(26), firstResponseAt: ago(170), botHandled: false,
+      aiIntent: 'Acessibilidade — reposição de aulas sem intérprete',
+      aiSummary: 'Aluna com deficiência auditiva pediu intérprete de Libras em 25/08 e ficou sem acompanhamento nas aulas práticas. O intérprete começa em 06/10, mas a reposição das aulas perdidas ainda não foi formalizada. A coordenação propôs 3 sábados a partir de 11/10 e deve confirmar por escrito até amanhã.',
+      ouvidoria: {
+        protocol: 'OUV-2026-0398', type: 'Reclamação', sector: 'Núcleo de Acessibilidade · Coordenação de Design', stage: 2,
+        origin: 'E-mail para a Ouvidoria', openedAt: ago(60 * 24 * 9), deadline: aheadBusiness(3),
+        deadlineRule: '10 dias úteis a partir do registro',
+        events: [
+          { at: ago(60 * 24 * 37), kind: 'contato', title: 'Pedido de intérprete à Secretaria', ref: 'h13', text: 'Aluna solicita intérprete de Libras para as aulas práticas de Tipografia e Ateliê. Encaminhado ao Núcleo de Acessibilidade.' },
+          { at: ago(60 * 24 * 21), kind: 'contato', title: 'Reiteração do pedido', ref: 'h14', text: 'Sem intérprete até aqui. Núcleo informa que o processo de contratação está "em análise".' },
+          { at: ago(60 * 24 * 9), kind: 'ouvidoria', title: 'Manifestação registrada na Ouvidoria', text: 'Reclamação de acessibilidade, marcada como prioritária pela Ouvidoria.' },
+          { at: ago(60 * 24 * 8), kind: 'setor', title: 'Encaminhada a dois setores', text: 'Núcleo de Acessibilidade (intérprete) e Coordenação de Design (reposição das aulas), prazo interno de 5 dias úteis.' },
+          { at: ago(60 * 24 * 3), kind: 'setor', title: 'Intérprete contratado', text: 'Núcleo confirma intérprete a partir de 06/10, em todas as aulas práticas.' },
+          { at: ago(60 * 24 * 1), kind: 'prazo', title: 'Prazo interno vencido', text: 'Coordenação de Design não respondeu sobre a reposição das aulas perdidas.' },
+          { at: ago(60 * 2), kind: 'setor', title: 'Coordenação propõe reposição', text: '3 encontros aos sábados com intérprete, a partir de 11/10. Confirmação por escrito até amanhã.' },
+        ],
+      },
+      messages: [
+        msg('aluno', 'e29', 'Oi. Recebi o e-mail da ouvidoria dizendo que o intérprete começa dia 06. Mas e as aulas práticas que eu já perdi? Ninguém me respondeu sobre reposição.', 180),
+        msg('agente', 'a-amanda', 'Oi, Beatriz! Obrigada por escrever. Estou com o seu protocolo aberto aqui e vou confirmar com a coordenação como fica a reposição das aulas práticas. Te retorno ainda hoje.', 170),
+        msg('nota', 'a-amanda', 'Coordenação de Design ainda não respondeu sobre a reposição. @Helena Martins Castro consegue reforçar pelo canal da ouvidoria? O prazo final vence em 3 dias úteis.', 165),
+        msg('nota', 'a-helena', 'Reforcei com a coordenadora (Profa. Cristina). Ela propôs 3 encontros de reposição aos sábados, com intérprete, a partir de 11/10. Confirma por escrito até amanhã.', 120),
+        msg('aluno', 'e29', 'Alguma novidade? Preciso me organizar com o trabalho se tiver aula extra.', 25),
+      ],
+    },
+    {
+      id: 'c23', studentId: 'e28', subject: 'Ouvidoria: nota do TCC lançada errada no portal',
+      channel: 'app', queue: 'ouvidoria', status: 'aberto', assignee: null,
+      priority: 'urgente', tags: ['Ouvidoria', 'Reclamação', 'TCC'], unread: 2, starred: false, mentioned: false,
+      slaDue: ahead(9), firstResponseAt: null, botHandled: true,
+      aiIntent: 'Divergência de nota de TCC — risco à colação',
+      aiSummary: 'Formando de Engenharia Civil: a banca atribuiu 8,5 ao TCC, mas o portal mostra 5,8 — o que o reprova e bloqueia a colação de dezembro. Ele enviou a ata da banca à coordenação há 6 dias sem resposta e registrou ouvidoria hoje.',
+      ouvidoria: {
+        protocol: 'OUV-2026-0431', type: 'Reclamação', sector: 'Coordenação de Engenharia Civil', stage: 1,
+        origin: 'Formulário da Ouvidoria (app)', openedAt: ago(60 * 3), deadline: aheadBusiness(10),
+        deadlineRule: '10 dias úteis a partir do registro',
+        events: [
+          { at: ago(60 * 24 * 12), kind: 'contato', title: 'Defesa do TCC', text: 'Ata da banca registra nota final 8,5 — aprovado.' },
+          { at: ago(60 * 24 * 6), kind: 'contato', title: 'E-mail à coordenação', text: 'Aluno percebe a nota 5,8 no portal e envia a ata assinada à coordenação. Sem resposta.' },
+          { at: ago(60 * 24 * 2), kind: 'contato', title: 'Contato no canal de atendimento', ref: 'h15', text: 'Orientado a aguardar o retorno da coordenação.' },
+          { at: ago(60 * 3), kind: 'ouvidoria', title: 'Manifestação registrada na Ouvidoria', text: 'Reclamação: nota divergente, risco de não colar grau em dezembro.' },
+        ],
+      },
+      messages: [
+        msg('aluno', 'e28', 'Boa noite. Registrei uma ouvidoria hoje (OUV-2026-0431). Minha nota do TCC está errada no portal: a banca me deu 8,5 e aparece 5,8. Isso me reprova e eu colo grau em dezembro.', 50),
+        msg('bot', 'bot', 'Entendi, Carlos. Como existe uma manifestação de ouvidoria aberta, vou encaminhar você para um atendente que acompanha o seu protocolo.', 50, { handoff: true }),
+        msg('aluno', 'e28', 'Já mandei a ata da banca para a coordenação semana passada e ninguém respondeu.', 47),
+      ],
+    },
+    {
+      id: 'c24', studentId: 'e30', subject: 'Ouvidoria: elogio à tutora do EAD',
+      channel: 'app', queue: 'ouvidoria', status: 'aberto', assignee: 'a-amanda',
+      priority: 'baixa', tags: ['Ouvidoria', 'Elogio'], unread: 0, starred: false, mentioned: false,
+      slaDue: ahead(190), firstResponseAt: null, botHandled: false,
+      aiIntent: 'Elogio — confirmação de recebimento',
+      aiSummary: 'O aluno registrou um elogio à tutora Simone, que o ajudou a não desistir do curso. A Ouvidoria já encaminhou o elogio à coordenação EAD; falta agradecer o aluno e concluir a manifestação.',
+      ouvidoria: {
+        protocol: 'OUV-2026-0420', type: 'Elogio', sector: 'Coordenação EAD', stage: 3,
+        origin: 'Formulário da Ouvidoria (site)', openedAt: ago(60 * 24 * 2), deadline: aheadBusiness(8),
+        deadlineRule: '10 dias úteis a partir do registro',
+        events: [
+          { at: ago(60 * 24 * 2), kind: 'ouvidoria', title: 'Elogio registrado na Ouvidoria', text: '"A tutora Simone me ajudou demais a não desistir do curso."' },
+          { at: ago(60 * 24 * 1), kind: 'setor', title: 'Encaminhado à coordenação EAD', text: 'Elogio repassado à coordenação e à tutora.' },
+          { at: ago(60 * 26), kind: 'aluno', title: 'Aluno pergunta se o elogio chegou', text: 'Mensagem no app.' },
+        ],
+      },
+      messages: [
+        msg('aluno', 'e30', 'Olá! Mandei um elogio pela ouvidoria pra tutora Simone, ela me ajudou demais a não desistir do curso. Queria saber se chegou pra ela 🙂', 60 * 26),
+        msg('nota', 'a-helena', 'Elogio encaminhado à coordenação EAD e à tutora. Pode agradecer o aluno e encerrar — eu concluo a manifestação quando você fechar.', 60 * 22),
       ],
     },
   ];
@@ -656,72 +822,187 @@
         msg('aluno', 'e15', 'show, obrigada', 60 * 24 * 55 - 6),
       ],
     },
+    {
+      id: 'h11', studentId: 'e27', subject: 'Taxa de rematrícula paga duas vezes',
+      channel: 'whatsapp', queue: 'financeiro', agent: 'a-ana', openedAt: ago(60 * 24 * 16),
+      closedAt: ago(60 * 24 * 16 - 38), durationMin: 38, waitMin: 6, frtMin: 6, rating: 7,
+      tags: ['Estorno'],
+      summary: 'Aluna pagou a taxa de rematrícula por boleto e por cartão. Protocolo FIN-7712 aberto; prometido estorno em até 5 dias úteis.',
+      messages: [
+        msg('aluno', 'e27', 'oi, paguei a taxa de rematrícula duas vezes sem querer, no boleto e no cartão. como faço pra receber de volta?', 60 * 24 * 16),
+        msg('agente', 'a-ana', 'Oi, Mariana! Localizei os dois pagamentos. Abri o protocolo FIN-7712 para o estorno do pagamento no cartão — o prazo é de até 5 dias úteis.', 60 * 24 * 16 - 6),
+        msg('aluno', 'e27', 'ok, obrigada', 60 * 24 * 16 - 36),
+      ],
+    },
+    {
+      id: 'h12', studentId: 'e27', subject: 'Estorno ainda não caiu',
+      channel: 'whatsapp', queue: 'financeiro', agent: 'a-ana', openedAt: ago(60 * 24 * 7),
+      closedAt: ago(60 * 24 * 7 - 25), durationMin: 25, waitMin: 41, frtMin: 41, rating: 3,
+      tags: ['Estorno', 'Reclamação'],
+      summary: 'Estorno "em processamento", sem data. Aluna insatisfeita, nota 3. Três dias depois ela registrou a ouvidoria.',
+      messages: [
+        msg('aluno', 'e27', 'já passou o prazo e o estorno não caiu', 60 * 24 * 7),
+        msg('agente', 'a-ana', 'Mariana, o estorno está em processamento com o banco. Assim que for liberado você recebe automaticamente.', 60 * 24 * 7 - 41),
+        msg('aluno', 'e27', 'mas quando? ninguém me dá uma data', 60 * 24 * 7 - 30),
+      ],
+    },
+    {
+      id: 'h13', studentId: 'e29', subject: 'Pedido de intérprete de Libras',
+      channel: 'portal', queue: 'secretaria', agent: 'a-carla', openedAt: ago(60 * 24 * 37),
+      closedAt: ago(60 * 24 * 37 - 90), durationMin: 90, waitMin: 18, frtMin: 18, rating: 8,
+      tags: ['Acessibilidade'],
+      summary: 'Solicitação de intérprete de Libras para as aulas práticas, encaminhada ao Núcleo de Acessibilidade.',
+      messages: [
+        msg('aluno', 'e29', 'Olá. Sou surda e preciso de intérprete de Libras nas aulas práticas de Tipografia e Ateliê. Como solicito?', 60 * 24 * 37),
+        msg('agente', 'a-carla', 'Oi, Beatriz! Registrei o seu pedido e encaminhei ao Núcleo de Acessibilidade, que organiza os intérpretes. Eles entram em contato por aqui.', 60 * 24 * 37 - 18),
+      ],
+    },
+    {
+      id: 'h14', studentId: 'e29', subject: 'Reiteração: ainda sem intérprete',
+      channel: 'whatsapp', queue: 'secretaria', agent: 'a-carla', openedAt: ago(60 * 24 * 21),
+      closedAt: ago(60 * 24 * 21 - 60), durationMin: 60, waitMin: 22, frtMin: 22, rating: 5,
+      tags: ['Acessibilidade', 'Reclamação'],
+      summary: 'Sem intérprete após 16 dias. Núcleo informa contratação "em análise". Aluna relata prejuízo nas aulas práticas.',
+      messages: [
+        msg('aluno', 'e29', 'Já faz duas semanas e continuo sem intérprete. Estou perdendo as aulas práticas.', 60 * 24 * 21),
+        msg('agente', 'a-carla', 'Entendo, Beatriz, e sinto muito. Cobrei o Núcleo agora: a contratação está em análise. Vou deixar registrado no seu cadastro que a comunicação é sempre por texto.', 60 * 24 * 21 - 22),
+      ],
+    },
+    {
+      id: 'h15', studentId: 'e28', subject: 'Nota do TCC divergente',
+      channel: 'app', queue: 'coordenacao', agent: 'a-marcos', openedAt: ago(60 * 24 * 2),
+      closedAt: ago(60 * 24 * 2 - 30), durationMin: 30, waitMin: 9, frtMin: 9, rating: 4,
+      tags: ['TCC', 'Notas'],
+      summary: 'Aluno relatou nota 5,8 no portal contra 8,5 da ata da banca. Orientado a aguardar retorno da coordenação.',
+      messages: [
+        msg('aluno', 'e28', 'minha nota do TCC está errada no portal, a banca deu 8,5', 60 * 24 * 2),
+        msg('agente', 'a-marcos', 'Carlos, a correção de nota é feita pela coordenação do curso. Já reforcei o seu caso por lá — o retorno costuma levar alguns dias.', 60 * 24 * 2 - 9),
+      ],
+    },
   ];
 
   /* ======================================================================
-     Séries do dashboard
+     Copilot — o que o atendente precisa saber em 10 segundos
+     ----------------------------------------------------------------------
+     Para cada conversa: o que o aluno precisa (uma frase), como ele está,
+     o que falta fazer e o ponto de atenção. Em produção isto sai do modelo
+     lendo conversa + cadastro + histórico; aqui é escrito à mão, com o mesmo
+     formato.
      ====================================================================== */
 
+  var COPILOT = {
+    c01: { need: 'Um boleto de setembro que funcione, com o vencimento reprogramado e sem surpresa de multa.', sentiment: 'ansioso', todo: ['Emitir 2ª via atualizada', 'Explicar a multa aplicada', 'Oferecer parcelamento do valor em aberto'], watch: 'R$ 1.284,90 em aberto — inadimplência recente.' },
+    c02: { need: 'A ementa da UniAnchieta de Psicologia Social e Comunitária para comparar e pedir aproveitamento.', sentiment: 'calmo', todo: ['Enviar a ementa oficial', 'Explicar o prazo de análise (15 dias úteis)'], watch: 'SLA estourado e sem primeira resposta humana.' },
+    c03: { need: 'Voltar a acessar o AVA e não perder a atividade que vence amanhã.', sentiment: 'ansioso', todo: ['Cobrar o chamado #SIS-4471', 'Registrar a falha para prorrogar a entrega', 'Avisar a aluna quando liberar'], watch: 'Entrega de atividade amanhã.' },
+    c04: { need: 'Destravar a rematrícula — e entender se as DPs atrapalham.', sentiment: 'calmo', todo: ['Receber o RG atualizado', 'Explicar o aceite do plano de recuperação das DPs', 'Liberar o passo 3'], watch: '2 DPs em aberto.' },
+    c05: { need: 'A declaração de matrícula com carga horária para o hospital do estágio.', sentiment: 'satisfeito', todo: ['Acompanhar o protocolo #DEC-8823', 'Enviar o PDF assinado'], watch: null },
+    c06: { need: 'Saber quando abre a matrícula em DP de Cálculo II e se há turma no noturno.', sentiment: 'calmo', todo: ['Confirmar a oferta no noturno com a coordenação'], watch: null },
+    c09: { need: 'Diz que quer trancar, mas o problema real é conseguir pagar o semestre.', sentiment: 'frustrado', todo: ['Oferecer renegociação antes do trancamento', 'Apresentar bolsa ou desconto disponível', 'Só então explicar o trancamento'], watch: 'Risco de evasão · R$ 2.340,00 em aberto.' },
+    c11: { need: 'Resolver as duas pendências documentais a tempo da colação.', sentiment: 'calmo', todo: ['Confirmar se precisa agendar a entrega', 'Lembrar o prazo do dia 30'], watch: 'Cerimônia em 18 dias.' },
+    c12: { need: 'Que a optativa escolhida apareça no AVA.', sentiment: 'calmo', todo: ['Pedir sincronização manual ao time de Pós & EAD'], watch: null },
+    c13: { need: 'Saber como enviar a foto para a carteirinha sair.', sentiment: 'calmo', todo: ['Explicar o envio da foto 3x4 pelo app'], watch: null },
+    c14: { need: 'Um acordo que caiba no orçamento antes da suspensão da matrícula.', sentiment: 'frustrado', todo: ['Simular parcelamento sem entrada alta', 'Registrar a perda de emprego para a análise', 'Confirmar a data da suspensão'], watch: 'Suspensão automática em 12 dias.' },
+    c17: { need: 'Mudar para o noturno por causa do emprego e saber se a mensalidade muda.', sentiment: 'calmo', todo: ['Verificar vaga no noturno', 'Informar diferença de valor, se houver'], watch: null },
+    c21: { need: 'Uma data concreta para o estorno de R$ 389,00 — ela não aceita mais "em processamento".', sentiment: 'frustrado', todo: ['Pedir desculpas pela demora, sem rodeios', 'Informar: lote bancário em 03/10, crédito em até 2 dias úteis', 'Combinar a confirmação do recebimento', 'Avisar a Ouvidoria para concluir'], watch: 'Terceiro contato sobre o mesmo assunto. Última avaliação: nota 3.' },
+    c22: { need: 'Saber quando e como vai repor as aulas práticas perdidas, para se organizar com o trabalho.', sentiment: 'ansioso', todo: ['Passar a proposta: 3 sábados a partir de 11/10, com intérprete', 'Confirmar que a proposta será formalizada até amanhã', 'Responder por texto, com datas objetivas'], watch: 'Prazo final da ouvidoria em 3 dias úteis. Acessibilidade: comunicação só por texto.' },
+    c23: { need: 'Corrigir a nota do TCC (8,5, não 5,8) a tempo de colar grau em dezembro.', sentiment: 'urgente', todo: ['Assumir e responder já', 'Pedir a ata da banca por aqui, se ele tiver', 'Acionar a coordenação com a Ouvidoria em cópia', 'Dar um prazo de retorno'], watch: 'Formando · colação em risco · sem resposta há 6 dias.' },
+    c24: { need: 'Saber que o elogio chegou à tutora.', sentiment: 'satisfeito', todo: ['Agradecer e confirmar o encaminhamento', 'Encerrar a conversa'], watch: null },
+  };
+
+  /* ======================================================================
+     Desempenho — a visão do atendente
+     ----------------------------------------------------------------------
+     O atendente vê os PRÓPRIOS números ao lado do agregado da equipe. A
+     equipe aparece como total e como média por atendente, nunca com nomes:
+     a ideia é ele se situar, não se comparar com o colega da mesa ao lado.
+     Tempos em minutos.
+     ====================================================================== */
+
+  var TEAM_SIZE = 8;
+
+  function seq(n, base, amp, seed) {
+    var out = [];
+    for (var i = 0; i < n; i++) {
+      var w = Math.sin((i + seed) * 1.7) * 0.5 + Math.cos((i + seed) * 0.6) * 0.5;
+      out.push(Math.max(1, Math.round(base + amp * w)));
+    }
+    return out;
+  }
+  function series(keys, abertos, finalizados, eu) {
+    return keys.map(function (k, i) {
+      return { k: k, abertos: abertos[i], finalizados: finalizados[i], eu: eu[i] };
+    });
+  }
+
+  var HOURS = ['08', '09', '10', '11', '12', '13', '14', '15', '16', '17', '18', '19'];
+
   var DASHBOARD = {
-    hourly: [
-      { h: '08', entradas: 14, resolvidas: 9 },
-      { h: '09', entradas: 23, resolvidas: 17 },
-      { h: '10', entradas: 31, resolvidas: 24 },
-      { h: '11', entradas: 27, resolvidas: 26 },
-      { h: '12', entradas: 12, resolvidas: 15 },
-      { h: '13', entradas: 18, resolvidas: 14 },
-      { h: '14', entradas: 29, resolvidas: 21 },
-      { h: '15', entradas: 34, resolvidas: 22 },
-      { h: '16', entradas: 26, resolvidas: 25 },
-      { h: '17', entradas: 21, resolvidas: 19 },
-      { h: '18', entradas: 16, resolvidas: 12 },
-      { h: '19', entradas: 9, resolvidas: 7 },
-    ],
-    frtSpark: [7.2, 6.8, 9.1, 8.4, 5.9, 4.8, 5.2, 4.1, 3.9, 4.4, 3.8, 3.6],
-    resolutionSpark: [96, 88, 104, 132, 118, 97, 91, 86, 79, 84, 77, 74],
-    waitSpark: [12, 9, 14, 18, 11, 8, 7, 9, 6, 7, 5, 6],
+    teamSize: TEAM_SIZE,
+    periods: {
+      hoje: {
+        label: 'Hoje', unit: 'hora',
+        me: { abertos: 14, finalizados: 11, transferidos: 2, tma: 18.4, tmr: 3.4, csat: 9.3 },
+        mePrev: { abertos: 12, finalizados: 10, transferidos: 3, tma: 20.1, tmr: 3.9, csat: 9.1 },
+        team: { abertos: 126, finalizados: 104, transferidos: 15, tma: 22.6, tmr: 4.7, csat: 8.9, sla: 91 },
+        teamPrev: { abertos: 118, finalizados: 101, transferidos: 17, tma: 23.9, tmr: 5.2, csat: 8.8, sla: 89 },
+        series: series(HOURS, [9, 14, 17, 15, 7, 10, 16, 18, 12, 4, 2, 2], [5, 10, 14, 15, 9, 8, 13, 15, 11, 3, 1, 0], [1, 2, 1, 2, 0, 1, 2, 2, 0, 0, 0, 0]),
+      },
+      ontem: {
+        label: 'Ontem', unit: 'hora',
+        me: { abertos: 16, finalizados: 15, transferidos: 1, tma: 17.6, tmr: 3.1, csat: 9.5 },
+        mePrev: { abertos: 15, finalizados: 13, transferidos: 2, tma: 19.0, tmr: 3.6, csat: 9.2 },
+        team: { abertos: 138, finalizados: 129, transferidos: 18, tma: 21.8, tmr: 4.4, csat: 9.0, sla: 93 },
+        teamPrev: { abertos: 131, finalizados: 120, transferidos: 16, tma: 22.7, tmr: 4.9, csat: 8.9, sla: 90 },
+        series: series(HOURS, [8, 13, 18, 17, 9, 11, 17, 16, 13, 9, 5, 2], [6, 11, 15, 16, 10, 9, 15, 16, 12, 10, 6, 3], [1, 2, 2, 2, 1, 1, 2, 2, 1, 1, 0, 0]),
+      },
+      '7d': {
+        label: '7 dias', unit: 'dia',
+        me: { abertos: 86, finalizados: 79, transferidos: 9, tma: 19.2, tmr: 3.8, csat: 9.2 },
+        mePrev: { abertos: 81, finalizados: 72, transferidos: 11, tma: 20.6, tmr: 4.3, csat: 9.0 },
+        team: { abertos: 812, finalizados: 754, transferidos: 97, tma: 23.4, tmr: 5.1, csat: 8.8, sla: 89 },
+        teamPrev: { abertos: 790, finalizados: 731, transferidos: 104, tma: 24.2, tmr: 5.5, csat: 8.7, sla: 87 },
+        series: null,
+      },
+      '30d': {
+        label: '30 dias', unit: 'dia',
+        me: { abertos: 352, finalizados: 331, transferidos: 41, tma: 19.8, tmr: 4.0, csat: 9.1 },
+        mePrev: { abertos: 337, finalizados: 309, transferidos: 46, tma: 21.1, tmr: 4.4, csat: 8.9 },
+        team: { abertos: 3390, finalizados: 3170, transferidos: 402, tma: 24.1, tmr: 5.4, csat: 8.7, sla: 87 },
+        teamPrev: { abertos: 3302, finalizados: 3051, transferidos: 431, tma: 24.8, tmr: 5.8, csat: 8.6, sla: 85 },
+        series: null,
+      },
+    },
+    /* Séries diárias geradas — determinísticas, para o gráfico não mudar a
+       cada recarga. As chaves viram datas na tela. */
+    daily7: { abertos: seq(7, 116, 22, 1), finalizados: seq(7, 108, 20, 2), eu: seq(7, 12, 3, 3) },
+    daily30: { abertos: seq(30, 113, 26, 4), finalizados: seq(30, 106, 24, 5), eu: seq(30, 11, 4, 6) },
     bySubject: [
       { label: 'Financeiro e boletos', value: 61 },
       { label: 'Documentos e declarações', value: 48 },
       { label: 'Rematrícula', value: 39 },
       { label: 'Estágios', value: 31 },
+      { label: 'Ouvidoria', value: 26 },
       { label: 'Notas e frequência', value: 24 },
       { label: 'Acesso e senha', value: 22 },
       { label: 'Equivalência e transferência', value: 17 },
-      { label: 'DP e adaptação', value: 13 },
-    ],
-    byChannel: [
-      { label: 'App do aluno', value: 148 },
-      { label: 'Portal', value: 67 },
-      { label: 'WhatsApp', value: 31 },
-      { label: 'E-mail', value: 9 },
     ],
     byQueue: [
       { label: 'Secretaria', value: 89 },
       { label: 'Financeiro', value: 74 },
       { label: 'Coordenação', value: 43 },
+      { label: 'Ouvidoria', value: 31 },
       { label: 'Estágios', value: 27 },
       { label: 'Suporte digital', value: 14 },
       { label: 'Pós & EAD', value: 8 },
     ],
-    period: {
-      hoje: { espera: '4:12', frt: '3:48', resolucao: '2h 51', resolvidos: 187, slaPct: 92, botPct: 41, csat: 9.1, delta: 6 },
-      '7d': { espera: '5:36', frt: '5:02', resolucao: '4h 12', resolvidos: 1204, slaPct: 88, botPct: 38, csat: 8.8, delta: -3 },
-      '30d': { espera: '6:48', frt: '6:20', resolucao: '5h 06', resolvidos: 4917, slaPct: 85, botPct: 36, csat: 8.6, delta: 2 },
-    },
+    transferTargets: [
+      { label: 'Financeiro', value: 34 },
+      { label: 'Secretaria', value: 27 },
+      { label: 'Coordenação', value: 19 },
+      { label: 'Ouvidoria', value: 11 },
+      { label: 'Suporte digital', value: 6 },
+    ],
   };
-
-  /* ======================================================================
-     Visões salvas
-     ====================================================================== */
-
-  var SAVED_VIEWS = [
-    { id: 'sv-sla', name: 'SLA em risco', icon: 'alertTriangle', tone: 'crit', filter: { sla: 'risco' } },
-    { id: 'sv-frt', name: 'Sem 1ª resposta', icon: 'timer', filter: { noFirstResponse: true } },
-    { id: 'sv-bot', name: 'Escalados pelo bot', icon: 'bot', filter: { botHandled: true } },
-    { id: 'sv-rematricula', name: 'Rematrícula 2026/1', icon: 'refresh', filter: { tag: 'Rematrícula' } },
-    { id: 'sv-retencao', name: 'Risco de evasão', icon: 'shieldAlert', filter: { tag: 'Retenção' } },
-  ];
 
   window.DATA = {
     NOW: NOW,
@@ -729,13 +1010,14 @@
     BOT: BOT,
     AGENTS: AGENTS,
     QUEUES: QUEUES,
+    OUV_STAGES: OUV_STAGES,
     CHANNELS: CHANNELS,
     TAGS: TAGS,
     MACROS: MACROS,
     STUDENTS: STUDENTS,
     CONVERSATIONS: CONVERSATIONS,
     HISTORY: HISTORY,
+    COPILOT: COPILOT,
     DASHBOARD: DASHBOARD,
-    SAVED_VIEWS: SAVED_VIEWS,
   };
 })();

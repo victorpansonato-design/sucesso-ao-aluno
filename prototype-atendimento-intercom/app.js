@@ -180,77 +180,112 @@
     search: '',
     filters: {},
     composer: { mode: 'reply', text: '' },
+    /* aluno · copilot · historico */
     ctxTab: 'aluno',
     /* Em telas estreitas o painel começa fechado — ele vira sobreposição, e
        abrir sobre a conversa sem o atendente ter pedido seria intrusivo. */
     ctxOpen: window.innerWidth >= 1400,
     bulk: null,
     copilot: { running: false, title: null, body: '', chips: null, insert: null },
-    groups: { filas: true, visoes: true },
-    sections: { academico: true, financeiro: true, atendimento: true, conversas: true, notas: false },
+    ask: { q: '', a: '', running: false },
+    groups: { pastas: true },
+    sections: { academico: true, financeiro: true, atendimento: true },
+    histOrder: 'desc',
     revealed: {},
     contacts: { search: '', segment: 'todos', sortKey: 'ultima', sortDir: 'desc', filters: {} },
     contactTab: 'visao',
     dashPeriod: 'hoje',
+    dashRange: null,
     dashDist: 'assunto',
     viewsOverlay: false,
     viewsCollapsed: false,
     autoReplied: {},
     flashAt: null,
     enterAnim: true,
-    theme: document.documentElement.classList.contains('dark') ? 'dark' : 'light',
+    folders: [],
+    newFolder: false,
+    theme: document.documentElement.getAttribute('data-theme') || 'claro',
   };
 
+  /* Visão do atendente: só o que ele usa no turno. Filas da equipe, menções,
+     favoritos e visões salvas saem — o canal de hoje não tem esse volume, e
+     cada aba a mais é uma aba a mais para conferir. Elas voltam quando o
+     canal crescer. As pastas são do próprio atendente. */
   var VIEWS = [
     { id: 'minha', name: 'Minha caixa', icon: 'inbox', hint: 'As conversas que são suas' },
-    { id: 'nao-atribuidos', name: 'Não atribuídos', icon: 'userPlus', hint: 'Esperando alguém assumir' },
-    { id: 'mencoes', name: 'Menções', icon: 'atSign', hint: 'Notas internas que citam você' },
-    { id: 'favoritos', name: 'Favoritos', icon: 'star', hint: 'Marcados por você' },
-    { id: 'todos', name: 'Todos os abertos', icon: 'messageSquare', hint: 'A operação inteira' },
-    { id: 'adiados', name: 'Adiados', icon: 'alarm', hint: 'Voltam sozinhos no horário' },
-    { id: 'encerrados', name: 'Encerrados', icon: 'circleCheck', hint: 'Somente leitura' },
+    { id: 'encerrados', name: 'Encerrados', icon: 'circleCheck', hint: 'Os que você finalizou' },
   ];
+
+  function folder(id) {
+    for (var i = 0; i < S.folders.length; i++) if (S.folders[i].id === id) return S.folders[i];
+    return null;
+  }
 
   function viewLabel(id) {
     for (var i = 0; i < VIEWS.length; i++) if (VIEWS[i].id === id) return VIEWS[i].name;
-    if (id.indexOf('fila:') === 0) return queue(id.slice(5)).name;
-    for (var j = 0; j < D.SAVED_VIEWS.length; j++)
-      if (D.SAVED_VIEWS[j].id === id) return D.SAVED_VIEWS[j].name;
+    if (id.indexOf('pasta:') === 0) return (folder(id.slice(6)) || { name: 'Pasta' }).name;
     return 'Conversas';
   }
 
   /** O predicado que define cada caixa. Cego a busca e filtros de propósito:
       esconder uma conversa não pode movê-la de caixa. */
   function inView(c, view) {
-    if (view.indexOf('fila:') === 0) return isOpen(c) && c.queue === view.slice(5);
+    if (view.indexOf('pasta:') === 0) return c.folder === view.slice(6) && c.assignee === D.ME.id;
     switch (view) {
       case 'minha':
         return isOpen(c) && c.assignee === D.ME.id;
-      case 'nao-atribuidos':
-        return isOpen(c) && c.assignee === null;
-      case 'mencoes':
-        return c.status !== 'encerrado' && c.mentioned === true;
-      case 'favoritos':
-        return c.status !== 'encerrado' && c.starred === true;
-      case 'todos':
-        return isOpen(c);
-      case 'adiados':
-        return c.status === 'snoozed';
       case 'encerrados':
-        return c.status === 'encerrado';
-      case 'sv-sla':
-        return isOpen(c) && (sla(c).state === 'estourado' || sla(c).state === 'proximo');
-      case 'sv-frt':
-        return isOpen(c) && !c.firstResponseAt;
-      case 'sv-bot':
-        return isOpen(c) && c.botHandled === true;
-      case 'sv-rematricula':
-        return c.status !== 'encerrado' && c.tags.indexOf('Rematrícula') >= 0;
-      case 'sv-retencao':
-        return c.status !== 'encerrado' && c.tags.indexOf('Retenção') >= 0;
+        return c.status === 'encerrado' && c.assignee === D.ME.id;
+      /* A fila não é uma caixa visível: é de onde "Atender próximo" puxa. */
+      case 'fila':
+        return isOpen(c) && c.assignee === null;
       default:
-        return isOpen(c);
+        return false;
     }
+  }
+
+  /* -- Pastas e fixados: a organização é do atendente, e sobrevive ao F5 --- */
+  var ORG_KEY = 'atendimento.v2.org';
+
+  function saveOrg() {
+    try {
+      var map = {};
+      var pins = [];
+      D.CONVERSATIONS.forEach(function (c) {
+        if (c.folder) map[c.id] = c.folder;
+        if (c.pinned) pins.push(c.id);
+      });
+      localStorage.setItem(ORG_KEY, JSON.stringify({ folders: S.folders, map: map, pins: pins }));
+    } catch (e) {
+      /* storage indisponível — vale só para esta sessão */
+    }
+  }
+
+  function loadOrg() {
+    var saved = null;
+    try {
+      saved = JSON.parse(localStorage.getItem(ORG_KEY) || 'null');
+    } catch (e) {
+      saved = null;
+    }
+    if (saved && saved.folders) {
+      S.folders = saved.folders;
+      D.CONVERSATIONS.forEach(function (c) {
+        c.folder = (saved.map && saved.map[c.id]) || null;
+        c.pinned = (saved.pins || []).indexOf(c.id) >= 0;
+      });
+      return;
+    }
+    /* Primeira visita: duas pastas de exemplo, para a função se explicar. */
+    S.folders = [
+      { id: 'f-ouv', name: 'Ouvidoria em andamento' },
+      { id: 'f-doc', name: 'Aguardando documento' },
+    ];
+    var seed = { c21: 'f-ouv', c22: 'f-ouv', c24: 'f-ouv', c04: 'f-doc', c11: 'f-doc' };
+    D.CONVERSATIONS.forEach(function (c) {
+      c.folder = seed[c.id] || null;
+      c.pinned = c.id === 'c22';
+    });
   }
 
   function countFor(view) {
@@ -266,8 +301,6 @@
     if (f.prioridade && c.priority !== f.prioridade) return false;
     if (f.tag && c.tags.indexOf(f.tag) < 0) return false;
     if (f.modalidade && student(c.studentId).modality !== f.modalidade) return false;
-    if (f.responsavel === 'nenhum' && c.assignee !== null) return false;
-    if (f.responsavel && f.responsavel !== 'nenhum' && c.assignee !== f.responsavel) return false;
     if (S.search) {
       var st = student(c.studentId);
       var hay = key(
@@ -283,6 +316,8 @@
       return inView(c, S.view) && matchesFilters(c);
     });
     out.sort(function (a, b) {
+      /* Fixadas sempre no topo — e na mesma ordem que o J/K percorre. */
+      if (!!a.pinned !== !!b.pinned) return a.pinned ? -1 : 1;
       if (S.sort === 'recentes') return updatedAt(b) - updatedAt(a);
       if (S.sort === 'antigos') return createdAt(a) - createdAt(b);
       if (S.sort === 'prioridade') {
@@ -308,19 +343,24 @@
   var popLayer = null;
   var modalStack = [];
 
-  function closePop() {
+  /** `immediate` tira o menu do DOM na hora — a troca de tema precisa disso,
+      senão a View Transition fotografa o popover no meio da saída. */
+  function closePop(immediate) {
     if (!popLayer) return;
     var pop = $('.pop', popLayer);
     var layer = popLayer;
     popLayer = null;
-    if (pop) {
+    if (pop && !immediate) {
       pop.setAttribute('data-closing', 'true');
       setTimeout(function () {
         layer.remove();
       }, 100);
     } else layer.remove();
-    $$('[aria-expanded="true"]').forEach(function (b) {
-      if (b.dataset.keepExpanded !== 'true') b.setAttribute('aria-expanded', 'false');
+    /* Só o gatilho deste popover volta a "fechado". Zerar todo aria-expanded
+       da página recolhia, de brinde, o grupo Pastas na coluna. */
+    $$('[data-pop-anchor]').forEach(function (b) {
+      b.removeAttribute('data-pop-anchor');
+      b.setAttribute('aria-expanded', 'false');
     });
   }
 
@@ -358,6 +398,7 @@
       if (e.target === popLayer) closePop();
     });
     anchor.setAttribute('aria-expanded', 'true');
+    anchor.setAttribute('data-pop-anchor', '');
     var auto = $('[data-autofocus]', pop);
     if (auto) setTimeout(function () { auto.focus(); }, 40);
     if (opts.onMount) opts.onMount(pop);
@@ -577,24 +618,40 @@
      4. SHELL — rail e coluna de views
      ====================================================================== */
 
-  function avatarHtml(name, initials, size, tone, extra) {
+  /**
+   * Avatar. Com `photo`, a foto cobre as iniciais; se ela não carregar (sem
+   * rede, link quebrado), o `onerror` remove a imagem e as iniciais — que
+   * estavam embaixo o tempo todo — aparecem. Nunca um quadrado quebrado.
+   */
+  function avatarHtml(name, initials, size, tone, extra, photo) {
     return (
       '<span class="avatar avatar--' +
       (size || 'sm') +
       (tone ? ' avatar--' + tone : '') +
+      (photo ? ' avatar--photo' : '') +
       '" title="' +
       esc(name) +
       '" aria-hidden="true">' +
       esc(initials) +
+      (photo
+        ? '<img src="' +
+          esc(photo) +
+          '" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer" ' +
+          'onerror="this.parentNode.classList.remove(\'avatar--photo\');this.remove()">'
+        : '') +
       (extra || '') +
       '</span>'
     );
   }
 
+  function studentAvatar(st, size, tone) {
+    return avatarHtml(st.name, st.initials, size, tone, '', st.photo);
+  }
+
   function renderRail() {
     var nav = [
-      { route: 'inbox', icon: 'inbox', label: 'Inbox', badge: countFor('minha') + countFor('nao-atribuidos'), k: 'G I' },
-      { route: 'dashboard', icon: 'gauge', label: 'Operação', k: 'G D' },
+      { route: 'inbox', icon: 'inbox', label: 'Inbox', badge: unreadMine(), k: 'G I' },
+      { route: 'dashboard', icon: 'gauge', label: 'Desempenho', k: 'G D' },
       { route: 'contatos', icon: 'users', label: 'Contatos', k: 'G C' },
     ];
     var railSnap = snapshotPill('.rail-pill');
@@ -624,10 +681,9 @@
       '<button class="rail__btn" data-act="notifications" data-tip="Notificações" data-tip-pos="right" aria-label="Notificações">' +
       I('bell', 18) +
       '<span class="rail__badge">3</span></button>' +
-      '<button class="rail__btn" data-act="theme" data-tip="' +
-      (S.theme === 'dark' ? 'Tema claro' : 'Tema escuro') +
-      '" data-tip-pos="right" aria-label="Alternar tema">' +
-      I(S.theme === 'dark' ? 'sun' : 'moon', 18) +
+      '<button class="rail__btn" data-act="theme" data-tip="Aparência" data-tip-pos="right" ' +
+      'aria-label="Aparência: ' + esc(themeById(S.theme).name) + '" aria-haspopup="dialog">' +
+      I(isDarkTheme(S.theme) ? 'moon' : 'sun', 18) +
       '</button>' +
       '<div class="rail__sep"></div>' +
       '<button class="rail__btn rail__avatar" data-act="me" data-tip="' +
@@ -639,12 +695,13 @@
       '"></span></button>';
   }
 
-  function navItemHtml(id, name, icon, count, tone) {
+  function navItemHtml(id, name, icon, count, tone, extraAttr) {
     return (
       '<button class="navitem" data-view="' +
       esc(id) +
       '"' +
       (S.view === id && S.route.name === 'inbox' ? ' aria-current="true"' : '') +
+      (extraAttr || '') +
       '>' +
       I(icon, 15) +
       '<span class="navitem__label">' +
@@ -657,6 +714,12 @@
       '</span>' +
       '</button>'
     );
+  }
+
+  function unreadMine() {
+    return D.CONVERSATIONS.filter(function (c) {
+      return inView(c, 'minha') && c.unread > 0;
+    }).length;
   }
 
   function brandBlockHtml() {
@@ -672,6 +735,25 @@
     );
   }
 
+  /** Uma pasta na coluna: item de navegação, alvo de arrastar-e-soltar e,
+      no hover, o menu para renomear ou excluir. */
+  function folderItemHtml(f) {
+    var n = countFor('pasta:' + f.id);
+    return (
+      '<div class="navfolder" data-drop-folder="' +
+      esc(f.id) +
+      '">' +
+      navItemHtml('pasta:' + f.id, f.name, 'folder', n, null) +
+      '<button class="iconbtn iconbtn--sm navfolder__more" data-folder-menu="' +
+      esc(f.id) +
+      '" aria-label="Opções da pasta ' +
+      esc(f.name) +
+      '">' +
+      I('more', 13) +
+      '</button></div>'
+    );
+  }
+
   function renderViewsColumn() {
     var col = $('#col-views');
     var navSnap = snapshotPill('.nav-pill');
@@ -682,13 +764,12 @@
     col.hidden = false;
 
     if (S.route.name === 'contatos') {
-      col.innerHTML = contactsNavHtml() + resizerHtml('views', 'right', 'Largura da lista de segmentos');
+      col.innerHTML = contactsNavHtml() + teamFootHtml() + resizerHtml('views', 'right', 'Largura da lista de segmentos');
       restorePill('.nav-pill', navSnap);
       syncNavPill($('.views__scroll'), '.navitem[aria-current="true"]', '.nav-pill');
       return;
     }
 
-    var slaCount = countFor('sv-sla');
     var html =
       brandBlockHtml() +
       '<div class="views__title"><h1>Inbox</h1>' +
@@ -700,71 +781,144 @@
       '<span>Buscar aluno, RA ou conversa</span><span class="kbd">Ctrl K</span></button>' +
       '<div class="views__scroll scroll-slim"><span class="nav-pill"></span>';
 
-    VIEWS.forEach(function (v) {
-      var n = countFor(v.id);
-      html += navItemHtml(v.id, v.name, v.icon, n, null);
-    });
+    /* "Minha caixa" também é alvo de soltar: arrastar uma conversa para lá
+       tira ela da pasta. */
+    html += '<div class="navfolder" data-drop-folder="">' + navItemHtml('minha', 'Minha caixa', 'inbox', countFor('minha'), null) + '</div>';
+    html += navItemHtml('encerrados', 'Encerrados', 'circleCheck', countFor('encerrados'), null);
 
     html +=
-      '<div class="navgroup"><button class="navgroup__head" data-group="filas" aria-expanded="' +
-      S.groups.filas +
+      '<div class="navgroup"><div class="navgroup__row"><button class="navgroup__head" data-group="pastas" aria-expanded="' +
+      S.groups.pastas +
       '">' +
       I('chevronDown', 13) +
-      'Filas da equipe</button><div class="navgroup__body" data-collapsed="' +
-      !S.groups.filas +
-      '"><div>';
-    D.QUEUES.forEach(function (q) {
-      html += navItemHtml('fila:' + q.id, q.name, q.icon, countFor('fila:' + q.id), null);
-    });
-    html += '</div></div></div>';
+      'Pastas</button>' +
+      '<button class="iconbtn iconbtn--sm" data-act="new-folder" data-tip="Nova pasta" aria-label="Nova pasta">' +
+      I('folderPlus', 14) +
+      '</button></div>' +
+      '<div class="navgroup__body" data-collapsed="' +
+      !S.groups.pastas +
+      '"><div>' +
+      S.folders.map(folderItemHtml).join('') +
+      (S.newFolder
+        ? '<div class="navfolder-input">' +
+          I('folder', 15) +
+          '<input id="new-folder-input" maxlength="40" placeholder="Nome da pasta" aria-label="Nome da nova pasta" autocomplete="off"></div>'
+        : !S.folders.length
+          ? '<button class="navgroup__empty" data-act="new-folder">' + I('plus', 12) + 'Criar a primeira pasta</button>'
+          : '') +
+      '</div></div></div>';
 
-    html +=
-      '<div class="navgroup"><button class="navgroup__head" data-group="visoes" aria-expanded="' +
-      S.groups.visoes +
-      '">' +
-      I('chevronDown', 13) +
-      'Visões salvas</button><div class="navgroup__body" data-collapsed="' +
-      !S.groups.visoes +
-      '"><div>';
-    D.SAVED_VIEWS.forEach(function (v) {
-      var n = countFor(v.id);
-      html += navItemHtml(v.id, v.name, v.icon, n, v.id === 'sv-sla' && slaCount > 0 ? 'crit' : null);
-    });
-    html += '</div></div></div></div>';
-
-    /* Presença da equipe: quem está online e com quanta carga. Vive no rodapé
-       porque é contexto de distribuição, não navegação. */
-    var online = D.AGENTS.filter(function (a) {
-      return a.presence === 'online' || a.presence === 'ocupado';
-    });
-    html +=
-      '<div class="views__foot"><div class="team-strip">' +
-      '<div class="team-strip__head"><span>Equipe agora</span><span class="mono">' +
-      online.length +
-      '/' +
-      D.AGENTS.length +
-      '</span></div>' +
-      online
-        .slice(0, 3)
-        .map(function (a) {
-          return (
-            '<div class="team-strip__row">' +
-            avatarHtml(a.name, a.initials, 'xs', null, '') +
-            '<span class="team-strip__name">' +
-            esc(a.name.split(' ')[0] + ' ' + a.name.split(' ')[1]) +
-            '</span><span class="team-strip__load">' +
-            a.open +
-            '/' +
-            a.capacity +
-            '</span></div>'
-          );
-        })
-        .join('') +
-      '</div></div>';
+    html += '</div>' + teamFootHtml();
 
     col.innerHTML = html + resizerHtml('views', 'right', 'Largura da lista de caixas');
     restorePill('.nav-pill', navSnap);
     syncNavPill($('.views__scroll'), '.navitem[aria-current="true"]', '.nav-pill');
+    var inp = $('#new-folder-input');
+    if (inp) setTimeout(function () { inp.focus(); }, 30);
+  }
+
+  /* Rodapé da coluna: só a palavra "Equipe". O detalhe — quem está e em que
+     estado — abre para cima, sob demanda. Contexto de distribuição não
+     precisa ocupar a coluna o turno inteiro. */
+  function teamFootHtml() {
+    var avail = D.AGENTS.filter(function (a) {
+      return a.presence === 'online';
+    }).length;
+    return (
+      '<div class="views__foot"><button class="team-btn" data-act="team" aria-haspopup="dialog">' +
+      I('users', 15) +
+      '<span class="team-btn__label">Equipe</span>' +
+      '<span class="team-btn__live" data-tip="' + avail + ' disponíveis agora"><i></i>' + avail + '</span>' +
+      I('chevronUp', 13) +
+      '</button></div>'
+    );
+  }
+
+  var PRESENCE = {
+    online: { label: 'Disponível', order: 0 },
+    ocupado: { label: 'Em atendimento', order: 1 },
+    ausente: { label: 'Ausente', order: 2 },
+    offline: { label: 'Offline', order: 3 },
+  };
+
+  function openTeam(anchor) {
+    var list = D.AGENTS.slice().sort(function (a, b) {
+      if (a.id === D.ME.id) return -1;
+      if (b.id === D.ME.id) return 1;
+      return PRESENCE[a.presence].order - PRESENCE[b.presence].order || a.name.localeCompare(b.name);
+    });
+    var counts = {};
+    D.AGENTS.forEach(function (a) {
+      counts[a.presence] = (counts[a.presence] || 0) + 1;
+    });
+    var html =
+      '<div class="pop__head team-pop__head"><span class="pop__title">Equipe agora</span>' +
+      '<span class="team-pop__sum">' +
+      ['online', 'ocupado', 'ausente', 'offline']
+        .filter(function (k) {
+          return counts[k];
+        })
+        .map(function (k) {
+          return '<span><i class="presence-dot" data-state="' + k + '"></i>' + counts[k] + '</span>';
+        })
+        .join('') +
+      '</span></div>' +
+      '<div class="pop__list scroll-slim team-pop__list">' +
+      list
+        .map(function (a) {
+          return (
+            '<div class="team-row">' +
+            '<span class="team-row__av">' +
+            avatarHtml(a.name, a.initials, 'sm', a.id === D.ME.id ? 'brand' : null) +
+            '<i class="presence-dot" data-state="' +
+            a.presence +
+            '"></i></span>' +
+            '<span class="team-row__text"><span class="team-row__name">' +
+            esc(a.name) +
+            (a.id === D.ME.id ? ' <span class="team-row__you">você</span>' : '') +
+            '</span><span class="team-row__role">' +
+            esc(a.role) +
+            '</span></span>' +
+            '<span class="team-row__state" data-state="' +
+            a.presence +
+            '">' +
+            PRESENCE[a.presence].label +
+            '</span></div>'
+          );
+        })
+        .join('') +
+      '</div>' +
+      '<div class="pop__foot team-pop__foot"><span>Seu status</span>' +
+      '<button class="linkbtn" data-act="me-status">' +
+      PRESENCE[D.ME.presence].label +
+      I('chevronDown', 12) +
+      '</button></div>';
+    var pop = openPop(anchor, html, { width: 300 });
+    pop.addEventListener('click', function (e) {
+      if (e.target.closest('[data-act="me-status"]')) {
+        e.stopPropagation();
+        closePop(true);
+        statusMenu(anchor);
+      }
+    });
+  }
+
+  function statusMenu(anchor) {
+    openMenu(
+      anchor,
+      [
+        { label: 'Disponível', act: 'p', value: 'online', checked: D.ME.presence === 'online' },
+        { label: 'Em atendimento', act: 'p', value: 'ocupado', checked: D.ME.presence === 'ocupado' },
+        { label: 'Ausente', act: 'p', value: 'ausente', checked: D.ME.presence === 'ausente' },
+      ],
+      function (a, v) {
+        D.ME.presence = v;
+        renderRail();
+        renderViewsColumn();
+        toast('Seu status: ' + PRESENCE[v].label, { icon: 'userCheck' });
+      },
+      { width: 220 }
+    );
   }
 
   function contactsNavHtml() {
@@ -814,12 +968,12 @@
     var sl = sla(c);
     var pm = previewMsg(c);
     var who = pm.from === 'aluno' ? '' : pm.from === 'bot' ? 'IA: ' : 'Você: ';
-    if (pm.from === 'agente' && c.assignee !== D.ME.id) {
+    if (pm.from === 'agente' && pm.authorId !== D.ME.id) {
       var ag = agent(pm.authorId);
       who = (ag ? ag.name.split(' ')[0] : 'Equipe') + ': ';
     }
-    var assignee = c.assignee ? agent(c.assignee) : null;
     var selectable = S.bulk !== null;
+    var fd = c.folder && S.view.indexOf('pasta:') !== 0 ? folder(c.folder) : null;
 
     return (
       '<button class="conv" style="--i:' +
@@ -832,7 +986,11 @@
       (c.unread > 0) +
       '" data-sla="' +
       sl.state +
-      '">' +
+      '" data-pinned="' +
+      !!c.pinned +
+      '"' +
+      (selectable ? '' : ' draggable="true"') +
+      '>' +
       '<span class="conv__rail"></span>' +
       '<span class="conv__top">' +
       (selectable
@@ -844,7 +1002,7 @@
           I('check', 11) +
           '</span>'
         : '<span class="conv__avatar">' +
-          avatarHtml(st.name, st.initials, 'sm', c.priority === 'urgente' ? 'crit' : null) +
+          studentAvatar(st, 'sm', c.priority === 'urgente' ? 'crit' : null) +
           (c.unread > 0 ? '<span class="conv__unread"></span>' : '') +
           '</span>') +
       '<span class="conv__who"><span class="conv__name">' +
@@ -854,10 +1012,26 @@
       '</span></span>' +
       '<span class="conv__time">' +
       relTime(updatedAt(c)) +
-      '</span></span>' +
+      '</span>' +
+      /* Fixar mora no hover da linha: aparece onde o olho já está. Um span
+         com papel de botão, porque um <button> dentro do <button> da linha
+         seria HTML inválido. */
+      (selectable
+        ? ''
+        : '<span class="conv__pin" role="button" tabindex="-1" data-pin="' +
+          c.id +
+          '" aria-label="' +
+          (c.pinned ? 'Desafixar' : 'Fixar no topo') +
+          '" data-tip="' +
+          (c.pinned ? 'Desafixar' : 'Fixar no topo') +
+          '">' +
+          I(c.pinned ? 'pinOff' : 'pin', 13) +
+          '</span>') +
+      '</span>' +
       '<span class="conv__subject" title="' +
       esc(c.subject) +
       '">' +
+      (c.pinned ? '<span class="conv__pinned" aria-label="Fixada">' + I('pin', 11) + '</span>' : '') +
       esc(c.subject) +
       '</span>' +
       '<span class="conv__preview" title="' +
@@ -875,22 +1049,19 @@
           I('flag', 12) +
           '</span>'
         : '') +
-      (S.view.indexOf('fila:') === 0 ? '' : '<span class="tag">' + esc(queue(c.queue).name) + '</span>') +
-      (c.tags[0] ? '<span class="tag">' + esc(c.tags[0]) + '</span>' : '') +
+      (c.ouvidoria
+        ? '<span class="tag tag--ouv">' + I('megaphone', 10) + 'Ouvidoria</span>'
+        : '<span class="tag">' + esc(queue(c.queue).name) + '</span>') +
+      (fd ? '<span class="tag tag--folder">' + I('folder', 10) + esc(fd.name) + '</span>' : c.tags[0] && !c.ouvidoria ? '<span class="tag">' + esc(c.tags[0]) + '</span>' : '') +
       '<span class="conv__meta-right">' +
       (c.status === 'encerrado'
-        ? '<span class="status status--quiet">Encerrado</span>'
-        : c.status === 'snoozed'
-          ? '<span class="sla">' + I('alarm', 11) + relTime(c.snoozedUntil) + '</span>'
-          : '<span class="sla" data-state="' +
-            sl.state +
-            '">' +
-            (sl.state === 'estourado' ? I('alertTriangle', 11) : I('clock', 11)) +
-            (sl.state === 'estourado' ? '-' + durShort(-sl.mins) : durShort(sl.mins)) +
-            '</span>') +
-      (assignee
-        ? avatarHtml(assignee.name, assignee.initials, 'xs', assignee.id === D.ME.id ? 'brand' : null)
-        : '<span class="avatar-empty" data-tip="Sem dono" title="Sem dono">' + I('user', 11) + '</span>') +
+        ? '<span class="status status--quiet">Encerrado ' + relTime(c.closedAt) + '</span>'
+        : '<span class="sla" data-state="' +
+          sl.state +
+          '">' +
+          (sl.state === 'estourado' ? I('alertTriangle', 11) : I('clock', 11)) +
+          (sl.state === 'estourado' ? '-' + durShort(-sl.mins) : durShort(sl.mins)) +
+          '</span>') +
       '</span></span></button>'
     );
   }
@@ -903,7 +1074,6 @@
       prioridade: function (v) { return 'Prioridade ' + v; },
       tag: function (v) { return v; },
       modalidade: function (v) { return v; },
-      responsavel: function (v) { return v === 'nenhum' ? 'Sem dono' : agent(v).name.split(' ')[0]; },
     };
     for (var k in S.filters) {
       if (!S.filters[k]) continue;
@@ -937,9 +1107,10 @@
     var pane = $('#pane-list');
     if (!pane) return;
     var items = listConversations();
-    var unassigned = countFor('nao-atribuidos');
+    var waiting = countFor('fila');
     var scroller = $('.conv-list', pane);
     var keepScroll = scroller ? scroller.scrollTop : 0;
+    var isFolder = S.view.indexOf('pasta:') === 0;
 
     var head =
       '<div class="panehead">' +
@@ -949,11 +1120,12 @@
           '</button>'
         : '') +
       '<div class="panehead__title"><h2>' +
+      (isFolder ? '<span class="panehead__folder">' + I('folder', 14) + '</span>' : '') +
       esc(viewLabel(S.view)) +
       '</h2><span class="panehead__sub">' +
       items.length +
       (items.length === 1 ? ' conversa' : ' conversas') +
-      (S.view === 'minha' ? ' · ' + D.ME.open + '/' + D.ME.capacity + ' da sua capacidade' : '') +
+      (S.view === 'minha' && unreadMine() ? ' · ' + unreadMine() + ' com mensagem nova' : '') +
       '</span></div>' +
       '<div class="panehead__spacer"></div>' +
       '<div class="panehead__tools">' +
@@ -971,6 +1143,7 @@
       '</button>' +
       '</div></div>';
 
+    var dis = S.bulk && S.bulk.length ? '' : ' disabled';
     var bulkbar =
       S.bulk !== null
         ? '<div class="bulkbar"><span class="bulkbar__count">' +
@@ -978,19 +1151,13 @@
           ' selecionada' +
           (S.bulk.length === 1 ? '' : 's') +
           '</span>' +
-          '<button class="btn btn--xs btn--secondary" data-act="bulk-assign"' +
-          (S.bulk.length ? '' : ' disabled') +
-          '>' +
-          I('userPlus', 13) +
-          'Atribuir</button>' +
-          '<button class="btn btn--xs btn--secondary" data-act="bulk-tag"' +
-          (S.bulk.length ? '' : ' disabled') +
-          '>' +
-          I('tag', 13) +
-          'Marcar</button>' +
-          '<button class="btn btn--xs btn--secondary" data-act="bulk-close"' +
-          (S.bulk.length ? '' : ' disabled') +
-          '>' +
+          '<button class="btn btn--xs btn--secondary" data-act="bulk-folder"' + dis + '>' +
+          I('folderInput', 13) +
+          'Pasta</button>' +
+          '<button class="btn btn--xs btn--secondary" data-act="bulk-transfer"' + dis + '>' +
+          I('arrowRightLeft', 13) +
+          'Transferir</button>' +
+          '<button class="btn btn--xs btn--secondary" data-act="bulk-close"' + dis + '>' +
           I('circleCheck', 13) +
           'Encerrar</button>' +
           '<button class="iconbtn iconbtn--sm" data-act="bulk" style="margin-left:auto" aria-label="Sair da seleção">' +
@@ -998,25 +1165,35 @@
           '</button></div>'
         : '';
 
+    /* Fixadas ganham um rótulo só quando existem — e só então o resto ganha
+       o dele, para a fronteira entre os dois grupos ficar legível. */
+    var pinnedCount = items.filter(function (c) { return c.pinned; }).length;
+    var rows = '';
+    items.forEach(function (c, i) {
+      if (pinnedCount && i === 0) rows += '<div class="conv-group">' + I('pin', 11) + 'Fixadas</div>';
+      if (pinnedCount && i === pinnedCount) rows += '<div class="conv-group">Demais conversas</div>';
+      rows += convRowHtml(c, i);
+    });
+
     var body = items.length
       ? '<div class="conv-list scroll-slim' +
         (S.enterAnim ? ' stagger' : '') +
         '" role="listbox" aria-label="Conversas">' +
-        items
-          .map(function (c, i) {
-            return convRowHtml(c, i);
-          })
-          .join('') +
+        rows +
         '</div>'
       : '<div class="conv-list scroll-slim">' +
         emptyHtml(
-          'inbox',
-          activeFilterCount() || S.search ? 'Nenhuma conversa neste recorte' : 'Caixa vazia',
+          isFolder ? 'folder' : 'inbox',
+          activeFilterCount() || S.search ? 'Nenhuma conversa neste recorte' : isFolder ? 'Pasta vazia' : 'Caixa vazia',
           activeFilterCount() || S.search
             ? 'Os filtros ativos escondem todas as conversas desta caixa.'
-            : S.view === 'nao-atribuidos'
-              ? 'Tudo que chegou já tem dono. Bom sinal.'
-              : 'Nada esperando por você aqui.',
+            : isFolder
+              ? 'Arraste uma conversa para cá, ou use "Mover para pasta" no menu da conversa.'
+              : S.view === 'encerrados'
+                ? 'O que você encerrar aparece aqui, para consulta.'
+                : waiting
+                  ? 'Nada com você agora. Há ' + waiting + ' na fila esperando atendimento.'
+                  : 'Nada esperando por você aqui.',
           activeFilterCount() || S.search
             ? '<button class="btn btn--sm btn--secondary" data-act="clear-filters">Limpar filtros</button>'
             : ''
@@ -1024,19 +1201,17 @@
         '</div>';
 
     /* "Atender próximo" reproduz o botão Atender do sistema antigo: pega a
-       conversa não atribuída mais crítica e já abre com ela atribuída. Fica no
-       TOPO da coluna porque é a primeira decisão do turno — procurar a próxima
-       conversa não pode custar uma rolagem até o fim da lista. */
+       conversa da fila mais crítica e já abre com ela atribuída. Fica no
+       TOPO da coluna porque é a primeira decisão do turno. */
     var pickNext =
-      unassigned > 0 && S.bulk === null
+      waiting > 0 && S.bulk === null && S.view !== 'encerrados'
         ? '<div class="pick-next">' +
           '<button class="btn btn--sm btn--primary btn--full" data-act="next-up">' +
           I('hand', 14) +
           'Atender próximo · ' +
-          unassigned +
+          waiting +
           ' na fila</button></div>'
         : '';
-    var foot = '';
 
     pane.innerHTML =
       resizerHtml('list', 'right', 'Largura da fila') +
@@ -1044,8 +1219,7 @@
       pickNext +
       bulkbar +
       filterBarHtml() +
-      body +
-      foot;
+      body;
     S.enterAnim = false;
     var newScroller = $('.conv-list', pane);
     if (newScroller) {
@@ -1085,23 +1259,22 @@
     var mine = c.assignee === D.ME.id;
     var closed = c.status === 'encerrado';
 
+    /* Visão do atendente: assumir, transferir para uma FILA e encerrar. Não
+       há "atribuir para fulano" — quem distribui é a fila, não o colega. */
     var actions = '';
     if (!closed) {
       if (!c.assignee) {
-        actions += '<button class="btn btn--sm btn--primary" data-act="claim">' + I('hand', 14) + 'Assumir</button>';
-      } else {
+        actions += '<button class="btn btn--sm btn--primary" data-act="claim" data-tip-key="A">' + I('hand', 14) + 'Assumir</button>';
+      } else if (mine) {
         actions +=
-          '<button class="iconbtn" data-act="assign" data-tip="Atribuir ou transferir" data-tip-key="A" aria-label="Atribuir">' +
-          I('userPlus', 15) +
-          '</button>' +
-          '<button class="iconbtn" data-act="snooze" data-tip="Adiar" data-tip-key="S" aria-label="Adiar">' +
-          I('alarm', 15) +
-          '</button>' +
-          '<button class="btn btn--sm btn--secondary" data-act="close-conv">' +
+          '<button class="btn btn--sm btn--ghost" data-act="transfer" data-tip="Transferir para outra fila" data-tip-key="F">' +
+          I('arrowRightLeft', 14) +
+          'Transferir</button>' +
+          '<button class="btn btn--sm btn--secondary" data-act="close-conv" data-tip-key="E">' +
           I('circleCheck', 14) +
           'Encerrar</button>';
       }
-    } else {
+    } else if (mine) {
       actions +=
         '<button class="btn btn--sm btn--secondary" data-act="reopen">' + I('rotateCcw', 14) + 'Reabrir</button>';
     }
@@ -1117,16 +1290,21 @@
       I('panelRight', 15) +
       '</button>';
 
+    var strip = '';
+    if (c.ouvidoria) strip += ouvStripHtml(c);
+    if (!closed && (sl.state === 'estourado' || sl.state === 'proximo' || (!c.firstResponseAt && c.assignee)))
+      strip += slaCalloutHtml(c, sl);
+
     return (
       '<div class="thread-head"><div class="thread-head__id">' +
-      avatarHtml(st.name, st.initials, 'md', c.priority === 'urgente' ? 'crit' : null) +
+      studentAvatar(st, 'md', c.priority === 'urgente' ? 'crit' : null) +
       '<div class="thread-head__text">' +
       '<div class="thread-head__name"><h2>' +
       esc(st.name) +
       '</h2><span class="thread-head__ra">RA ' +
       esc(st.ra) +
       '</span>' +
-      (c.starred ? '<span style="color:var(--ink-3)">' + I('star', 12) + '</span>' : '') +
+      (c.pinned ? '<span class="thread-head__pin" data-tip="Fixada no topo">' + I('pin', 12) + '</span>' : '') +
       '</div>' +
       '<div class="thread-head__meta">' +
       '<span class="thread-head__subject" title="' +
@@ -1134,21 +1312,78 @@
       '">' +
       esc(c.subject) +
       '</span>' +
+      '<span class="thread-head__dot">·</span><span>' +
+      esc(queue(c.queue).name) +
+      '</span>' +
       (closed
         ? '<span class="thread-head__dot">·</span><span class="status status--quiet">Encerrado ' + relTime(c.closedAt) + '</span>'
         : assignee
-          ? '<span class="thread-head__dot">·</span><span class="status" data-tone="info">' +
-            '<span class="status__dot"></span>' +
-            (mine ? 'Atribuído a você' : esc(assignee.name.split(' ')[0] + ' ' + (assignee.name.split(' ')[1] || ''))) +
-            '</span>'
-          : '<span class="thread-head__dot">·</span><span class="status" data-tone="warn" data-solid="true"><span class="status__dot"></span>Sem dono</span>') +
+          ? mine
+            ? ''
+            : '<span class="thread-head__dot">·</span><span class="status" data-tone="info"><span class="status__dot"></span>Com ' +
+              esc(assignee.name.split(' ')[0]) +
+              '</span>'
+          : '<span class="thread-head__dot">·</span><span class="status" data-tone="warn" data-solid="true"><span class="status__dot"></span>Na fila</span>') +
       '</div></div></div>' +
       '<div class="thread-head__actions">' +
       actions +
       '</div></div>' +
-      (!closed && (sl.state === 'estourado' || sl.state === 'proximo' || !c.firstResponseAt)
-        ? '<div class="thread-strip">' + slaCalloutHtml(c, sl) + '</div>'
-        : '')
+      (strip ? '<div class="thread-strip">' + strip + '</div>' : '')
+    );
+  }
+
+  /** Dias úteis entre agora e `ts` — a régua da Ouvidoria é em dias úteis. */
+  function businessDays(ts) {
+    var d = new Date();
+    var end = new Date(ts);
+    var n = 0;
+    var sign = end >= d ? 1 : -1;
+    var cur = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+    var last = new Date(end.getFullYear(), end.getMonth(), end.getDate());
+    while ((sign > 0 && cur < last) || (sign < 0 && cur > last)) {
+      cur.setDate(cur.getDate() + sign);
+      var w = cur.getDay();
+      if (w !== 0 && w !== 6) n += sign;
+    }
+    return n;
+  }
+
+  function ouvDeadline(o) {
+    var n = businessDays(o.deadline);
+    if (n < 0) return { tone: 'crit', label: 'prazo vencido há ' + -n + (n === -1 ? ' dia útil' : ' dias úteis') };
+    if (n === 0) return { tone: 'crit', label: 'prazo vence hoje' };
+    if (n <= 3) return { tone: 'warn', label: 'prazo em ' + n + (n === 1 ? ' dia útil' : ' dias úteis') };
+    return { tone: 'info', label: 'prazo em ' + n + ' dias úteis' };
+  }
+
+  /* A faixa da Ouvidoria: protocolo, tipo, etapa e prazo — as quatro coisas
+     que o aluno vai perguntar. Clicar abre o histórico completo ao lado. */
+  function ouvStripHtml(c) {
+    var o = c.ouvidoria;
+    var dl = ouvDeadline(o);
+    return (
+      '<button class="ouv-strip" data-tone="' +
+      dl.tone +
+      '" data-act="open-ouv-history">' +
+      '<span class="ouv-strip__icon">' +
+      I('megaphone', 14) +
+      '</span>' +
+      '<span class="ouv-strip__body"><span class="ouv-strip__title">Ouvidoria · <span class="mono">' +
+      esc(o.protocol) +
+      '</span> · ' +
+      esc(o.type) +
+      '</span><span class="ouv-strip__meta">' +
+      esc(D.OUV_STAGES[o.stage - 1]) +
+      ' · ' +
+      esc(o.sector) +
+      '</span></span>' +
+      '<span class="ouv-strip__deadline">' +
+      I('clock', 12) +
+      esc(dl.label) +
+      '</span>' +
+      '<span class="ouv-strip__go">Ver linha do tempo' +
+      I('arrowRight', 12) +
+      '</span></button>'
     );
   }
 
@@ -1186,14 +1421,14 @@
     var st = student(c.studentId);
     var who = isIn ? st : agent(m.authorId) || D.BOT;
     var direction = isNote ? 'note' : isIn ? 'in' : m.from === 'bot' ? 'bot' : 'out';
-    var body = esc(m.text).replace(/@([A-ZÁÉÍÓÚÂÊÔÃÕÇ][\wÀ-ú]+(?: [A-ZÁÉÍÓÚÂÊÔÃÕÇ][\wÀ-ú]+)?)/g, '<span class="msg__mention">@$1</span>');
+    var body = withMentions(m.text);
 
     return (
       '<div class="msg msg--' +
       direction +
       (isNew ? ' msg--new' : '') +
       '">' +
-      (isNote ? '' : avatarHtml(who.name, who.initials, 'sm', m.from === 'bot' ? 'bot' : isIn ? null : 'brand')) +
+      (isNote ? '' : avatarHtml(who.name, who.initials, 'sm', m.from === 'bot' ? 'bot' : isIn ? null : 'brand', '', isIn ? who.photo : null)) +
       '<div class="msg__col">' +
       (isNote
         ? '<div class="msg__author">' + I('note', 12) + 'Nota interna · ' + esc(who.name) + '</div>'
@@ -1251,19 +1486,31 @@
         '<p><strong>Atendimento encerrado</strong> ' +
         relTime(c.closedAt) +
         (c.rating ? ' · nota ' + c.rating : '') +
-        '. Reabra para voltar a responder.</p>' +
-        '<button class="btn btn--sm btn--secondary" data-act="reopen">' +
-        I('rotateCcw', 14) +
-        'Reabrir</button></div></div>'
+        (c.assignee === D.ME.id ? '. Reabra para voltar a responder.' : '.') +
+        '</p>' +
+        (c.assignee === D.ME.id
+          ? '<button class="btn btn--sm btn--secondary" data-act="reopen">' + I('rotateCcw', 14) + 'Reabrir</button>'
+          : '') +
+        '</div></div>'
       );
     }
     if (!c.assignee) {
       return (
         '<div class="composer"><div class="composer__lock">' +
-        '<p><strong>Ninguém assumiu esta conversa.</strong> Assuma para responder — ela sai da fila de não atribuídos e passa para a sua caixa.</p>' +
+        '<p><strong>Esta conversa está na fila de ' +
+        esc(queue(c.queue).name) +
+        '.</strong> Assuma para responder — ela passa para a sua caixa.</p>' +
         '<button class="btn btn--sm btn--primary" data-act="claim">' +
         I('hand', 14) +
         'Assumir</button></div></div>'
+      );
+    }
+    if (c.assignee !== D.ME.id) {
+      return (
+        '<div class="composer"><div class="composer__lock">' +
+        '<p><strong>Em atendimento com ' +
+        esc(agent(c.assignee).name.split(' ')[0]) +
+        '.</strong> Você pode ler a conversa; quem responde é quem está com ela.</p></div></div>'
       );
     }
 
@@ -1393,9 +1640,14 @@
     if (pillSel === '.rail-pill') {
       pill.style.transform = 'translateY(' + active.offsetTop + 'px)';
     } else {
-      pill.style.width = active.offsetWidth + 'px';
-      pill.style.height = active.offsetHeight + 'px';
-      pill.style.transform = 'translate(' + active.offsetLeft + 'px,' + active.offsetTop + 'px)';
+      /* Medido por retângulo, não por offsetTop: um item dentro de uma pasta
+         (ou de um grupo) tem outro offsetParent e a pílula pousaria no topo. */
+      var cr = container.getBoundingClientRect();
+      var ar = active.getBoundingClientRect();
+      pill.style.width = ar.width + 'px';
+      pill.style.height = ar.height + 'px';
+      pill.style.transform =
+        'translate(' + (ar.left - cr.left + container.scrollLeft) + 'px,' + (ar.top - cr.top + container.scrollTop) + 'px)';
     }
     pill.style.opacity = '1';
     if (first) {
@@ -1571,6 +1823,30 @@
     });
   }
 
+  function shortDate(ts) {
+    var d = new Date(ts);
+    return pad(d.getDate()) + '/' + pad(d.getMonth() + 1);
+  }
+
+  /** Destaca @menções num texto já escapado. */
+  function withMentions(text) {
+    return esc(text).replace(
+      /@([A-ZÁÉÍÓÚÂÊÔÃÕÇ][\wÀ-ú]+(?: [A-ZÁÉÍÓÚÂÊÔÃÕÇ][\wÀ-ú]+){0,2})/g,
+      '<span class="msg__mention">@$1</span>'
+    );
+  }
+
+  /* ----------------------------------------------------------------------
+     O painel direito tem três andares fixos:
+       1. abas (Aluno · Copilot · Histórico)
+       2. o conteúdo da aba, que rola
+       3. as notas internas — ancoradas no rodapé, com rolagem PRÓPRIA.
+     Rolar o painel nunca leva as notas embora: elas são a primeira coisa a
+     ler ao abrir um atendimento, então não podem depender de rolagem.
+     ---------------------------------------------------------------------- */
+
+  var ctxMemo = { id: null, tab: null, scroll: 0, notesScroll: 0 };
+
   function renderContext() {
     var pane = $('#pane-context');
     if (!pane) return;
@@ -1584,40 +1860,204 @@
     }
     var st = student(c.studentId);
 
+    /* Re-render no mesmo aluno e na mesma aba preserva as duas rolagens. */
+    var oldBody = $('.ctx', pane);
+    var oldNotes = $('.notes-dock__list', pane);
+    var same = ctxMemo.id === c.id && ctxMemo.tab === S.ctxTab;
+    var keep = same && oldBody ? oldBody.scrollTop : 0;
+    var keepNotes = ctxMemo.id === c.id && oldNotes ? oldNotes.scrollTop : 0;
+    var draft = $('#dock-note', pane);
+    if (draft) S.noteDraft = draft.value;
+    if (ctxMemo.id !== c.id) S.noteDraft = '';
+
+    var tabs = [
+      { id: 'aluno', label: 'Aluno', icon: 'user' },
+      { id: 'copilot', label: 'Copilot', icon: 'sparkles' },
+      { id: 'historico', label: 'Histórico', icon: 'history' },
+    ];
     var head =
-      '<div class="panehead"><div class="seg" data-seg="ctx" style="width:100%">' +
+      '<div class="panehead"><div class="seg seg--fill" data-seg="ctx" role="tablist">' +
       '<span class="seg__thumb"></span>' +
-      '<button class="seg__opt" data-ctx-tab="aluno" role="tab" aria-selected="' +
-      (S.ctxTab === 'aluno') +
-      '" style="flex:1">' +
-      I('user', 12) +
-      'Aluno</button>' +
-      '<button class="seg__opt" data-ctx-tab="copilot" role="tab" aria-selected="' +
-      (S.ctxTab === 'copilot') +
-      '" style="flex:1">' +
-      I('sparkles', 12) +
-      'Copilot</button></div></div>';
+      tabs
+        .map(function (t) {
+          return (
+            '<button class="seg__opt" data-ctx-tab="' +
+            t.id +
+            '" role="tab" aria-selected="' +
+            (S.ctxTab === t.id) +
+            '">' +
+            I(t.icon, 12) +
+            t.label +
+            '</button>'
+          );
+        })
+        .join('') +
+      '</div></div>';
+
+    var body =
+      S.ctxTab === 'copilot' ? copilotHtml(c, st) : S.ctxTab === 'historico' ? historyPanelHtml(c, st) : studentPanelHtml(c, st);
 
     pane.innerHTML =
       resizerHtml('context', 'left', 'Largura do painel do aluno') +
       head +
-      (S.ctxTab === 'copilot' ? copilotHtml(c) : studentPanelHtml(c, st));
+      '<div class="ctx scroll-slim' +
+      (same ? '' : ' ctx--enter') +
+      '">' +
+      body +
+      '</div>' +
+      notesDockHtml(c, st);
     syncSegThumbs(pane);
+
+    var nb = $('.ctx', pane);
+    if (nb) nb.scrollTop = keep;
+    var nl = $('.notes-dock__list', pane);
+    if (nl) nl.scrollTop = keepNotes;
+    var ta = $('#dock-note', pane);
+    if (ta && S.noteDraft) {
+      ta.value = S.noteDraft;
+      autoGrowNote(ta);
+    }
+    ctxMemo.id = c.id;
+    ctxMemo.tab = S.ctxTab;
+  }
+
+  /* -- Notas internas (rodapé fixo) ---------------------------------------- */
+
+  function notesFor(c, st) {
+    var out = st.notes.map(function (n) {
+      return { author: n.author, at: n.at, text: n.text, scope: 'aluno' };
+    });
+    D.CONVERSATIONS.forEach(function (o) {
+      if (o.studentId !== st.id) return;
+      o.messages.forEach(function (m) {
+        if (m.from === 'nota') out.push({ author: m.authorId, at: m.at, text: m.text, scope: o.id === c.id ? 'conversa' : 'outra', fresh: S.flashAt === m.at });
+      });
+    });
+    return out.sort(function (a, b) {
+      return b.at - a.at;
+    });
+  }
+
+  function notesDockHtml(c, st) {
+    var notes = notesFor(c, st);
+    var scopeLabel = { aluno: 'ficha do aluno', conversa: 'nesta conversa', outra: 'outra conversa' };
+    return (
+      '<section class="notes-dock" data-has="' +
+      (notes.length > 0) +
+      '" aria-label="Notas internas">' +
+      '<header class="notes-dock__head">' +
+      '<span class="notes-dock__title">' +
+      I('note', 13) +
+      'Notas internas' +
+      (notes.length ? '<span class="notes-dock__count">' + notes.length + '</span>' : '') +
+      '</span><span class="notes-dock__hint">' +
+      I('lock', 11) +
+      'só a equipe vê</span></header>' +
+      '<div class="notes-dock__list scroll-slim">' +
+      (notes.length
+        ? notes
+            .map(function (n) {
+              var who = agent(n.author) || D.ME;
+              return (
+                '<article class="note-card' +
+                (n.fresh ? ' note-card--new' : '') +
+                '"><div class="note-card__meta"><span class="note-card__who">' +
+                esc(who.id === D.ME.id ? 'Você' : who.name.split(' ').slice(0, 2).join(' ')) +
+                '</span><span class="note-card__when" title="' +
+                fullDate(n.at) +
+                '">' +
+                relTime(n.at) +
+                '</span><span class="note-card__scope">' +
+                scopeLabel[n.scope] +
+                '</span></div><p class="note-card__text">' +
+                withMentions(n.text) +
+                '</p></article>'
+              );
+            })
+            .join('')
+        : '<p class="notes-dock__empty">Nenhuma nota ainda. O que você registrar aqui fica com o aluno e aparece para quem atender depois.</p>') +
+      '</div>' +
+      '<div class="notes-dock__form">' +
+      '<textarea id="dock-note" rows="1" placeholder="Adicionar nota para a equipe…" aria-label="Nova nota interna"></textarea>' +
+      '<button class="iconbtn iconbtn--sm notes-dock__send" data-act="dock-note-save" data-tip="Salvar nota (Enter)" aria-label="Salvar nota">' +
+      I('send', 13) +
+      '</button></div></section>'
+    );
+  }
+
+  function autoGrowNote(box) {
+    box.style.height = 'auto';
+    box.style.height = Math.min(96, box.scrollHeight) + 'px';
+  }
+
+  function saveDockNote() {
+    var c = S.selected ? conv(S.selected) : null;
+    var ta = $('#dock-note');
+    if (!c || !ta || !ta.value.trim()) return;
+    var at = Date.now();
+    c.messages.push({ from: 'nota', authorId: D.ME.id, text: ta.value.trim(), at: at });
+    S.noteDraft = '';
+    ta.value = '';
+    S.flashAt = at;
+    var list = $('.notes-dock__list');
+    if (list) list.scrollTop = 0;
+    renderThread();
+    scrollMessages(true);
+    S.flashAt = at;
+    renderContext();
+    S.flashAt = null;
+    var again = $('#dock-note');
+    if (again) again.focus();
+    toast('Nota salva para a equipe', { icon: 'note', sub: 'Aparece na conversa e no painel. O aluno não vê.' });
+  }
+
+  /* -- Aba Aluno ----------------------------------------------------------- */
+
+  function insightFor(c) {
+    var base = D.COPILOT[c.id];
+    if (base) return base;
+    return {
+      need: 'Resolver: ' + c.aiIntent.charAt(0).toLowerCase() + c.aiIntent.slice(1) + '.',
+      sentiment: c.priority === 'urgente' ? 'urgente' : c.priority === 'alta' ? 'ansioso' : 'calmo',
+      todo: [nextAction(c, student(c.studentId)).split('\n')[0]],
+      watch: null,
+    };
+  }
+
+  var SENTIMENT = {
+    calmo: { label: 'Tranquilo', tone: 'ok' },
+    satisfeito: { label: 'Satisfeito', tone: 'info' },
+    ansioso: { label: 'Ansioso', tone: 'warn' },
+    frustrado: { label: 'Frustrado', tone: 'risk' },
+    urgente: { label: 'Urgente', tone: 'crit' },
+  };
+
+  function ouvStepsHtml(o, compact) {
+    return (
+      '<ol class="ouv-steps' +
+      (compact ? ' ouv-steps--compact' : '') +
+      '">' +
+      D.OUV_STAGES.map(function (label, i) {
+        var state = i + 1 < o.stage ? 'done' : i + 1 === o.stage ? 'now' : 'next';
+        return (
+          '<li class="ouv-steps__item" data-state="' +
+          state +
+          '"><span class="ouv-steps__dot">' +
+          (state === 'done' ? I('check', 9) : '') +
+          '</span><span class="ouv-steps__label">' +
+          esc(label) +
+          '</span></li>'
+        );
+      }).join('') +
+      '</ol>'
+    );
   }
 
   function studentPanelHtml(c, st) {
     var fin = financialTone(st);
     var aca = academicTone(st);
-    var hist = historyFor(st.id);
-    var notes = st.notes.concat(
-      c.messages
-        .filter(function (m) {
-          return m.from === 'nota';
-        })
-        .map(function (m) {
-          return { author: m.authorId, at: m.at, text: m.text };
-        })
-    );
+    var ins = insightFor(c);
+    var sen = SENTIMENT[ins.sentiment] || SENTIMENT.calmo;
 
     var alerts = st.alerts.length
       ? '<div class="stack stack--sm" style="padding:0 16px 14px">' +
@@ -1637,10 +2077,26 @@
         '</div>'
       : '';
 
+    var ouv = c.ouvidoria
+      ? '<button class="ouv-mini" data-ctx-tab="historico">' +
+        '<span class="ouv-mini__top"><span class="ouv-mini__title">' +
+        I('megaphone', 13) +
+        'Ouvidoria <span class="mono">' +
+        esc(c.ouvidoria.protocol) +
+        '</span></span><span class="ouv-mini__dl" data-tone="' +
+        ouvDeadline(c.ouvidoria).tone +
+        '">' +
+        esc(ouvDeadline(c.ouvidoria).label) +
+        '</span></span>' +
+        ouvStepsHtml(c.ouvidoria, true) +
+        '</button>'
+      : '';
+
+    var fd = c.folder ? folder(c.folder) : null;
+
     return (
-      '<div class="ctx scroll-slim">' +
       '<div class="ctx__id">' +
-      avatarHtml(st.name, st.initials, 'lg', st.academic === 'risco' ? 'crit' : null) +
+      studentAvatar(st, 'lg', st.academic === 'risco' ? 'crit' : null) +
       '<div><div class="ctx__name">' +
       esc(st.name) +
       '</div><div class="ctx__ra">RA ' +
@@ -1666,10 +2122,23 @@
       '</button>' +
       '<button class="iconbtn" data-act="mail" data-tip="Enviar e-mail" aria-label="E-mail">' +
       I('mail', 15) +
-      '</button>' +
-      '<button class="iconbtn" data-act="add-note" data-tip="Nota interna" data-tip-key="N" aria-label="Nota interna">' +
-      I('note', 15) +
       '</button></div>' +
+      /* O Copilot já abre dizendo o que o aluno precisa — o atendente não
+         precisa trocar de aba para saber por onde começar. */
+      '<button class="cp-teaser" data-ctx-tab="copilot">' +
+      '<span class="cp-teaser__head">' +
+      I('sparkles', 12) +
+      'O que o aluno precisa<span class="cp-teaser__sent" data-tone="' +
+      sen.tone +
+      '"><i></i>' +
+      sen.label +
+      '</span></span>' +
+      '<span class="cp-teaser__need">' +
+      esc(ins.need) +
+      '</span><span class="cp-teaser__go">Abrir o Copilot' +
+      I('arrowRight', 11) +
+      '</span></button>' +
+      ouv +
       alerts +
       accHtml(
         'atendimento',
@@ -1677,7 +2146,6 @@
         null,
         kv('Fila', esc(queue(c.queue).name)) +
           kv('Canal', esc(channel(c.channel).name)) +
-          kv('Responsável', c.assignee ? esc(agent(c.assignee).name) : '<span style="color:var(--ink-4)">sem dono</span>') +
           kv('Prioridade', esc(c.priority.charAt(0).toUpperCase() + c.priority.slice(1))) +
           kv('Aberta', relTime(createdAt(c))) +
           kv(
@@ -1686,6 +2154,7 @@
               ? '<span class="mono">' + dur(Math.round((c.firstResponseAt - createdAt(c)) / 60000)) + '</span>'
               : '<span style="color:var(--crit-ink)">pendente</span>'
           ) +
+          (fd ? kv('Pasta', '<span class="kv-folder">' + I('folder', 12) + esc(fd.name) + '</span>') : '') +
           '<div style="margin-top:10px" class="tagrow">' +
           c.tags
             .map(function (t) {
@@ -1714,9 +2183,7 @@
           kv('Turno', esc(st.shift)) +
           kv('Período', '<span class="mono">' + st.period + 'º</span>') +
           kv('Dependências', '<span class="mono">' + st.dps + '</span>') +
-          (st.enrollments.length > 1
-            ? kv('Matrículas', st.enrollments.map(esc).join('<br>'))
-            : '')
+          (st.enrollments.length > 1 ? kv('Matrículas', st.enrollments.map(esc).join('<br>')) : '')
       ) +
       accHtml(
         'financeiro',
@@ -1731,95 +2198,268 @@
               'Simular renegociação</button></div>'
             : '')
       ) +
-      accHtml(
-        'conversas',
-        'Conversas anteriores',
-        String(hist.length),
-        hist.length
-          ? hist
-              .slice(0, 4)
-              .map(function (h) {
-                return (
-                  '<button class="ctx-conv" data-history="' +
-                  h.id +
-                  '"><span class="ctx-conv__top"><span class="ctx-conv__subject">' +
-                  esc(h.subject) +
-                  '</span><span class="ctx-conv__when">' +
-                  relTime(h.closedAt) +
-                  '</span></span><span class="ctx-conv__meta">' +
-                  esc(queue(h.queue).name) +
-                  ' · ' +
-                  (h.agent === 'bot' ? 'resolvido pela IA' : esc((agent(h.agent) || D.BOT).name.split(' ')[0])) +
-                  (h.rating ? ' · nota ' + h.rating : '') +
-                  '</span></button>'
-                );
-              })
-              .join('') +
-            (hist.length > 4
-              ? '<button class="linkbtn" data-act="open-360" style="margin:8px 0 0 10px">Ver todas as ' + hist.length + '</button>'
-              : '')
-          : '<p style="font-size:12px;color:var(--ink-4)">Primeira conversa deste aluno.</p>'
-      ) +
-      accHtml(
-        'notas',
-        'Notas internas',
-        String(notes.length),
-        notes.length
-          ? notes
-              .map(function (n) {
-                return (
-                  '<div style="padding:8px 0;border-top:1px solid var(--hairline)"><div style="display:flex;justify-content:space-between;gap:8px;font-size:11px;color:var(--ink-4);margin-bottom:3px"><span>' +
-                  esc((agent(n.author) || D.ME).name) +
-                  '</span><span class="mono">' +
-                  relTime(n.at) +
-                  '</span></div><p style="font-size:12px;line-height:1.6;color:var(--ink-2)">' +
-                  esc(n.text) +
-                  '</p></div>'
-                );
-              })
-              .join('')
-          : '<p style="font-size:12px;color:var(--ink-4)">Nenhuma nota ainda.</p>'
-      ) +
-      '<div style="padding:14px 16px 0"><button class="btn btn--xs btn--ghost btn--full" data-act="sync">' +
+      '<div style="padding:14px 16px 4px"><button class="btn btn--xs btn--ghost btn--full" data-act="sync">' +
       I('refresh', 12) +
       'Sincronizado ' +
       relTime(st.syncedAt) +
-      '</button></div>' +
-      '</div>'
+      '</button></div>'
+    );
+  }
+
+  /* -- Aba Histórico: tudo o que aconteceu com o aluno, em ordem ---------- */
+
+  function timelineItems(c, st) {
+    var items = [];
+    var linked = {};
+    D.CONVERSATIONS.forEach(function (o) {
+      if (o.studentId !== st.id || !o.ouvidoria) return;
+      o.ouvidoria.events.forEach(function (ev) {
+        if (ev.ref) linked[ev.ref] = true;
+        items.push({
+          at: ev.at,
+          kind: ev.kind,
+          title: ev.title,
+          body: ev.text,
+          meta: o.ouvidoria.protocol,
+          history: ev.ref || null,
+        });
+      });
+    });
+    historyFor(st.id).forEach(function (h) {
+      if (linked[h.id]) return;
+      items.push({
+        at: h.openedAt,
+        kind: 'contato',
+        title: h.subject,
+        body: h.summary,
+        meta: queue(h.queue).name + ' · ' + (h.agent === 'bot' ? 'resolvido pela IA' : (agent(h.agent) || D.BOT).name.split(' ')[0]) + (h.rating ? ' · nota ' + h.rating : ''),
+        history: h.id,
+      });
+    });
+    D.CONVERSATIONS.forEach(function (o) {
+      if (o.studentId !== st.id || o.status === 'encerrado') return;
+      items.push({
+        at: createdAt(o),
+        kind: o.id === c.id ? 'atual' : 'aberta',
+        title: o.id === c.id ? 'Esta conversa começou' : 'Outra conversa em aberto: ' + o.subject,
+        body: o.messages[0].text,
+        meta: channel(o.channel).name + ' · ' + queue(o.queue).name,
+        conv: o.id === c.id ? null : o.id,
+      });
+      (o.events || []).forEach(function (ev) {
+        items.push({ at: ev.at, kind: 'setor', title: ev.title, body: ev.text, meta: 'registro do atendimento' });
+      });
+    });
+    st.notes.forEach(function (n) {
+      items.push({ at: n.at, kind: 'nota', title: 'Nota interna · ' + (agent(n.author) || D.ME).name.split(' ').slice(0, 2).join(' '), body: n.text, meta: 'visível só para a equipe' });
+    });
+    return items.sort(function (a, b) {
+      return S.histOrder === 'asc' ? a.at - b.at : b.at - a.at;
+    });
+  }
+
+  var KIND = {
+    ouvidoria: { label: 'Ouvidoria', icon: 'megaphone' },
+    setor: { label: 'Setor', icon: 'building' },
+    prazo: { label: 'Prazo', icon: 'alertTriangle' },
+    aluno: { label: 'Aluno', icon: 'messageCircle' },
+    contato: { label: 'Atendimento', icon: 'messageSquare' },
+    atual: { label: 'Agora', icon: 'messageSquare' },
+    aberta: { label: 'Em aberto', icon: 'messageSquare' },
+    nota: { label: 'Nota', icon: 'note' },
+  };
+
+  function historyPanelHtml(c, st) {
+    var o = c.ouvidoria;
+    var items = timelineItems(c, st);
+    var card = '';
+    if (o) {
+      var dl = ouvDeadline(o);
+      card =
+        '<div class="ouv-card">' +
+        '<div class="ouv-card__head"><span class="ouv-card__title">' +
+        I('megaphone', 14) +
+        'Manifestação de ouvidoria</span><span class="ouv-card__type">' +
+        esc(o.type) +
+        '</span></div>' +
+        '<div class="ouv-card__protocol mono">' +
+        esc(o.protocol) +
+        '</div>' +
+        ouvStepsHtml(o, false) +
+        '<dl class="ouv-card__grid">' +
+        '<div><dt>Registrada</dt><dd>' +
+        shortDate(o.openedAt) +
+        ' · ' +
+        esc(o.origin) +
+        '</dd></div>' +
+        '<div><dt>Setor responsável</dt><dd>' +
+        esc(o.sector) +
+        '</dd></div>' +
+        '<div><dt>Prazo final</dt><dd><span class="ouv-card__dl" data-tone="' +
+        dl.tone +
+        '">' +
+        shortDate(o.deadline) +
+        ' · ' +
+        esc(dl.label) +
+        '</span></dd></div>' +
+        '<div><dt>Regra</dt><dd>' +
+        esc(o.deadlineRule) +
+        '</dd></div></dl>' +
+        '<button class="btn btn--xs btn--secondary btn--full" data-act="copilot-ouv">' +
+        I('sparkles', 12) +
+        'Resumir a ouvidoria com o Copilot</button></div>';
+    }
+
+    var lastDay = null;
+    var rows = items
+      .map(function (it) {
+        var day = dayLabel(it.at);
+        var sep = day !== lastDay ? '<div class="hist-day">' + esc(day) + '</div>' : '';
+        lastDay = day;
+        var k = KIND[it.kind] || KIND.contato;
+        return (
+          sep +
+          '<div class="hist-item" data-kind="' +
+          it.kind +
+          '"><span class="hist-item__dot">' +
+          I(k.icon, 11) +
+          '</span><div class="hist-item__main">' +
+          '<div class="hist-item__head"><span class="hist-item__title">' +
+          esc(it.title) +
+          '</span><span class="hist-item__when">' +
+          clock(it.at) +
+          '</span></div>' +
+          '<p class="hist-item__body">' +
+          esc(it.body) +
+          '</p>' +
+          '<div class="hist-item__meta"><span class="hist-item__kind">' +
+          k.label +
+          '</span>' +
+          (it.meta ? '<span>' + esc(it.meta) + '</span>' : '') +
+          (it.history ? '<button class="linkbtn" data-history="' + it.history + '">Ler' + I('arrowRight', 11) + '</button>' : '') +
+          (it.conv ? '<button class="linkbtn" data-goto-conv="' + it.conv + '">Abrir' + I('arrowRight', 11) + '</button>' : '') +
+          '</div></div></div>'
+        );
+      })
+      .join('');
+
+    return (
+      '<div class="hist">' +
+      card +
+      '<div class="hist__bar"><span class="hist__label">Linha do tempo · ' +
+      items.length +
+      ' registros</span>' +
+      '<div class="seg seg--xs" data-seg="hist"><span class="seg__thumb"></span>' +
+      '<button class="seg__opt" data-hist-order="desc" role="tab" aria-selected="' +
+      (S.histOrder === 'desc') +
+      '">Recentes</button>' +
+      '<button class="seg__opt" data-hist-order="asc" role="tab" aria-selected="' +
+      (S.histOrder === 'asc') +
+      '">Cronológica</button></div></div>' +
+      '<div class="hist__list">' +
+      (rows || '<p class="notes-dock__empty">Primeiro contato deste aluno.</p>') +
+      '</div></div>'
     );
   }
 
   /* -- Copilot ------------------------------------------------------------- */
 
-  var COPILOT_ACTIONS = [
-    { id: 'resumo', label: 'Resumir conversa', icon: 'fileText' },
-    { id: 'sugerir', label: 'Sugerir resposta', icon: 'messageSquare' },
-    { id: 'intencao', label: 'Identificar intenção', icon: 'zap' },
-    { id: 'proxima', label: 'Próxima melhor ação', icon: 'arrowRight' },
-    { id: 'base', label: 'Buscar na base', icon: 'bookOpen' },
-    { id: 'similares', label: 'Casos parecidos', icon: 'copy' },
-  ];
+  function copilotActions(c) {
+    var list = [
+      { id: 'sugerir', label: 'Sugerir resposta', icon: 'messageSquare' },
+      { id: 'proxima', label: 'Próxima melhor ação', icon: 'target' },
+      { id: 'resumo', label: 'Resumir conversa', icon: 'fileText' },
+      { id: 'base', label: 'Buscar na base', icon: 'bookOpen' },
+      { id: 'similares', label: 'Casos parecidos', icon: 'copy' },
+      { id: 'nota-ia', label: 'Redigir nota interna', icon: 'note' },
+    ];
+    if (c.ouvidoria) {
+      list.unshift({ id: 'ouv-resumo', label: 'Resumo da ouvidoria', icon: 'megaphone' });
+      list.splice(2, 0, { id: 'ouv-retorno', label: 'Retorno formal', icon: 'scale' });
+    }
+    return list;
+  }
 
-  function copilotHtml(c) {
-    var body =
-      '<div class="copilot">' +
-      '<p class="copilot__intro">O Copilot lê esta conversa e o cadastro do aluno. Nada é enviado sem você revisar.</p>' +
-      '<div class="copilot__grid">' +
-      COPILOT_ACTIONS.map(function (a) {
-        return (
-          '<button class="copilot__action" data-copilot="' +
-          a.id +
-          '">' +
-          I(a.icon, 14) +
-          esc(a.label) +
-          '</button>'
-        );
-      }).join('') +
-      '</div>';
+  function askChips(c) {
+    if (c.ouvidoria) return ['Qual o prazo da ouvidoria?', 'O que já foi feito até aqui?', 'Ele já reclamou antes?'];
+    return ['Ele já teve esse problema antes?', 'Tem pendência financeira?', 'O que eu respondo?'];
+  }
 
+  function copilotHtml(c, st) {
+    var ins = insightFor(c);
+    var sen = SENTIMENT[ins.sentiment] || SENTIMENT.calmo;
+    S.todo = S.todo || {};
+    var o = c.ouvidoria;
+
+    var chrono = '';
+    if (o) {
+      chrono =
+        '<div class="cp-brief__sec"><div class="cp-brief__k">Linha do tempo resumida</div><ol class="cp-chrono">' +
+        o.events
+          .map(function (ev) {
+            return '<li><span class="mono">' + shortDate(ev.at) + '</span>' + esc(ev.title) + '</li>';
+          })
+          .join('') +
+        '</ol></div>';
+    }
+
+    var brief =
+      '<section class="cp-brief">' +
+      '<div class="cp-brief__head"><span class="cp-brief__title">' +
+      I('sparkles', 13) +
+      (o ? 'Resumo do caso e da ouvidoria' : 'Resumo do caso') +
+      '</span><span class="cp-brief__stamp">gerado agora</span></div>' +
+      '<div class="cp-brief__k">O que o aluno precisa</div>' +
+      '<p class="cp-brief__need">' +
+      esc(ins.need) +
+      '</p>' +
+      '<div class="cp-brief__chips">' +
+      '<span class="cp-sent" data-tone="' +
+      sen.tone +
+      '"><i></i>' +
+      sen.label +
+      '</span>' +
+      '<span class="cp-intent">' +
+      I('zap', 11) +
+      esc(c.aiIntent) +
+      '</span></div>' +
+      '<div class="cp-brief__sec"><div class="cp-brief__k">Contexto</div><p class="cp-brief__text">' +
+      esc(c.aiSummary) +
+      '</p></div>' +
+      chrono +
+      '<div class="cp-brief__sec"><div class="cp-brief__k">Para resolver</div><ul class="cp-todo">' +
+      ins.todo
+        .map(function (t, i) {
+          var done = !!S.todo[c.id + ':' + i];
+          return (
+            '<li><button class="cp-todo__item" data-todo="' +
+            i +
+            '" aria-pressed="' +
+            done +
+            '">' +
+            I(done ? 'circleCheck' : 'circle', 14) +
+            '<span>' +
+            esc(t) +
+            '</span></button></li>'
+          );
+        })
+        .join('') +
+      '</ul></div>' +
+      (ins.watch
+        ? '<div class="cp-watch">' + I('alertCircle', 13) + '<span>' + esc(ins.watch) + '</span></div>'
+        : '') +
+      '<div class="cp-brief__foot"><button class="btn btn--xs btn--primary" data-copilot="sugerir">' +
+      I('messageSquare', 12) +
+      'Sugerir resposta</button>' +
+      (o
+        ? '<button class="btn btn--xs btn--secondary" data-copilot="ouv-retorno">' + I('scale', 12) + 'Retorno formal</button>'
+        : '<button class="btn btn--xs btn--secondary" data-copilot="proxima">' + I('target', 12) + 'Próxima ação</button>') +
+      '</div></section>';
+
+    var result = '';
     if (S.copilot.title) {
-      body +=
-        '<div class="copilot__result"><div class="copilot__result-head">' +
+      result =
+        '<div class="copilot__result" id="copilot-result"><div class="copilot__result-head">' +
         I('sparkles', 12) +
         esc(S.copilot.title) +
         '</div><div class="copilot__result-body" id="copilot-body">' +
@@ -1838,16 +2478,47 @@
         (S.copilot.insert && !S.copilot.running
           ? '<div class="copilot__result-foot"><button class="btn btn--xs btn--primary" data-act="copilot-insert">' +
             I('arrowRight', 13) +
-            'Inserir no composer</button><button class="btn btn--xs btn--ghost" data-act="copilot-dismiss">Descartar</button></div>'
+            (S.copilot.insertMode === 'note' ? 'Usar como nota' : 'Inserir no composer') +
+            '</button><button class="btn btn--xs btn--ghost" data-act="copilot-dismiss">Descartar</button></div>'
           : S.copilot.running
             ? ''
             : '<div class="copilot__result-foot"><button class="btn btn--xs btn--ghost" data-act="copilot-dismiss">Fechar</button></div>') +
         '</div>';
     }
 
-    body +=
-      '<div style="border-top:1px solid var(--hairline);padding-top:12px;margin-top:4px">' +
-      '<div style="font-size:11px;font-weight:600;color:var(--ink-3);margin-bottom:8px">Ajustar o que você escreveu</div>' +
+    var ask =
+      '<section class="cp-ask">' +
+      '<div class="cp-ask__field">' +
+      I('sparkles', 13) +
+      '<input id="copilot-ask" placeholder="Pergunte sobre este aluno…" autocomplete="off" value="' +
+      esc(S.ask.q) +
+      '"><button class="iconbtn iconbtn--sm" data-act="copilot-ask" aria-label="Perguntar">' +
+      I('send', 13) +
+      '</button></div>' +
+      (S.ask.a || S.ask.running
+        ? '<div class="cp-ask__answer" id="copilot-ask-answer">' + S.ask.a + (S.ask.running ? '<span class="copilot__caret"></span>' : '') + '</div>'
+        : '<div class="cp-ask__chips">' +
+          askChips(c)
+            .map(function (q) {
+              return '<button class="chip chip--sm" data-ask="' + esc(q) + '">' + esc(q) + '</button>';
+            })
+            .join('') +
+          '</div>') +
+      '</section>';
+
+    return (
+      '<div class="copilot">' +
+      brief +
+      result +
+      ask +
+      '<div class="cp-sec"><div class="cp-sec__title">Ações</div><div class="copilot__grid">' +
+      copilotActions(c)
+        .map(function (a) {
+          return '<button class="copilot__action" data-copilot="' + a.id + '">' + I(a.icon, 14) + esc(a.label) + '</button>';
+        })
+        .join('') +
+      '</div></div>' +
+      '<div class="cp-sec"><div class="cp-sec__title">Ajustar o que você escreveu</div>' +
       '<div class="copilot__grid">' +
       [
         { id: 'empatia', label: 'Mais empática', icon: 'smile' },
@@ -1856,20 +2527,22 @@
         { id: 'revisar', label: 'Corrigir texto', icon: 'check' },
       ]
         .map(function (a) {
-          return (
-            '<button class="copilot__action" data-copilot="' + a.id + '">' + I(a.icon, 14) + esc(a.label) + '</button>'
-          );
+          return '<button class="copilot__action" data-copilot="' + a.id + '">' + I(a.icon, 14) + esc(a.label) + '</button>';
         })
         .join('') +
-      '</div></div></div>';
-    return body;
+      '</div></div>' +
+      '<p class="copilot__intro">O Copilot lê a conversa, o cadastro, o histórico e a ouvidoria. Nada é enviado sem você revisar.</p>' +
+      '</div>'
+    );
   }
 
   /** Resultados simulados — texto derivado do caso real da conversa. */
   function copilotRun(id, c) {
     var st = student(c.studentId);
     var first = st.name.split(' ')[0];
-    var out = { title: '', text: '', chips: null, insert: null };
+    var out = { title: '', text: '', chips: null, insert: null, insertMode: 'reply' };
+    var o = c.ouvidoria;
+    var hist = historyFor(st.id);
 
     switch (id) {
       case 'resumo':
@@ -1883,13 +2556,28 @@
           (c.firstResponseAt ? ' · 1ª resposta em ' + dur(Math.round((c.firstResponseAt - createdAt(c)) / 60000)) : ' · sem 1ª resposta');
         out.chips = c.tags.concat([queue(c.queue).name]);
         break;
+      case 'ouv-resumo':
+        out.title = 'Resumo da ouvidoria · ' + o.protocol;
+        out.text =
+          o.type + ' registrada em ' + shortDate(o.openedAt) + ' (' + o.origin.toLowerCase() + '), hoje na etapa "' +
+          D.OUV_STAGES[o.stage - 1] + '" com ' + o.sector + '. ' + ouvDeadline(o).label.charAt(0).toUpperCase() + ouvDeadline(o).label.slice(1) + ' (' + shortDate(o.deadline) + ').\n\n' +
+          'Em ordem:\n' +
+          o.events
+            .map(function (ev) {
+              return '• ' + shortDate(ev.at) + ' — ' + ev.title + ': ' + ev.text;
+            })
+            .join('\n') +
+          '\n\nO que o aluno precisa agora: ' + insightFor(c).need;
+        out.chips = [o.protocol, o.type, o.sector];
+        break;
+      case 'ouv-retorno':
+        out.title = 'Retorno formal ao manifestante';
+        out.text = formalReply(c, st, first);
+        out.insert = out.text;
+        break;
       case 'intencao':
         out.title = 'Intenção detectada';
-        out.text =
-          c.aiIntent +
-          '\n\nConfiança alta. A classificação usa o texto do aluno, a fila de origem e o histórico de ' +
-          historyFor(st.id).length +
-          ' conversas anteriores deste RA.';
+        out.text = c.aiIntent + '\n\nConfiança alta. A classificação usa o texto do aluno, a fila de origem e o histórico de ' + hist.length + ' conversas anteriores deste RA.';
         out.chips = [queue(c.queue).name, 'Prioridade ' + c.priority];
         break;
       case 'sugerir':
@@ -1901,41 +2589,43 @@
         out.title = 'Próxima melhor ação';
         out.text = nextAction(c, st);
         break;
+      case 'nota-ia':
+        out.title = 'Nota interna sugerida';
+        out.text =
+          'Atendimento ' + (o ? 'da ouvidoria ' + o.protocol : 'de ' + c.aiIntent.toLowerCase()) + '. ' +
+          insightFor(c).need + ' Próximo passo: ' + insightFor(c).todo[0].toLowerCase() + '.' +
+          (insightFor(c).watch ? ' Atenção: ' + insightFor(c).watch : '');
+        out.insert = out.text;
+        out.insertMode = 'note';
+        break;
       case 'base':
         out.title = 'Da base de conhecimento';
-        out.text =
-          'Artigo: "' +
-          c.aiIntent +
-          '" — procedimento vigente para ' +
-          queue(c.queue).name +
-          '.\n\n1. Confirmar RA e identidade do aluno.\n2. Verificar bloqueios no acadêmico e no financeiro.\n3. Abrir protocolo na fila responsável.\n4. Informar o prazo oficial e registrar a nota interna.\n\nÚltima revisão: há 12 dias, por Coordenação de Atendimento.';
+        out.text = o
+          ? 'Procedimento: "Atendimento de manifestação de ouvidoria".\n\n1. Nunca pedir ao aluno que repita o relato — ele já está no protocolo.\n2. Dar uma data concreta, mesmo que seja a data do próximo retorno.\n3. Registrar cada contato como nota, citando a Ouvidoria (@Helena Martins Castro).\n4. Encerrar só depois que o aluno confirmar que o assunto foi resolvido.\n\nPrazo legal de resposta: ' + o.deadlineRule + '.'
+          : 'Artigo: "' + c.aiIntent + '" — procedimento vigente para ' + queue(c.queue).name + '.\n\n1. Confirmar RA e identidade do aluno.\n2. Verificar bloqueios no acadêmico e no financeiro.\n3. Abrir protocolo na fila responsável.\n4. Informar o prazo oficial e registrar a nota interna.\n\nÚltima revisão: há 12 dias, por Coordenação de Atendimento.';
         out.chips = ['Procedimento interno', queue(c.queue).name];
         break;
       case 'similares':
         out.title = 'Casos parecidos';
-        var sim = D.CONVERSATIONS.filter(function (o) {
-          return o.id !== c.id && o.queue === c.queue;
+        var sim = D.CONVERSATIONS.filter(function (x) {
+          return x.id !== c.id && x.queue === c.queue;
         }).slice(0, 3);
         out.text = sim.length
           ? sim
-              .map(function (o) {
-                return '• ' + o.subject + ' — ' + student(o.studentId).name + ' (' + relTime(updatedAt(o)) + ')';
+              .map(function (x) {
+                return '• ' + x.subject + ' — ' + student(x.studentId).name + ' (' + relTime(updatedAt(x)) + ')';
               })
-              .join('\n') + '\n\nOs três seguiram o mesmo procedimento da fila ' + queue(c.queue).name + '.'
+              .join('\n') + '\n\nTodos seguiram o procedimento da fila ' + queue(c.queue).name + '.'
           : 'Nenhuma conversa parecida nas últimas semanas.';
         break;
       case 'empatia':
         out.title = 'Versão mais empática';
-        out.text = S.composer.text
-          ? empathize(S.composer.text, first)
-          : 'Escreva algo no composer primeiro — eu reescrevo em cima do seu texto, não do zero.';
+        out.text = S.composer.text ? empathize(S.composer.text, first) : 'Escreva algo no composer primeiro — eu reescrevo em cima do seu texto, não do zero.';
         out.insert = S.composer.text ? out.text : null;
         break;
       case 'curta':
         out.title = 'Versão mais curta';
-        out.text = S.composer.text
-          ? S.composer.text.split(/(?<=\.)\s+/).slice(0, 2).join(' ').slice(0, 260)
-          : 'Não há texto no composer para encurtar.';
+        out.text = S.composer.text ? S.composer.text.split(/(?<=\.)\s+/).slice(0, 2).join(' ').slice(0, 260) : 'Não há texto no composer para encurtar.';
         out.insert = S.composer.text ? out.text : null;
         break;
       case 'formal':
@@ -1956,7 +2646,31 @@
     return out;
   }
 
+  /* Respostas escritas para o caso — não para a fila. É a diferença entre um
+     Copilot que ajuda e um que só preenche saudação. */
+  var REPLY_BY_CONV = {
+    c21: function (f) {
+      return 'Oi, ' + f + '. Peço desculpas: você não deveria ter precisado voltar aqui três vezes pelo mesmo assunto.\n\nAgora tenho uma resposta concreta. O Financeiro confirmou o pagamento em duplicidade e aprovou o estorno de R$ 389,00. Ele entra no lote bancário desta sexta-feira (03/10) e o crédito cai em até 2 dias úteis na mesma conta/cartão do pagamento.\n\nNa segunda-feira eu volto a falar com você para confirmar que o dinheiro chegou — e só então a sua manifestação na Ouvidoria (OUV-2026-0412) é concluída.';
+    },
+    c22: function (f) {
+      return 'Oi, ' + f + '! Tenho novidade sobre a reposição.\n\nA coordenação propôs 3 encontros de reposição das aulas práticas, aos sábados, a partir de 11/10 — todos com intérprete de Libras. A proposta será confirmada por escrito até amanhã, e eu te mando aqui as datas e os horários assim que chegar.\n\nO intérprete nas aulas regulares começa na segunda, 06/10.';
+    },
+    c23: function (f) {
+      return 'Boa noite, ' + f + '. Estou com a sua manifestação (OUV-2026-0431) e vou acompanhar pessoalmente.\n\nSe você tiver a ata da banca em PDF ou foto, pode anexar aqui mesmo — assim eu envio junto à coordenação, com a Ouvidoria em cópia, ainda hoje.\n\nTe dou um retorno até amanhã às 18h, com a posição da coordenação sobre a correção da nota. Sei que a colação está próxima e isso é prioridade.';
+    },
+    c24: function (f) {
+      return 'Oi, ' + f + '! Chegou sim 🙂\n\nO seu elogio foi encaminhado à coordenação do EAD e à própria tutora Simone. Esse tipo de retorno faz muita diferença para a equipe — obrigada por ter tirado um tempo para escrever.\n\nBons estudos, e conte com a gente no que precisar!';
+    },
+    c09: function (f) {
+      return 'Oi, ' + f + '. Obrigada por me contar o motivo — isso muda o que eu posso fazer por você.\n\nAntes de falar de trancamento, quero te mostrar duas opções: parcelar o valor em aberto em até 6x sem juros e verificar se você tem direito a algum desconto ou bolsa para o próximo semestre. Assim você não perde o semestre que já cursou.\n\nPosso simular agora? Se mesmo assim preferir trancar, eu te explico o prazo e o passo a passo.';
+    },
+    c14: function (f) {
+      return 'Boa tarde, ' + f + '. Sinto muito pela perda do emprego — vamos encontrar um caminho.\n\nConsigo um acordo para o valor em aberto com entrada reduzida e parcelas que caibam no seu momento. Fechando o acordo, a suspensão da matrícula é cancelada.\n\nQuanto você consegue pagar por mês, mais ou menos? Com isso eu já monto a proposta aqui.';
+    },
+  };
+
   function suggestReply(c, st, first) {
+    if (REPLY_BY_CONV[c.id]) return REPLY_BY_CONV[c.id](first);
     var base = {
       financeiro:
         'Oi, ' + first + '! Localizei sua mensalidade aqui.\n\nO erro no portal acontece quando o título já foi reemitido com a multa. Eu gerei uma segunda via atualizada, com vencimento para daqui a 3 dias úteis, e vou anexar o PDF nesta conversa.\n\nSe preferir parcelar o valor em aberto, também consigo simular aqui mesmo. Quer que eu faça?',
@@ -1970,14 +2684,31 @@
         'Oi, ' + first + '! Abri um chamado com o time de sistemas para liberar seu acesso.\n\nA previsão é de até 4 horas úteis. Sobre o prazo da atividade: eu registro na sua ocorrência que a falha foi do nosso lado, então a entrega não fica prejudicada.',
       'pos-ead':
         'Oi, ' + first + '! Verifiquei a sua matrícula na optativa.\n\nA escolha está registrada, mas a liberação no AVA ficou pendente. Já solicitei a sincronização manual — costuma entrar em até 24h e eu te aviso por aqui quando estiver disponível.',
+      ouvidoria:
+        'Oi, ' + first + '! Estou acompanhando o seu protocolo junto à Ouvidoria e já tenho uma posição do setor responsável. Te explico abaixo o que foi feito e qual é o próximo passo.',
     };
     return base[c.queue] || base.secretaria;
   }
 
+  function formalReply(c, st, first) {
+    var o = c.ouvidoria;
+    return (
+      'Prezado(a) ' + st.name + ',\n\n' +
+      'Em atenção à sua manifestação registrada sob o protocolo ' + o.protocol + ' em ' + shortDate(o.openedAt) + ', informamos que o caso foi analisado pelo setor responsável (' + o.sector + ').\n\n' +
+      (REPLY_BY_CONV[c.id] ? REPLY_BY_CONV[c.id](first).split('\n\n').slice(1, 2).join('') + '\n\n' : '') +
+      'Permanecemos à disposição por este canal. A manifestação será concluída após a sua confirmação de que a demanda foi atendida.\n\n' +
+      'Atenciosamente,\n' + D.ME.name + ' — Central de Atendimento UniAnchieta, em nome da Ouvidoria'
+    );
+  }
+
   function nextAction(c, st) {
+    if (c.ouvidoria) {
+      var dl = ouvDeadline(c.ouvidoria);
+      return 'Responder com data concreta e registrar para a Ouvidoria.\n\nA manifestação ' + c.ouvidoria.protocol + ' está em "' + D.OUV_STAGES[c.ouvidoria.stage - 1] + '", ' + dl.label + '. Envie a resposta ao aluno, depois deixe uma nota citando @Helena Martins Castro com o que foi informado — é assim que a Ouvidoria consegue concluir no prazo.';
+    }
     if (st.academic === 'risco')
-      return 'Oferecer renegociação antes de processar o pedido.\n\nO aluno tem ' + money(st.balance) + ' em aberto e sinalizou dificuldade financeira. Casos parecidos que receberam proposta de parcelamento na primeira resposta tiveram 3x menos evasão. Acione a equipe de retenção pela nota interna antes de encaminhar para a Secretaria.';
-    if (!c.assignee) return 'Assumir a conversa.\n\nEla está há ' + dur(Math.round((Date.now() - createdAt(c)) / 60000)) + ' sem dono e o SLA da fila ' + queue(c.queue).name + ' ' + (sla(c).state === 'estourado' ? 'já estourou' : 'vence em ' + dur(sla(c).mins)) + '.';
+      return 'Oferecer renegociação antes de processar o pedido.\n\nO aluno tem ' + money(st.balance) + ' em aberto e sinalizou dificuldade financeira. Casos parecidos que receberam proposta de parcelamento na primeira resposta tiveram 3x menos evasão.';
+    if (!c.assignee) return 'Assumir a conversa.\n\nEla está há ' + dur(Math.round((Date.now() - createdAt(c)) / 60000)) + ' na fila de ' + queue(c.queue).name + ' e o SLA ' + (sla(c).state === 'estourado' ? 'já estourou' : 'vence em ' + dur(sla(c).mins)) + '.';
     if (!c.firstResponseAt) return 'Enviar a primeira resposta agora.\n\nO aluno ainda não falou com uma pessoa. Uma primeira resposta, mesmo sem a solução final, reduz em 40% a chance de ele reabrir o assunto por outro canal.';
     if (st.balance > 0) return 'Registrar a pendência financeira na conversa.\n\nO aluno tem ' + money(st.balance) + ' em aberto, o que pode bloquear a solicitação atual. Vale avisar antes que ele descubra sozinho no portal.';
     return 'Confirmar o prazo e encerrar.\n\nO assunto já foi respondido e não há pendência no cadastro. Encerre com o template de encerramento cordial para liberar a fila.';
@@ -1990,6 +2721,81 @@
       '! Entendo perfeitamente a sua preocupação, e vou cuidar disso com você.\n\n' +
       text.replace(/^(oi|olá|ei)[,!]?\s*/i, '').replace(/^\w/, function (m) { return m.toUpperCase(); }) +
       '\n\nQualquer dúvida no caminho, é só me chamar por aqui que eu retomo de onde paramos.'
+    );
+  }
+
+  /** Perguntas livres ao Copilot — respondidas a partir dos dados do aluno. */
+  function answerQuestion(q, c, st) {
+    var k = key(q);
+    var o = c.ouvidoria;
+    var hist = historyFor(st.id);
+    if (/prazo|quando|vence/.test(k)) {
+      if (o) return 'O prazo final da manifestação ' + o.protocol + ' é ' + shortDate(o.deadline) + ' (' + ouvDeadline(o).label + '). Regra: ' + o.deadlineRule + '. O SLA desta conversa ' + (sla(c).state === 'estourado' ? 'já estourou' : 'vence em ' + dur(sla(c).mins)) + '.';
+      return 'O SLA desta conversa ' + (sla(c).state === 'estourado' ? 'estourou há ' + dur(-sla(c).mins) : 'vence em ' + dur(sla(c).mins)) + ' (fila ' + queue(c.queue).name + ').';
+    }
+    if (/feito|ja foi|andamento|aconteceu/.test(k) && o) {
+      return o.events
+        .map(function (ev) {
+          return shortDate(ev.at) + ' — ' + ev.title + '.';
+        })
+        .join('\n');
+    }
+    if (/antes|ja teve|reclamou|historico|anterior|outra vez/.test(k)) {
+      if (!hist.length) return 'Não. Esta é a primeira conversa registrada deste RA.';
+      return 'Sim, ' + hist.length + (hist.length === 1 ? ' atendimento anterior' : ' atendimentos anteriores') + ':\n' +
+        hist
+          .slice(0, 4)
+          .map(function (h) {
+            return '• ' + shortDate(h.openedAt) + ' — ' + h.subject + (h.rating ? ' (nota ' + h.rating + ')' : '');
+          })
+          .join('\n') +
+        (hist.some(function (h) { return h.rating && h.rating <= 5; }) ? '\n\nAtenção: há avaliação baixa no histórico.' : '');
+    }
+    if (/debito|financeir|deve|pagamento|boleto|divida/.test(k)) {
+      return st.balance > 0
+        ? financialTone(st).label + ': ' + money(st.balance) + ' em aberto. Vale oferecer renegociação antes de qualquer bloqueio.'
+        : 'Não há débito em aberto. Situação: ' + financialTone(st).label.toLowerCase() + '.';
+    }
+    if (/nota|observa|registr/.test(k)) {
+      var ns = notesFor(c, st);
+      return ns.length ? ns.length + ' notas internas. A mais recente (' + relTime(ns[0].at) + '): "' + ns[0].text.slice(0, 160) + (ns[0].text.length > 160 ? '…' : '') + '"' : 'Nenhuma nota interna sobre este aluno.';
+    }
+    if (/respond|dizer|escrev|falar/.test(k)) return suggestReply(c, st, st.name.split(' ')[0]);
+    if (/ouvidoria|protocolo/.test(k)) return o ? 'Manifestação ' + o.protocol + ' (' + o.type.toLowerCase() + '), etapa "' + D.OUV_STAGES[o.stage - 1] + '", setor ' + o.sector + '.' : 'Este aluno não tem manifestação de ouvidoria aberta.';
+    return 'Pelo que li na conversa e no cadastro: ' + insightFor(c).need + ' O próximo passo sugerido é: ' + insightFor(c).todo[0].toLowerCase() + '.';
+  }
+
+  /** Escrita simulada, reaproveitada pelas ações e pela pergunta livre. */
+  function typeInto(text, onStep, onDone) {
+    var i = 0;
+    var step = Math.max(3, Math.round(text.length / 42));
+    var timer = setInterval(function () {
+      i += step;
+      onStep(esc(text.slice(0, i)).replace(/\n/g, '<br>'));
+      if (i >= text.length) {
+        clearInterval(timer);
+        onDone(esc(text).replace(/\n/g, '<br>'));
+      }
+    }, 18);
+  }
+
+  function askCopilot(q) {
+    var c = S.selected ? conv(S.selected) : null;
+    if (!c || !q.trim()) return;
+    var text = answerQuestion(q, c, student(c.studentId));
+    S.ask = { q: q, a: '', running: true };
+    renderContext();
+    typeInto(
+      text,
+      function (html) {
+        S.ask.a = html;
+        var el = $('#copilot-ask-answer');
+        if (el) el.innerHTML = html + '<span class="copilot__caret"></span>';
+      },
+      function (html) {
+        S.ask = { q: q, a: html, running: false };
+        renderContext();
+      }
     );
   }
 
@@ -2042,13 +2848,15 @@
       Math.max.apply(
         null,
         data.map(function (d) {
-          return d.entradas;
+          return Math.max(d.abertos, d.finalizados);
         })
       )
     );
     var slot = iw / data.length;
-    var bw = Math.min(16, slot * 0.34);
-    var out = '<svg class="chart" width="' + w + '" height="' + h + '" role="img" aria-label="Entradas e resoluções por hora">';
+    var bw = Math.max(2, Math.min(14, slot * 0.32));
+    /* Com 30 colunas, rotular todas vira borrão: mostra um rótulo a cada N. */
+    var every = Math.ceil(data.length / 12);
+    var out = '<svg class="chart" width="' + w + '" height="' + h + '" role="img" aria-label="Atendimentos abertos e finalizados pela equipe">';
     [0, 0.5, 1].forEach(function (t) {
       var y = padT + ih - ih * t;
       out +=
@@ -2057,14 +2865,15 @@
     });
     data.forEach(function (d, i) {
       var cx = padL + slot * i + slot / 2;
-      var he = Math.max(2, (d.entradas / max) * ih);
-      var hr = Math.max(2, (d.resolvidas / max) * ih);
+      var he = Math.max(2, (d.abertos / max) * ih);
+      var hr = Math.max(2, (d.finalizados / max) * ih);
       out +=
-        '<g class="chart__col"><title>' + d.h + 'h — ' + d.entradas + ' entradas, ' + d.resolvidas + ' resolvidas</title>' +
+        '<g class="chart__col"><title>' + d.label + ' — ' + d.abertos + ' abertos, ' + d.finalizados + ' finalizados</title>' +
         '<rect class="chart__hover" x="' + (cx - slot / 2) + '" y="' + padT + '" width="' + slot + '" height="' + ih + '" rx="4"/>' +
-        '<rect x="' + (cx - bw - 1) + '" y="' + (padT + ih - he) + '" width="' + bw + '" height="' + he + '" rx="2" fill="var(--brand)" style="animation-delay:' + i * 35 + 'ms"/>' +
-        '<rect x="' + (cx + 1) + '" y="' + (padT + ih - hr) + '" width="' + bw + '" height="' + hr + '" rx="2" fill="var(--ink-4)" style="animation-delay:' + (i * 35 + 60) + 'ms"/>' +
-        '<text x="' + cx + '" y="' + (h - 6) + '" text-anchor="middle">' + d.h + '</text></g>';
+        '<rect x="' + (cx - bw - 1) + '" y="' + (padT + ih - he) + '" width="' + bw + '" height="' + he + '" rx="2" fill="var(--brand)" style="animation-delay:' + Math.min(i, 20) * 30 + 'ms"/>' +
+        '<rect x="' + (cx + 1) + '" y="' + (padT + ih - hr) + '" width="' + bw + '" height="' + hr + '" rx="2" fill="var(--ink-4)" style="animation-delay:' + (Math.min(i, 20) * 30 + 60) + 'ms"/>' +
+        (i % every === 0 ? '<text x="' + cx + '" y="' + (h - 6) + '" text-anchor="middle">' + d.k + '</text>' : '') +
+        '</g>';
     });
     return out + '</svg>';
   }
@@ -2104,9 +2913,7 @@
       rows
         .map(function (r) {
           return (
-            '<button class="barlist__row" data-bar="' +
-            esc(r.label) +
-            '"><span class="barlist__fill" style="width:' +
+            '<div class="barlist__row"><span class="barlist__fill" style="width:' +
             ((r.value / max) * 100).toFixed(1) +
             '%"></span><span class="barlist__label">' +
             esc(r.label) +
@@ -2114,7 +2921,7 @@
             r.value +
             '</span><span class="barlist__pct">' +
             Math.round((r.value / total) * 100) +
-            '%</span></button>'
+            '%</span></div>'
           );
         })
         .join('') +
@@ -2122,215 +2929,346 @@
     );
   }
 
-  function liveStats() {
-    var open = D.CONVERSATIONS.filter(isOpen);
+  /* -- Dados do período ----------------------------------------------------- */
+
+  function dayKey(offset) {
+    var d = new Date(Date.now() - offset * 86400000);
+    return pad(d.getDate()) + '/' + pad(d.getMonth() + 1);
+  }
+
+  function dailySeries(src, n) {
+    var out = [];
+    for (var i = 0; i < n; i++) {
+      var off = n - 1 - i;
+      out.push({ k: dayKey(off), label: dayKey(off), abertos: src.abertos[i % src.abertos.length], finalizados: src.finalizados[i % src.finalizados.length], eu: src.eu[i % src.eu.length] });
+    }
+    return out;
+  }
+
+  /** Período personalizado: escala a média diária dos últimos 30 dias, com
+      variação determinística — o mesmo intervalo sempre dá o mesmo número. */
+  function customPeriod(range) {
+    var base = D.DASHBOARD.periods['30d'];
+    var from = new Date(range.from + 'T00:00:00');
+    var to = new Date(range.to + 'T00:00:00');
+    var days = Math.max(1, Math.round((to - from) / 86400000) + 1);
+    var f = days / 30;
+    var j = 1 + (Math.sin(days * 2.3) * 0.06);
+    function scale(o, isTeam) {
+      return {
+        abertos: Math.max(1, Math.round(o.abertos * f * j)),
+        finalizados: Math.max(1, Math.round(o.finalizados * f * j * 0.99)),
+        transferidos: Math.max(0, Math.round(o.transferidos * f * (2 - j))),
+        tma: +(o.tma * (2 - j)).toFixed(1),
+        tmr: +(o.tmr * (2 - j)).toFixed(1),
+        csat: +Math.min(10, o.csat * (j > 1 ? 1.01 : 0.99)).toFixed(1),
+        sla: isTeam ? Math.round(o.sla * (j > 1 ? 1.01 : 0.99)) : undefined,
+      };
+    }
+    var src = { abertos: [], finalizados: [], eu: [] };
+    for (var i = 0; i < days; i++) {
+      var w = Math.sin((i + days) * 1.7) * 0.5 + Math.cos((i + days) * 0.6) * 0.5;
+      src.abertos.push(Math.round(113 + 26 * w));
+      src.finalizados.push(Math.round(106 + 24 * w * 0.9));
+      src.eu.push(Math.max(1, Math.round(11 + 4 * w)));
+    }
+    var ser = [];
+    for (var k = 0; k < days; k++) {
+      var d = new Date(from.getTime() + k * 86400000);
+      var lab = pad(d.getDate()) + '/' + pad(d.getMonth() + 1);
+      ser.push({ k: lab, label: lab, abertos: src.abertos[k], finalizados: src.finalizados[k], eu: src.eu[k] });
+    }
+    /* Mais de 31 dias: agrupa por semana, senão o gráfico vira um pente. */
+    if (days > 31) {
+      var wk = [];
+      for (var x = 0; x < ser.length; x += 7) {
+        var chunk = ser.slice(x, x + 7);
+        wk.push({
+          k: chunk[0].k,
+          label: 'Semana de ' + chunk[0].k,
+          abertos: chunk.reduce(function (a, r) { return a + r.abertos; }, 0),
+          finalizados: chunk.reduce(function (a, r) { return a + r.finalizados; }, 0),
+          eu: chunk.reduce(function (a, r) { return a + r.eu; }, 0),
+        });
+      }
+      ser = wk;
+    }
     return {
-      fila: open.filter(function (c) {
-        return !c.assignee;
-      }).length,
-      atendimento: open.filter(function (c) {
-        return !!c.assignee;
-      }).length,
-      semResposta: open.filter(function (c) {
-        return !c.firstResponseAt;
-      }).length,
-      risco: open.filter(function (c) {
-        var s = sla(c).state;
-        return s === 'estourado' || s === 'proximo';
-      }).length,
-      online: D.AGENTS.filter(function (a) {
-        return a.presence === 'online' || a.presence === 'ocupado';
-      }).length,
-      maiorEspera: open.reduce(function (acc, c) {
-        var m = Math.round((Date.now() - createdAt(c)) / 60000);
-        return !c.firstResponseAt && m > acc ? m : acc;
-      }, 0),
+      label: shortDate(from) + ' – ' + shortDate(to),
+      unit: days > 31 ? 'semana' : 'dia',
+      days: days,
+      me: scale(base.me),
+      mePrev: scale(base.mePrev),
+      team: scale(base.team, true),
+      teamPrev: scale(base.teamPrev, true),
+      series: ser,
     };
   }
 
-  function renderDashboard() {
-    var p = D.DASHBOARD.period[S.dashPeriod];
-    var st = liveStats();
-    var dist =
-      S.dashDist === 'fila' ? D.DASHBOARD.byQueue : S.dashDist === 'canal' ? D.DASHBOARD.byChannel : D.DASHBOARD.bySubject;
+  function periodData() {
+    if (S.dashPeriod === 'custom' && S.dashRange) return customPeriod(S.dashRange);
+    var p = D.DASHBOARD.periods[S.dashPeriod];
+    var out = {};
+    for (var k in p) out[k] = p[k];
+    if (!p.series) out.series = dailySeries(S.dashPeriod === '7d' ? D.DASHBOARD.daily7 : D.DASHBOARD.daily30, S.dashPeriod === '7d' ? 7 : 30);
+    else
+      out.series = p.series.map(function (r) {
+        return { k: r.k + 'h', label: r.k + 'h', abertos: r.abertos, finalizados: r.finalizados, eu: r.eu };
+      });
+    return out;
+  }
 
-    var nowCells = [
-      { id: 'fila', v: st.fila, label: 'Na fila sem dono', foot: st.maiorEspera ? 'maior espera ' + dur(st.maiorEspera) : 'nenhuma espera', view: 'nao-atribuidos' },
-      { id: 'resp', v: st.semResposta, label: 'Sem 1ª resposta', foot: 'meta 5 min', view: 'sv-frt' },
-      { id: 'atend', v: st.atendimento, label: 'Em atendimento', foot: st.online + ' atendentes online', view: 'todos' },
-      { id: 'risco', v: st.risco, label: 'SLA em risco', foot: 'vencendo ou estourado', tone: 'crit', view: 'sv-sla' },
-      { id: 'resolv', v: p.resolvidos, label: 'Resolvidos no período', foot: (p.delta >= 0 ? '+' : '') + p.delta + '% vs. anterior' },
+  /* -- Formatação ---------------------------------------------------------- */
+
+  function fmtMin(m) {
+    if (m < 1) return Math.round(m * 60) + ' s';
+    if (m < 10) {
+      var mm = Math.floor(m);
+      var ss = Math.round((m - mm) * 60);
+      return mm + ' min' + (ss ? ' ' + pad(ss) + ' s' : '');
+    }
+    if (m < 60) return Math.round(m) + ' min';
+    return dur(m);
+  }
+  function fmtNum(n) {
+    return String(n).replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+  }
+  function fmtDec(n) {
+    return n.toFixed(1).replace('.', ',');
+  }
+
+  var METRICS = [
+    { id: 'abertos', label: 'Atendimentos abertos', hint: 'conversas que você assumiu', fmt: fmtNum, better: null, perAgent: true },
+    { id: 'finalizados', label: 'Finalizados', hint: 'encerrados por você', fmt: fmtNum, better: 'up', perAgent: true },
+    { id: 'transferidos', label: 'Transferidos', hint: 'enviados para outra fila', fmt: fmtNum, better: null, perAgent: true },
+    { id: 'tma', label: 'Tempo médio de atendimento', hint: 'da primeira resposta ao encerramento', fmt: fmtMin, better: 'down' },
+    { id: 'tmr', label: 'Tempo até a 1ª resposta', hint: 'quanto o aluno espera por você', fmt: fmtMin, better: 'down' },
+    { id: 'csat', label: 'Nota média do aluno', hint: 'pesquisa após o encerramento, 0 a 10', fmt: fmtDec, better: 'up' },
+  ];
+
+  function deltaHtml(cur, prev, better) {
+    if (!prev) return '';
+    var pct = Math.round(((cur - prev) / prev) * 100);
+    if (pct === 0) return '<span class="trend" data-dir="flat">= 0%</span>';
+    var up = pct > 0;
+    var good = better ? (better === 'up') === up : null;
+    return (
+      '<span class="trend" data-dir="' +
+      (up ? 'up' : 'down') +
+      '"' +
+      (good === null ? '' : ' data-good="' + good + '"') +
+      ' title="vs. período anterior">' +
+      I(up ? 'arrowUpRight' : 'arrowDownRight', 12) +
+      Math.abs(pct) +
+      '%</span>'
+    );
+  }
+
+  function renderDashboard() {
+    var p = periodData();
+    var size = D.DASHBOARD.teamSize;
+    var dist =
+      S.dashDist === 'fila' ? D.DASHBOARD.byQueue : S.dashDist === 'transf' ? D.DASHBOARD.transferTargets : D.DASHBOARD.bySubject;
+    var waiting = countFor('fila');
+    var avail = D.AGENTS.filter(function (a) {
+      return a.presence === 'online' && a.id !== D.ME.id;
+    }).length;
+    var busy = D.AGENTS.filter(function (a) {
+      return a.presence === 'ocupado';
+    }).length;
+
+    var periods = [
+      { id: 'hoje', label: 'Hoje' },
+      { id: 'ontem', label: 'Ontem' },
+      { id: '7d', label: '7 dias' },
+      { id: '30d', label: '30 dias' },
     ];
+
+    /* Cada número seu vem com a média POR ATENDENTE da equipe embaixo. Nunca
+       o colega com o melhor número: o atendente se situa, não se ranqueia. */
+    var kpis = METRICS.map(function (m, i) {
+      var me = p.me[m.id];
+      var avg = m.perAgent ? p.team[m.id] / size : p.team[m.id];
+      var top = Math.max(me, avg) || 1;
+      return (
+        '<div class="kpi" style="--i:' +
+        i +
+        '"><div class="kpi__top"><span class="kpi__label">' +
+        esc(m.label) +
+        '</span>' +
+        deltaHtml(me, p.mePrev[m.id], m.better) +
+        '</div><div class="kpi__value">' +
+        m.fmt(me) +
+        '</div><div class="kpi__hint">' +
+        esc(m.hint) +
+        '</div>' +
+        '<div class="kpi__cmp"><div class="kpi__bars" aria-hidden="true">' +
+        '<span class="kpi__bar kpi__bar--me" style="width:' +
+        ((me / top) * 100).toFixed(1) +
+        '%"></span><span class="kpi__bar kpi__bar--team" style="width:' +
+        ((avg / top) * 100).toFixed(1) +
+        '%"></span></div>' +
+        '<div class="kpi__legend"><span><i class="kpi__sw kpi__sw--me"></i>Você</span><span><i class="kpi__sw kpi__sw--team"></i>Média da equipe <b>' +
+        (m.perAgent ? fmtDec(avg).replace(',0', '') : m.fmt(avg)) +
+        '</b></span></div></div></div>'
+      );
+    }).join('');
+
+    var t = p.team;
+    var resolution = Math.round((t.finalizados / t.abertos) * 100);
+    var teamCells = [
+      { v: fmtNum(t.abertos), label: 'Abertos', foot: deltaHtml(t.abertos, p.teamPrev.abertos, null) },
+      { v: fmtNum(t.finalizados), label: 'Finalizados', foot: deltaHtml(t.finalizados, p.teamPrev.finalizados, 'up') },
+      { v: fmtNum(t.transferidos), label: 'Transferidos', foot: '<span class="metric__foot">' + Math.round((t.transferidos / t.abertos) * 100) + '% dos abertos</span>' },
+      { v: fmtMin(t.tma), label: 'Tempo médio de atendimento', foot: deltaHtml(t.tma, p.teamPrev.tma, 'down') },
+      { v: fmtMin(t.tmr), label: 'Tempo até a 1ª resposta', foot: deltaHtml(t.tmr, p.teamPrev.tmr, 'down') },
+    ];
+
+    var rangeLabel = S.dashPeriod === 'custom' && S.dashRange ? p.label : null;
 
     var html =
       '<div class="page scroll-slim"><div class="page__inner stack route-enter stagger">' +
       '<header class="pagehead" style="--i:0"><div><div class="pagehead__eyebrow">' +
       '<span class="live-dot pulse-dot"></span>' +
-      'Operação ao vivo · atualizado agora</div>' +
-      '<h1>Operação do atendimento</h1>' +
-      '<p>O que está acontecendo agora e como a equipe está respondendo. Clique em qualquer número para abrir a fila correspondente.</p></div>' +
+      'Desempenho · ' +
+      esc(p.label) +
+      '</div>' +
+      '<h1>Seu desempenho e o da equipe</h1>' +
+      '<p>Seus números ao lado do agregado da equipe. A equipe aparece como total e média por atendente — sem nomes, para você se situar no turno, não se comparar com ninguém.</p></div>' +
       '<div class="pagehead__actions">' +
       '<div class="seg" data-seg="period"><span class="seg__thumb"></span>' +
-      ['hoje', '7d', '30d']
+      periods
         .map(function (k) {
-          return (
-            '<button class="seg__opt" data-dash-period="' +
-            k +
-            '" role="tab" aria-selected="' +
-            (S.dashPeriod === k) +
-            '">' +
-            (k === 'hoje' ? 'Hoje' : k === '7d' ? '7 dias' : '30 dias') +
-            '</button>'
-          );
+          return '<button class="seg__opt" data-dash-period="' + k.id + '" role="tab" aria-selected="' + (S.dashPeriod === k.id) + '">' + k.label + '</button>';
         })
         .join('') +
-      '</div>' +
+      '<button class="seg__opt" data-act="dash-range" role="tab" aria-selected="' +
+      (S.dashPeriod === 'custom') +
+      '">' +
+      I('calendar', 12) +
+      (rangeLabel ? esc(rangeLabel) : 'Período') +
+      '</button></div>' +
       '<button class="btn btn--sm btn--secondary" data-act="export">' +
       I('download', 14) +
       'Exportar</button></div></header>' +
 
-      '<section class="nowrow" style="--i:1">' +
-      nowCells
-        .map(function (n) {
-          /* Só é botão o número que leva a algum lugar. Um retângulo que
-             responde ao hover e não faz nada é uma promessa quebrada. */
-          var tag = n.view ? 'button' : 'div';
-          return (
-            '<' +
-            tag +
-            ' class="nowrow__cell"' +
-            (n.view ? ' data-open-view="' + n.view + '" data-tip="Abrir esta fila"' : '') +
-            '><span class="metric__value"' +
-            (n.tone && n.v > 0 ? ' data-tone="' + n.tone + '"' : '') +
-            '>' +
-            n.v +
-            '</span><span class="metric__label">' +
-            esc(n.label) +
-            '</span><span class="metric__foot">' +
-            esc(n.foot) +
-            '</span></' +
-            tag +
-            '>'
-          );
-        })
-        .join('') +
+      '<section class="perf-now" style="--i:1">' +
+      '<span class="perf-now__item"><span class="live-dot pulse-dot" style="background:var(--brand-2);color:var(--brand-2)"></span><b>Agora</b></span>' +
+      '<span class="perf-now__item"><b class="mono">' + waiting + '</b> na fila esperando atendimento</span>' +
+      '<span class="perf-now__item"><b class="mono">' + avail + '</b> colegas disponíveis · <b class="mono">' + busy + '</b> em atendimento</span>' +
+      '<span class="perf-now__item"><b class="mono">' + countFor('minha') + '</b> conversas com você</span>' +
       '</section>' +
 
-      '<section class="grid grid--dash" style="--i:2">' +
-      '<div class="card card--inset"><div class="cardhead"><div><h2>Volume por hora</h2>' +
-      '<p>Quanto entra e quanto sai. O vão entre as barras é a fila crescendo.</p></div>' +
-      '<div class="chart__legend"><span><i class="chart__swatch" style="background:var(--brand)"></i>Entradas</span>' +
-      '<span><i class="chart__swatch" style="background:var(--ink-4)"></i>Resolvidas</span></div></div>' +
-      '<div id="chart-hourly" style="margin-top:14px"></div></div>' +
+      '<section style="--i:2"><div class="section-label" style="margin-bottom:14px"><h2>Você</h2><span class="section-label__hint">comparado ao período anterior e à média da equipe</span></div>' +
+      '<div class="kpi-grid">' +
+      kpis +
+      '</div></section>' +
 
-      '<div class="card card--inset"><div class="cardhead"><div><h2>Tempos</h2>' +
-      '<p>A régua do acordo com o aluno.</p></div></div>' +
-      '<div style="margin-top:16px;display:flex;flex-direction:column;gap:16px">' +
-      '<div><span class="metric__value">' +
-      p.frt +
-      '</span><span class="metric__label">Até a 1ª resposta</span><div id="chart-frt" style="margin-top:8px"></div></div>' +
-      '<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;border-top:1px solid var(--hairline);padding-top:16px">' +
-      '<div><span class="stat__value" style="margin:0">' +
-      p.espera +
-      '</span><span class="metric__label" style="margin-top:6px">Espera na fila</span></div>' +
-      '<div><span class="stat__value" style="margin:0">' +
-      p.resolucao +
-      '</span><span class="metric__label" style="margin-top:6px">Até resolver</span></div></div>' +
-      '<div style="border-top:1px solid var(--hairline);padding-top:16px">' +
-      '<div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:8px">' +
-      '<span class="metric__label" style="margin:0">Dentro do SLA</span>' +
+      '<section style="--i:3"><div class="section-label" style="margin-bottom:16px"><h2>A equipe como um todo</h2><span class="section-label__hint">' +
+      size +
+      ' atendentes · ' +
+      resolution +
+      '% de resolução · nota média ' +
+      fmtDec(t.csat) +
+      '</span></div>' +
+      '<div class="nowrow nowrow--team">' +
+      teamCells
+        .map(function (n) {
+          return '<div class="nowrow__cell"><span class="metric__value">' + n.v + '</span><span class="metric__label">' + esc(n.label) + '</span><span class="metric__foot">' + n.foot + '</span></div>';
+        })
+        .join('') +
+      '</div></section>' +
+
+      '<section class="grid grid--dash" style="--i:4">' +
+      '<div class="card card--inset"><div class="cardhead"><div><h2>Volume da equipe por ' +
+      p.unit +
+      '</h2>' +
+      '<p>Quanto entra e quanto a equipe finaliza. O vão entre as barras é a fila crescendo.</p></div>' +
+      '<div class="chart__legend"><span><i class="chart__swatch" style="background:var(--brand)"></i>Abertos</span>' +
+      '<span><i class="chart__swatch" style="background:var(--ink-4)"></i>Finalizados</span></div></div>' +
+      '<div id="chart-volume" style="margin-top:14px"></div>' +
+      '<div class="dash-sla"><div class="dash-sla__row"><span class="metric__label" style="margin:0">Equipe dentro do SLA</span>' +
       '<span class="mono" style="font-size:13px;font-weight:500">' +
-      p.slaPct +
+      t.sla +
       '% <span style="color:var(--ink-4);font-size:11px">meta 90%</span></span></div>' +
       '<div class="meter"><div class="meter__fill" data-tone="' +
-      (p.slaPct >= 90 ? 'neutral' : 'warn') +
+      (t.sla >= 90 ? 'brand' : 'warn') +
       '" style="width:' +
-      p.slaPct +
-      '%"></div></div></div>' +
-      '</div></div></section>' +
+      t.sla +
+      '%"></div></div></div></div>' +
 
-      '<section class="grid grid--dash" style="--i:3">' +
-      '<div class="card card--inset"><div class="cardhead"><div><h2>Carga da equipe</h2>' +
-      '<p>Quem tem espaço para receber a próxima conversa.</p></div>' +
-      '<button class="linkbtn" data-act="balance">' +
-      I('refresh', 12) +
-      'Balancear fila</button></div>' +
-      '<div style="margin-top:14px">' +
-      '<div class="teamrow teamrow--head"><span>Atendente</span><span>Em aberto</span><span class="teamrow__hide">Capacidade</span><span class="teamrow__hide">1ª resposta</span><span>Situação</span></div>' +
-      D.AGENTS.map(function (a) {
-        var pct = Math.round((a.open / a.capacity) * 100);
-        var tone = pct >= 100 ? 'crit' : pct >= 80 ? 'warn' : null;
-        return (
-          '<div class="teamrow"><span class="teamrow__who">' +
-          avatarHtml(a.name, a.initials, 'sm', a.id === D.ME.id ? 'brand' : null) +
-          '<span style="min-width:0"><span class="teamrow__name">' +
-          esc(a.name) +
-          (a.id === D.ME.id ? ' <span style="color:var(--ink-4);font-weight:400">(você)</span>' : '') +
-          '</span><span class="teamrow__sub">' +
-          esc(a.role) +
-          '</span></span></span>' +
-          '<span class="teamrow__num">' +
-          a.open +
-          '</span>' +
-          '<span class="teamrow__cap teamrow__hide"><span class="meter" style="flex:1"><span class="meter__fill" style="display:block;width:' +
-          Math.min(100, pct) +
-          '%' +
-          (tone ? ';background:var(--' + (tone === 'crit' ? 'crit' : 'warn') + ')' : '') +
-          '"></span></span><span class="teamrow__num" style="font-size:11px;color:var(--ink-4)">' +
-          pct +
-          '%</span></span>' +
-          '<span class="teamrow__num teamrow__hide">' +
-          a.frt.toFixed(1) +
-          ' min</span>' +
-          '<span>' +
-          (a.presence === 'offline'
-            ? '<span class="status status--quiet">Offline</span>'
-            : pct >= 100
-              ? '<span class="status" data-tone="crit" data-solid="true"><span class="status__dot"></span>Lotado</span>'
-              : a.presence === 'ausente'
-                ? '<span class="status" data-tone="warn"><span class="status__dot"></span>Ausente</span>'
-                : '<span class="status status--quiet">Disponível</span>') +
-          '</span></div>'
-        );
-      }).join('') +
-      '</div></div>' +
-
-      '<div class="card card--inset"><div class="cardhead"><div><h2>Distribuição</h2>' +
-      '<p>Onde o volume se concentra no período.</p></div></div>' +
+      '<div class="card card--inset"><div class="cardhead"><div><h2>Onde o volume se concentra</h2>' +
+      '<p>Assuntos, filas e para onde a equipe mais transfere.</p></div></div>' +
       '<div style="margin-top:12px;margin-bottom:12px"><div class="seg seg--xs" data-seg="dist"><span class="seg__thumb"></span>' +
-      ['assunto', 'fila', 'canal']
+      [
+        { id: 'assunto', label: 'Assunto' },
+        { id: 'fila', label: 'Fila' },
+        { id: 'transf', label: 'Transferências' },
+      ]
         .map(function (k) {
-          return (
-            '<button class="seg__opt" data-dist="' +
-            k +
-            '" role="tab" aria-selected="' +
-            (S.dashDist === k) +
-            '">' +
-            k.charAt(0).toUpperCase() +
-            k.slice(1) +
-            '</button>'
-          );
+          return '<button class="seg__opt" data-dist="' + k.id + '" role="tab" aria-selected="' + (S.dashDist === k.id) + '">' + k.label + '</button>';
         })
         .join('') +
       '</div></div>' +
       barListHtml(dist) +
-      '<div style="margin-top:16px;border-top:1px solid var(--hairline);padding-top:14px;display:grid;grid-template-columns:1fr 1fr;gap:14px">' +
-      '<div><span class="stat__value" style="margin:0">' +
-      p.botPct +
-      '%</span><span class="metric__label" style="margin-top:6px">Resolvido pela IA sem atendente</span></div>' +
-      '<div><span class="stat__value" style="margin:0">' +
-      p.csat.toFixed(1) +
-      '</span><span class="metric__label" style="margin-top:6px">Nota média do aluno</span></div></div>' +
       '</div></section></div></div>';
 
     $('#main').innerHTML = html;
-    mountChart($('#chart-hourly'), function (w) {
-      return columnChartSvg(w, D.DASHBOARD.hourly);
-    });
-    mountChart($('#chart-frt'), function (w) {
-      return sparkSvg(w, D.DASHBOARD.frtSpark);
+    mountChart($('#chart-volume'), function (w) {
+      return columnChartSvg(w, p.series);
     });
     syncSegThumbs($('#main'));
+  }
+
+  function rangePopover(anchor) {
+    var today = new Date();
+    function iso(d) {
+      return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate());
+    }
+    var r = S.dashRange || { from: iso(new Date(today.getTime() - 13 * 86400000)), to: iso(today) };
+    var html =
+      '<div class="pop__head"><span class="pop__title">Período personalizado</span></div>' +
+      '<div class="range-pop">' +
+      '<label class="label">De<input class="input" type="date" id="range-from" value="' + r.from + '" max="' + iso(today) + '"></label>' +
+      '<label class="label">Até<input class="input" type="date" id="range-to" value="' + r.to + '" max="' + iso(today) + '"></label>' +
+      '<div class="range-pop__quick">' +
+      [
+        { d: 14, l: '14 dias' },
+        { d: 60, l: '60 dias' },
+        { d: 90, l: '90 dias' },
+      ]
+        .map(function (q) {
+          return '<button class="chip chip--sm" data-range-days="' + q.d + '">' + q.l + '</button>';
+        })
+        .join('') +
+      '</div><p class="help" id="range-err" hidden>A data final precisa ser depois da inicial (até 90 dias).</p></div>' +
+      '<div class="pop__foot" style="display:flex;justify-content:flex-end;gap:6px">' +
+      '<button class="btn btn--xs btn--ghost" data-close-pop>Cancelar</button>' +
+      '<button class="btn btn--xs btn--primary" data-range-apply>Aplicar</button></div>';
+    var pop = openPop(anchor, html, { width: 300, align: 'right' });
+    pop.addEventListener('click', function (e) {
+      var q = e.target.closest('[data-range-days]');
+      if (q) {
+        var n = parseInt(q.dataset.rangeDays, 10);
+        $('#range-from', pop).value = iso(new Date(today.getTime() - (n - 1) * 86400000));
+        $('#range-to', pop).value = iso(today);
+        return;
+      }
+      if (e.target.closest('[data-close-pop]')) closePop();
+      if (e.target.closest('[data-range-apply]')) {
+        var from = $('#range-from', pop).value;
+        var to = $('#range-to', pop).value;
+        var days = (new Date(to) - new Date(from)) / 86400000;
+        if (!from || !to || days < 0 || days > 89) {
+          $('#range-err', pop).hidden = false;
+          return;
+        }
+        S.dashRange = { from: from, to: to };
+        S.dashPeriod = 'custom';
+        closePop();
+        renderDashboard();
+      }
+    });
   }
 
   /* ======================================================================
@@ -2501,7 +3439,7 @@
                 '<tr data-student="' +
                 st.id +
                 '"><td><div class="cell-who">' +
-                avatarHtml(st.name, st.initials, 'sm', st.academic === 'risco' ? 'crit' : null) +
+                studentAvatar(st, 'sm', st.academic === 'risco' ? 'crit' : null) +
                 '<div style="min-width:0"><div class="cell-who__name">' +
                 esc(st.name) +
                 '</div><div class="cell-who__ra">RA ' +
@@ -2800,7 +3738,7 @@
       I('arrowLeft', 13) +
       'Contatos</button></div>' +
       '<header class="hero360"><div class="hero360__id">' +
-      avatarHtml(st.name, st.initials, 'lg', st.academic === 'risco' ? 'crit' : null) +
+      studentAvatar(st, 'lg', st.academic === 'risco' ? 'crit' : null) +
       '<div style="min-width:0"><div class="hero360__name"><h1>' +
       esc(st.name) +
       '</h1><span class="hero360__ra">RA ' +
@@ -3108,44 +4046,247 @@
     });
   }
 
-  function assignMenu(anchor, c) {
-    var items = [];
-    D.AGENTS.forEach(function (a) {
-      items.push({
-        label: a.name + (a.id === D.ME.id ? ' (você)' : ''),
-        sub: a.role + ' · ' + a.open + '/' + a.capacity + (a.presence === 'offline' ? ' · offline' : ''),
-        act: 'agent',
-        value: a.id,
-        checked: c.assignee === a.id,
-        icon: 'user',
-      });
+  /**
+   * Transferência para FILA. O atendente não escolhe o colega: escolhe o
+   * setor, e a fila distribui. O motivo vira nota interna — quem pegar do
+   * outro lado não começa do zero — e o aluno pode ser avisado na hora.
+   */
+  function transferModal(convs) {
+    convs = [].concat(convs);
+    var single = convs.length === 1 ? convs[0] : null;
+    var from = single ? single.queue : null;
+    var options = D.QUEUES.filter(function (q) {
+      return q.id !== from;
     });
-    items.push({ sep: true });
-    D.QUEUES.forEach(function (q) {
-      items.push({ label: 'Transferir para ' + q.name, act: 'queue', value: q.id, icon: q.icon, checked: false });
+    var waitingBy = {};
+    D.CONVERSATIONS.forEach(function (c) {
+      if (inView(c, 'fila')) waitingBy[c.queue] = (waitingBy[c.queue] || 0) + 1;
     });
-    items.push({ sep: true });
-    items.push({ label: 'Devolver para não atribuídos', act: 'none', icon: 'rotateCcw' });
 
+    openModal({
+      icon: 'arrowRightLeft',
+      title: single ? 'Transferir atendimento' : 'Transferir ' + convs.length + ' atendimentos',
+      sub: single ? student(single.studentId).name + ' · hoje em ' + queue(single.queue).name : 'Todas vão para a mesma fila.',
+      size: 'sm',
+      body:
+        '<p class="label">Para qual fila?</p>' +
+        '<div class="qpick" role="radiogroup">' +
+        options
+          .map(function (q, i) {
+            return (
+              '<button class="qpick__opt" role="radio" data-queue="' +
+              q.id +
+              '" aria-checked="' +
+              (i === 0) +
+              '">' +
+              '<span class="qpick__icon">' +
+              I(q.icon, 15) +
+              '</span><span class="qpick__name">' +
+              esc(q.name) +
+              '</span><span class="qpick__wait">' +
+              (waitingBy[q.id] ? waitingBy[q.id] + ' na fila' : 'fila livre') +
+              '</span></button>'
+            );
+          })
+          .join('') +
+        '</div>' +
+        '<div style="margin-top:14px"><label class="label" for="transfer-why">Contexto para quem receber <span style="color:var(--ink-4);font-weight:400">(vira nota interna)</span></label>' +
+        '<textarea class="textarea" id="transfer-why" rows="3" data-autofocus placeholder="O que já foi feito e o que falta. Ex.: aluno já enviou o RG; falta validar o aceite das DPs."></textarea></div>' +
+        (single
+          ? '<label class="checkrow"><input type="checkbox" id="transfer-tell" checked><span>Avisar o aluno que o atendimento foi transferido</span></label>'
+          : '') +
+        '<p class="help">A conversa sai da sua caixa e entra na fila escolhida. O aluno continua na mesma conversa.</p>',
+      footer:
+        '<button class="btn btn--sm btn--ghost" data-close>Cancelar</button>' +
+        '<button class="btn btn--sm btn--primary" data-confirm-transfer>' +
+        I('arrowRightLeft', 14) +
+        'Transferir</button>',
+      onMount: function (sheet, close) {
+        sheet.addEventListener('click', function (e) {
+          var opt = e.target.closest('[data-queue]');
+          if (opt) {
+            $$('[data-queue]', sheet).forEach(function (o) {
+              o.setAttribute('aria-checked', String(o === opt));
+            });
+            return;
+          }
+          if (!e.target.closest('[data-confirm-transfer]')) return;
+          var picked = $('[data-queue][aria-checked="true"]', sheet);
+          if (!picked) return;
+          var to = picked.dataset.queue;
+          var why = $('#transfer-why', sheet).value.trim();
+          var tell = $('#transfer-tell', sheet);
+          var now = Date.now();
+          convs.forEach(function (c) {
+            var prev = c.queue;
+            if (tell && tell.checked) {
+              c.messages.push({
+                from: 'agente',
+                authorId: D.ME.id,
+                text: 'Vou transferir seu atendimento para a equipe de ' + queue(to).name + ', que é quem resolve esse assunto. Você continua nesta mesma conversa — não precisa explicar de novo.',
+                at: now,
+              });
+            }
+            c.messages.push({
+              from: 'nota',
+              authorId: D.ME.id,
+              text: 'Transferido de ' + queue(prev).name + ' para ' + queue(to).name + '.' + (why ? ' ' + why : ''),
+              at: now + 1,
+            });
+            c.events = (c.events || []).concat([{ at: now, title: 'Transferido para ' + queue(to).name, text: why || 'Sem observação.' }]);
+            c.queue = to;
+            c.assignee = null;
+            c.pinned = false;
+            c.folder = null;
+            c.transferredBy = D.ME.id;
+          });
+          D.ME.open = Math.max(0, D.ME.open - convs.length);
+          saveOrg();
+          close();
+          S.bulk = null;
+          if (single && S.selected === single.id) S.selected = null;
+          ensureSelection();
+          rerenderInbox();
+          toast(single ? 'Transferido para ' + queue(to).name : convs.length + ' atendimentos transferidos para ' + queue(to).name, {
+            icon: 'arrowRightLeft',
+            sub: why ? 'O contexto foi como nota interna.' : 'Saiu da sua caixa e entrou na fila.',
+          });
+        });
+      },
+    });
+  }
+
+  /* -- Pastas -------------------------------------------------------------- */
+
+  function createFolder(name, thenMove) {
+    var f = { id: 'f-' + Date.now().toString(36), name: name.slice(0, 40) };
+    S.folders.push(f);
+    if (thenMove) [].concat(thenMove).forEach(function (c) { c.folder = f.id; });
+    saveOrg();
+    return f;
+  }
+
+  function moveToFolder(convs, folderId) {
+    convs = [].concat(convs);
+    convs.forEach(function (c) {
+      c.folder = folderId || null;
+    });
+    saveOrg();
+    /* Na própria pasta, tirar uma conversa de lá a faz sumir da lista: a
+       seleção acompanha. */
+    if (S.view.indexOf('pasta:') === 0) ensureSelection();
+    rerenderInbox();
+    var f = folderId ? folder(folderId) : null;
+    toast(f ? (convs.length > 1 ? convs.length + ' conversas movidas para ' : 'Movida para ') + f.name : 'Removida da pasta', {
+      icon: f ? 'folderInput' : 'folder',
+      sub: f ? 'Continua também em Minha caixa.' : null,
+    });
+  }
+
+  function folderPicker(anchor, convs) {
+    convs = [].concat(convs);
+    var cur = convs.length === 1 ? convs[0].folder : null;
+    var items = S.folders.map(function (f) {
+      return { label: f.name, act: 'move', value: f.id, icon: 'folder', checked: cur === f.id };
+    });
+    if (items.length) items.push({ sep: true });
+    items.push({ label: 'Nova pasta…', act: 'new', icon: 'folderPlus' });
+    if (cur) items.push({ label: 'Tirar da pasta', act: 'out', icon: 'x' });
     openMenu(
       anchor,
       items,
-      function (act, value) {
-        if (act === 'agent') {
-          c.assignee = value;
-          toast('Atribuído a ' + agent(value).name.split(' ')[0], { icon: 'userCheck' });
-        } else if (act === 'queue') {
-          c.queue = value;
-          c.assignee = null;
-          toast('Transferido para ' + queue(value).name, { icon: 'arrowRight', sub: 'A conversa voltou para a fila da equipe.' });
-        } else if (act === 'none') {
-          c.assignee = null;
-          toast('Devolvido para a fila', { icon: 'rotateCcw' });
-        }
-        rerenderInbox();
+      function (a, v) {
+        if (a === 'move') moveToFolder(convs, v);
+        else if (a === 'out') moveToFolder(convs, null);
+        else if (a === 'new') folderNameModal(null, convs);
       },
-      { width: 280 }
+      { width: 250, align: 'right' }
     );
+  }
+
+  /** Criar (com conversas para já mover) ou renomear uma pasta. */
+  function folderNameModal(f, convs) {
+    openModal({
+      icon: f ? 'pencil' : 'folderPlus',
+      title: f ? 'Renomear pasta' : 'Nova pasta',
+      sub: convs && convs.length ? (convs.length === 1 ? 'A conversa vai direto para ela.' : convs.length + ' conversas vão direto para ela.') : 'Organize a sua caixa do seu jeito.',
+      size: 'sm',
+      body: '<label class="label" for="folder-name">Nome</label><input class="input" id="folder-name" maxlength="40" data-autofocus value="' + esc(f ? f.name : '') + '" placeholder="Ex.: Aguardando retorno do setor">',
+      footer: '<button class="btn btn--sm btn--ghost" data-close>Cancelar</button><button class="btn btn--sm btn--primary" data-folder-ok>' + (f ? 'Salvar' : 'Criar pasta') + '</button>',
+      onMount: function (sheet, close) {
+        var input = $('#folder-name', sheet);
+        function ok() {
+          var name = input.value.trim();
+          if (!name) {
+            input.focus();
+            return;
+          }
+          if (f) {
+            f.name = name;
+            saveOrg();
+            toast('Pasta renomeada', { icon: 'folder' });
+          } else {
+            var nf = createFolder(name, convs);
+            toast('Pasta criada', { icon: 'folderPlus', sub: nf.name });
+          }
+          close();
+          rerenderInbox();
+        }
+        $('[data-folder-ok]', sheet).addEventListener('click', ok);
+        input.addEventListener('keydown', function (e) {
+          if (e.key === 'Enter') {
+            e.preventDefault();
+            ok();
+          }
+        });
+      },
+    });
+  }
+
+  function folderMenu(anchor, id) {
+    var f = folder(id);
+    if (!f) return;
+    openMenu(
+      anchor,
+      [
+        { label: 'Renomear', act: 'rename', icon: 'pencil' },
+        { label: 'Excluir pasta', act: 'delete', icon: 'trash', danger: true, sub: 'as conversas continuam em Minha caixa' },
+      ],
+      function (a) {
+        if (a === 'rename') folderNameModal(f);
+        else if (a === 'delete') {
+          var idx = S.folders.indexOf(f);
+          var moved = D.CONVERSATIONS.filter(function (c) { return c.folder === id; });
+          S.folders.splice(idx, 1);
+          moved.forEach(function (c) { c.folder = null; });
+          if (S.view === 'pasta:' + id) {
+            S.view = 'minha';
+            ensureSelection();
+          }
+          saveOrg();
+          rerenderInbox();
+          toast('Pasta excluída', {
+            icon: 'trash',
+            sub: f.name,
+            action: 'Desfazer',
+            onAction: function () {
+              S.folders.splice(idx, 0, f);
+              moved.forEach(function (c) { c.folder = id; });
+              saveOrg();
+              rerenderInbox();
+            },
+          });
+        }
+      },
+      { width: 260 }
+    );
+  }
+
+  function togglePin(c) {
+    c.pinned = !c.pinned;
+    saveOrg();
+    rerenderInbox();
+    toast(c.pinned ? 'Fixada no topo' : 'Desafixada', { icon: c.pinned ? 'pin' : 'pinOff', sub: student(c.studentId).name });
   }
 
   function tagPopover(anchor, c) {
@@ -3309,7 +4450,7 @@
 
   function sendMessage() {
     var c = S.selected ? conv(S.selected) : null;
-    if (!c || !c.assignee || c.status === 'encerrado') return;
+    if (!c || c.assignee !== D.ME.id || c.status === 'encerrado') return;
     var box = $('#composer-box');
     var text = (box ? box.value : S.composer.text).trim();
     if (!text) return;
@@ -3340,60 +4481,35 @@
     else maybeAutoReply(c);
   }
 
-  function snoozeMenu(anchor, c) {
-    openMenu(
-      anchor,
-      [
-        { label: 'Em 1 hora', act: 'snooze', value: '60', icon: 'clock' },
-        { label: 'Em 3 horas', act: 'snooze', value: '180', icon: 'clock' },
-        { label: 'Amanhã, 8h', act: 'snooze', value: '960', icon: 'alarm' },
-        { label: 'Segunda-feira, 8h', act: 'snooze', value: '4320', icon: 'calendar' },
-        { sep: true },
-        { label: 'Quando o aluno responder', act: 'snooze', value: '2880', icon: 'messageSquare', sub: 'volta sozinha se ele escrever' },
-      ],
-      function (act, value) {
-        c.status = 'snoozed';
-        c.snoozedUntil = Date.now() + parseInt(value, 10) * 60000;
-        rerenderInbox();
-        toast('Adiado até ' + fullDate(c.snoozedUntil), {
-          icon: 'alarm',
-          action: 'Desfazer',
-          onAction: function () {
-            c.status = 'aberto';
-            rerenderInbox();
-          },
-        });
-      },
-      { width: 250, align: 'right' }
-    );
-  }
-
   function runCopilot(id) {
     var c = S.selected ? conv(S.selected) : null;
     if (!c) return;
     var res = copilotRun(id, c);
     S.ctxTab = 'copilot';
-    S.copilot = { running: true, title: res.title, body: '', chips: res.chips, insert: null };
+    S.copilot = { running: true, title: res.title, body: '', chips: res.chips, insert: null, insertMode: res.insertMode };
     renderContext();
+    /* O resultado nasce abaixo do resumo: rola até ele, senão o atendente
+       clica numa ação e nada parece acontecer. */
+    var el0 = $('#copilot-result');
+    var box = $('.ctx');
+    if (el0 && box) box.scrollTo({ top: el0.offsetTop - 12, behavior: prefersReducedMotion() ? 'auto' : 'smooth' });
 
     /* Escrita simulada: rápida o bastante para não atrapalhar, lenta o
        bastante para o atendente ver que a resposta está sendo montada. */
-    var i = 0;
-    var text = res.text;
-    var step = Math.max(3, Math.round(text.length / 42));
-    var timer = setInterval(function () {
-      i += step;
-      S.copilot.body = esc(text.slice(0, i)).replace(/\n/g, '<br>');
-      var el = $('#copilot-body');
-      if (el) el.innerHTML = S.copilot.body + '<span class="copilot__caret"></span>';
-      if (i >= text.length) {
-        clearInterval(timer);
+    typeInto(
+      res.text,
+      function (html) {
+        S.copilot.body = html;
+        var el = $('#copilot-body');
+        if (el) el.innerHTML = html + '<span class="copilot__caret"></span>';
+      },
+      function (html) {
         S.copilot.running = false;
-        S.copilot.body = esc(text).replace(/\n/g, '<br>');
+        S.copilot.body = html;
         S.copilot.insert = res.insert;
         renderContext();
       }
-    }, 18);
+    );
   }
 
   /* -- Command palette ------------------------------------------------------ */
@@ -3439,18 +4555,27 @@
       var out = [];
       var nav = [
         { group: 'Ir para', label: 'Inbox', icon: 'inbox', hint: 'G I', run: function () { location.hash = '#/inbox'; } },
-        { group: 'Ir para', label: 'Operação', icon: 'gauge', hint: 'G D', run: function () { location.hash = '#/dashboard'; } },
+        { group: 'Ir para', label: 'Desempenho', icon: 'gauge', hint: 'G D', run: function () { location.hash = '#/dashboard'; } },
         { group: 'Ir para', label: 'Contatos', icon: 'users', hint: 'G C', run: function () { location.hash = '#/contatos'; } },
-        { group: 'Ir para', label: 'Minha caixa', icon: 'inbox', run: function () { S.view = 'minha'; location.hash = '#/inbox'; rerenderInbox(); } },
-        { group: 'Ir para', label: 'Não atribuídos', icon: 'userPlus', run: function () { S.view = 'nao-atribuidos'; location.hash = '#/inbox'; rerenderInbox(); } },
-        { group: 'Ir para', label: 'SLA em risco', icon: 'alertTriangle', run: function () { S.view = 'sv-sla'; location.hash = '#/inbox'; rerenderInbox(); } },
-      ];
+        { group: 'Ir para', label: 'Minha caixa', icon: 'inbox', run: function () { S.view = 'minha'; location.hash = '#/inbox'; ensureSelection(); rerenderInbox(); } },
+        { group: 'Ir para', label: 'Encerrados', icon: 'circleCheck', run: function () { S.view = 'encerrados'; location.hash = '#/inbox'; ensureSelection(); rerenderInbox(); } },
+      ].concat(
+        S.folders.map(function (f) {
+          return { group: 'Pastas', label: f.name, icon: 'folder', run: function () { S.view = 'pasta:' + f.id; location.hash = '#/inbox'; ensureSelection(); rerenderInbox(); } };
+        })
+      );
       var acts = [
         { group: 'Ações', label: 'Atender o próximo da fila', icon: 'hand', run: nextUp },
-        { group: 'Ações', label: 'Alternar tema claro/escuro', icon: S.theme === 'dark' ? 'sun' : 'moon', run: toggleTheme },
+        { group: 'Ações', label: 'Nova pasta', icon: 'folderPlus', run: function () { folderNameModal(null); } },
         { group: 'Ações', label: 'Nova nota interna', icon: 'note', run: function () { S.composer.mode = 'note'; renderThread(); var b = $('#composer-box'); if (b) b.focus(); } },
-        { group: 'Ações', label: 'Encerrar esta conversa', icon: 'circleCheck', run: function () { var c = conv(S.selected); if (c) closeConv(c); } },
-      ];
+        { group: 'Ações', label: 'Transferir esta conversa', icon: 'arrowRightLeft', hint: 'F', run: function () { var c = conv(S.selected); if (c && c.assignee === D.ME.id && isOpen(c)) transferModal(c); } },
+        { group: 'Ações', label: 'Fixar ou desafixar esta conversa', icon: 'pin', hint: 'P', run: function () { var c = conv(S.selected); if (c) togglePin(c); } },
+        { group: 'Ações', label: 'Encerrar esta conversa', icon: 'circleCheck', hint: 'E', run: function () { var c = conv(S.selected); if (c && c.assignee === D.ME.id && isOpen(c)) closeConv(c); } },
+      ].concat(
+        THEMES.map(function (t) {
+          return { group: 'Aparência', label: 'Tema ' + t.name + (S.theme === t.id ? ' (atual)' : ''), icon: t.dark ? 'moon' : 'sun', run: function () { applyTheme(t.id); } };
+        })
+      );
       nav.concat(acts).forEach(function (it) {
         if (!q || key(it.label).indexOf(key(q)) >= 0) out.push(it);
       });
@@ -3558,7 +4683,7 @@
         items: [
           ['Ctrl K', 'Busca e comandos'],
           ['G depois I', 'Ir para o Inbox'],
-          ['G depois D', 'Ir para a Operação'],
+          ['G depois D', 'Ir para Desempenho'],
           ['G depois C', 'Ir para Contatos'],
           ['J / K', 'Próxima / anterior na fila'],
           ['Esc', 'Fechar o que está aberto'],
@@ -3567,9 +4692,11 @@
       {
         name: 'Na conversa',
         items: [
-          ['A', 'Assumir ou atribuir'],
+          ['A', 'Assumir da fila'],
+          ['F', 'Transferir para outra fila'],
           ['E', 'Encerrar atendimento'],
-          ['S', 'Adiar'],
+          ['P', 'Fixar no topo'],
+          ['M', 'Mover para pasta'],
           ['T', 'Marcadores'],
           ['R', 'Responder ao aluno'],
           ['N', 'Nota interna'],
@@ -3749,21 +4876,133 @@
   function gotoConv(id) {
     var c = conv(id);
     if (!c) return;
+    /* Conversa de outra pessoa ou da fila abre ao lado da caixa atual, só
+       para leitura — a lista do atendente continua sendo a dele. */
     if (!inView(c, S.view)) {
-      S.view = c.status === 'encerrado' ? 'encerrados' : c.assignee === D.ME.id ? 'minha' : c.assignee ? 'todos' : 'nao-atribuidos';
+      if (c.assignee === D.ME.id) S.view = c.status === 'encerrado' ? 'encerrados' : 'minha';
     }
     location.hash = '#/inbox/' + id;
   }
 
-  function toggleTheme() {
-    S.theme = S.theme === 'dark' ? 'light' : 'dark';
-    document.documentElement.classList.toggle('dark', S.theme === 'dark');
-    document.documentElement.style.colorScheme = S.theme;
+  /* ======================================================================
+     Aparência
+     ----------------------------------------------------------------------
+     Quatro temas: dois claros e dois escuros. O botão do rail abre o seletor;
+     escolher um revela o tema novo num círculo que nasce do botão — o mesmo
+     efeito do Sucesso ao Aluno (View Transitions API + clip-path). Sem a API,
+     ou com movimento reduzido, a troca é seca.
+     ====================================================================== */
+
+  var THEMES = [
+    { id: 'claro', name: 'Claro', desc: 'O padrão. Branco e cinza neutro.', dark: false, sw: ['#f3f4f6', '#ffffff', '#eef0f2', '#00509d', '#101317'] },
+    { id: 'nevoa', name: 'Névoa', desc: 'Claro de baixo brilho, para turnos longos.', dark: false, sw: ['#d9e1ec', '#f2f5f9', '#e5ebf3', '#00509d', '#0e1621'] },
+    { id: 'grafite', name: 'Grafite', desc: 'Escuro neutro, preto acinzentado.', dark: true, sw: ['#121315', '#1b1c1f', '#232427', '#2f74c0', '#e8e9eb'] },
+    { id: 'marinho', name: 'Marinho', desc: 'Escuro com o azul da UniAnchieta.', dark: true, sw: ['#0d1522', '#132032', '#19283d', '#2c75c3', '#e5ebf2'] },
+  ];
+
+  function themeById(id) {
+    for (var i = 0; i < THEMES.length; i++) if (THEMES[i].id === id) return THEMES[i];
+    return THEMES[0];
+  }
+  function isDarkTheme(id) {
+    return themeById(id).dark;
+  }
+
+  function setThemeAttrs(id) {
+    var t = themeById(id);
+    var root = document.documentElement;
+    root.classList.toggle('dark', t.dark);
+    root.setAttribute('data-theme', t.id);
+    root.style.colorScheme = t.dark ? 'dark' : 'light';
+    var meta = $('#theme-color');
+    if (meta) meta.setAttribute('content', t.sw[0]);
+    S.theme = t.id;
     try {
-      localStorage.setItem('atendimento.v1.theme', S.theme);
-    } catch (e) {}
-    renderRail();
-    if (S.route.name === 'dashboard') renderDashboard();
+      localStorage.setItem('atendimento.v1.theme', t.id);
+    } catch (e) {
+      /* storage indisponível — vale só para esta sessão */
+    }
+  }
+
+  function themeOrigin() {
+    var btn = $('[data-act="theme"]');
+    if (!btn) return { x: 48, y: window.innerHeight - 48 };
+    var r = btn.getBoundingClientRect();
+    return { x: r.left + r.width / 2, y: r.top + r.height / 2 };
+  }
+
+  function applyTheme(id, origin) {
+    if (id === S.theme) return;
+    var apply = function () {
+      setThemeAttrs(id);
+      renderRail();
+      syncPills();
+      if (S.route.name === 'dashboard') renderDashboard();
+    };
+    var root = document.documentElement;
+    var start = document.startViewTransition && document.startViewTransition.bind(document);
+    if (!start || prefersReducedMotion()) {
+      apply();
+      return;
+    }
+    var o = origin || themeOrigin();
+    /* Raio até o canto mais distante: o círculo tem de cobrir a tela inteira. */
+    var radius = Math.hypot(Math.max(o.x, window.innerWidth - o.x), Math.max(o.y, window.innerHeight - o.y));
+    var transition = start(apply);
+    transition.ready.then(function () {
+      root.animate(
+        { clipPath: ['circle(0px at ' + o.x + 'px ' + o.y + 'px)', 'circle(' + radius + 'px at ' + o.x + 'px ' + o.y + 'px)'] },
+        { duration: 700, easing: 'cubic-bezier(0.22, 1, 0.36, 1)', pseudoElement: '::view-transition-new(root)' }
+      );
+    });
+  }
+
+  function themePicker(anchor) {
+    var html =
+      '<div class="pop__head"><span class="pop__title">Aparência</span></div>' +
+      '<div class="theme-grid">' +
+      THEMES.map(function (t) {
+        return (
+          '<button class="theme-card" data-theme-pick="' +
+          t.id +
+          '" aria-pressed="' +
+          (S.theme === t.id) +
+          '">' +
+          /* Miniatura do app no tema: canvas, placa, lista e um botão azul. */
+          '<span class="theme-card__preview" style="background:' +
+          t.sw[0] +
+          '"><span class="theme-card__rail"><i style="background:' +
+          t.sw[3] +
+          '"></i></span><span class="theme-card__slab" style="background:' +
+          t.sw[1] +
+          '"><span class="theme-card__line" style="background:' +
+          t.sw[4] +
+          ';width:58%"></span><span class="theme-card__row" style="background:' +
+          t.sw[2] +
+          '"></span><span class="theme-card__row" style="background:' +
+          t.sw[2] +
+          ';width:72%"></span><span class="theme-card__btn" style="background:' +
+          t.sw[3] +
+          '"></span></span></span>' +
+          '<span class="theme-card__text"><span class="theme-card__name">' +
+          esc(t.name) +
+          (S.theme === t.id ? I('check', 12) : '') +
+          '</span><span class="theme-card__desc">' +
+          esc(t.desc) +
+          '</span></span></button>'
+        );
+      }).join('') +
+      '</div>';
+    var pop = openPop(anchor, html, { width: 336 });
+    pop.addEventListener('click', function (e) {
+      var b = e.target.closest('[data-theme-pick]');
+      if (!b) return;
+      var o = themeOrigin();
+      /* Fecha na hora: a transição fotografa a tela, e o menu não pode
+         aparecer no meio da revelação. */
+      closePop(true);
+      applyTheme(b.dataset.themePick, o);
+    });
   }
 
   /* ======================================================================
@@ -3792,7 +5031,10 @@
         syncPills();
         break;
       case 'theme':
-        toggleTheme();
+        themePicker(el);
+        break;
+      case 'team':
+        openTeam(el);
         break;
       case 'me':
         openMenu(
@@ -3801,10 +5043,10 @@
             { label: D.ME.name, sub: D.ME.role, icon: 'user' },
             { sep: true },
             { label: 'Disponível', act: 'p', value: 'online', checked: D.ME.presence === 'online' },
-            { label: 'Ocupado', act: 'p', value: 'ocupado', checked: D.ME.presence === 'ocupado' },
+            { label: 'Em atendimento', act: 'p', value: 'ocupado', checked: D.ME.presence === 'ocupado' },
             { label: 'Ausente', act: 'p', value: 'ausente', checked: D.ME.presence === 'ausente' },
             { sep: true },
-            { label: 'Alternar tema', act: 'theme', icon: S.theme === 'dark' ? 'sun' : 'moon' },
+            { label: 'Aparência', sub: themeById(S.theme).name, act: 'theme', icon: 'palette' },
             { label: 'Sair', act: 'out', icon: 'logOut' },
           ],
           function (a, v) {
@@ -3812,8 +5054,8 @@
               D.ME.presence = v;
               renderRail();
               renderViewsColumn();
-              toast('Status alterado para ' + v, { icon: 'userCheck' });
-            } else if (a === 'theme') toggleTheme();
+              toast('Seu status: ' + PRESENCE[v].label, { icon: 'userCheck' });
+            } else if (a === 'theme') themePicker($('[data-act="theme"]') || el);
             else if (a === 'out') toast('Sessão encerrada no protótipo', { icon: 'logOut' });
           },
           { width: 240 }
@@ -3823,9 +5065,9 @@
         openMenu(
           el,
           [
-            { label: 'Menção de Rafael Antunes', sub: 'Calendário de provas do híbrido · há 1 h', icon: 'atSign', act: 'go', value: 'c15' },
-            { label: 'SLA estourado', sub: 'Renegociação de mensalidades · Sérgio Tanaka', icon: 'alertTriangle', act: 'go', value: 'c14' },
-            { label: 'Nova conversa sem dono', sub: 'Trancamento de matrícula · Patrícia Figueiredo', icon: 'inbox', act: 'go', value: 'c09' },
+            { label: 'Aluna respondeu na ouvidoria', sub: 'Beatriz Lacerda · reposição das aulas · há 25 min', icon: 'megaphone', act: 'go', value: 'c22' },
+            { label: 'Nota da Ouvidoria para você', sub: 'Mariana Albuquerque · estorno aprovado', icon: 'note', act: 'go', value: 'c21' },
+            { label: 'Nova manifestação na fila', sub: 'Carlos Eduardo · nota do TCC · urgente', icon: 'inbox', act: 'go', value: 'c23' },
           ],
           function (a, v) {
             if (a === 'go') gotoConv(v);
@@ -3856,26 +5098,27 @@
         S.bulk = S.bulk === null ? [] : null;
         renderList();
         break;
-      case 'bulk-assign':
-        S.bulk.forEach(function (id) {
-          conv(id).assignee = D.ME.id;
-        });
-        toast(S.bulk.length + ' conversas atribuídas a você', { icon: 'userCheck' });
-        S.bulk = null;
-        rerenderInbox();
+      case 'bulk-folder':
+        if (S.bulk && S.bulk.length) {
+          var sel = S.bulk.map(conv).filter(function (k) {
+            return k.assignee === D.ME.id;
+          });
+          S.bulk = null;
+          folderPicker(el, sel);
+        }
         break;
-      case 'bulk-tag':
-        S.bulk.forEach(function (id) {
-          var k = conv(id);
-          if (k.tags.indexOf('Retenção') < 0) k.tags.push('Retenção');
-        });
-        toast('Marcador "Retenção" aplicado a ' + S.bulk.length + ' conversas', { icon: 'tag' });
-        S.bulk = null;
-        rerenderInbox();
+      case 'bulk-transfer':
+        if (S.bulk && S.bulk.length)
+          transferModal(
+            S.bulk.map(conv).filter(function (k) {
+              return k.assignee === D.ME.id && isOpen(k);
+            })
+          );
         break;
       case 'bulk-close':
         S.bulk.forEach(function (id) {
           var k = conv(id);
+          if (k.assignee !== D.ME.id) return;
           k.status = 'encerrado';
           k.closedAt = Date.now();
         });
@@ -3911,11 +5154,39 @@
           toast('Atendimento reaberto', { icon: 'rotateCcw' });
         }
         break;
-      case 'assign':
-        if (c) assignMenu(el, c);
+      case 'transfer':
+        if (c && c.assignee === D.ME.id && isOpen(c)) transferModal(c);
         break;
-      case 'snooze':
-        if (c) snoozeMenu(el, c);
+      case 'pin':
+        if (c) togglePin(c);
+        break;
+      case 'move-folder':
+        if (c) folderPicker(el, c);
+        break;
+      case 'new-folder':
+        S.groups.pastas = true;
+        S.newFolder = true;
+        renderViewsColumn();
+        break;
+      case 'open-ouv-history':
+        S.ctxTab = 'historico';
+        if (!S.ctxOpen) {
+          S.ctxOpen = true;
+          renderMain(true);
+        } else renderContext();
+        break;
+      case 'copilot-ouv':
+        runCopilot('ouv-resumo');
+        break;
+      case 'dock-note-save':
+        saveDockNote();
+        break;
+      case 'copilot-ask':
+        var qa = $('#copilot-ask');
+        if (qa) askCopilot(qa.value);
+        break;
+      case 'dash-range':
+        rangePopover(el);
         break;
       case 'priority':
         if (c)
@@ -3938,48 +5209,36 @@
       case 'tags':
         if (c) tagPopover(el, c);
         break;
-      case 'star':
-        if (c) {
-          c.starred = !c.starred;
-          rerenderInbox();
-        }
-        break;
       case 'more':
-        if (c)
+        if (c) {
+          var mine = c.assignee === D.ME.id;
+          var fd = c.folder ? folder(c.folder) : null;
           openMenu(
             el,
             [
-              { label: 'Prioridade', sub: c.priority.charAt(0).toUpperCase() + c.priority.slice(1), act: 'prio', icon: 'flag' },
-              { label: 'Marcadores', sub: c.tags.length ? c.tags.join(', ') : 'nenhum', act: 'tag', icon: 'tag', hint: 'T' },
-              { label: c.starred ? 'Remover dos favoritos' : 'Favoritar', act: 'star', icon: 'star' },
+              { label: c.pinned ? 'Desafixar' : 'Fixar no topo', act: 'pin', icon: c.pinned ? 'pinOff' : 'pin', hint: 'P' },
+              mine ? { label: 'Mover para pasta', sub: fd ? fd.name : 'nenhuma', act: 'folder', icon: 'folderInput', hint: 'M' } : {},
+              mine && isOpen(c) ? { label: 'Transferir para outra fila', act: 'transfer', icon: 'arrowRightLeft', hint: 'F' } : {},
               { sep: true },
+              mine ? { label: 'Prioridade', sub: c.priority.charAt(0).toUpperCase() + c.priority.slice(1), act: 'prio', icon: 'flag' } : {},
+              mine ? { label: 'Marcadores', sub: c.tags.length ? c.tags.join(', ') : 'nenhum', act: 'tag', icon: 'tag', hint: 'T' } : {},
               { label: 'Ver ficha 360 do aluno', act: '360', icon: 'user' },
-              { label: 'Criar ticket para outro setor', act: 'ticket', icon: 'ticket' },
               { label: 'Copiar link da conversa', act: 'link', icon: 'link' },
               { label: 'Exportar transcrição', act: 'export', icon: 'download' },
-              { sep: true },
-              { label: 'Marcar como spam', act: 'spam', icon: 'shieldAlert', danger: true },
             ],
             function (a) {
-              if (a === 'prio') handleAct('priority', el);
+              if (a === 'pin') togglePin(c);
+              else if (a === 'folder') folderPicker(el, c);
+              else if (a === 'transfer') transferModal(c);
+              else if (a === 'prio') handleAct('priority', el);
               else if (a === 'tag') tagPopover(el, c);
-              else if (a === 'star') {
-                c.starred = !c.starred;
-                rerenderInbox();
-                toast(c.starred ? 'Adicionado aos favoritos' : 'Removido dos favoritos', { icon: 'star' });
-              } else if (a === '360') location.hash = '#/contatos/' + c.studentId;
+              else if (a === '360') location.hash = '#/contatos/' + c.studentId;
               else if (a === 'link') toast('Link copiado', { sub: location.origin + '/#/inbox/' + c.id, icon: 'link' });
-              else if (a === 'ticket') toast('Ticket criado', { sub: '#TK-' + Math.floor(1000 + Math.random() * 9000) + ' na fila ' + queue(c.queue).name, icon: 'ticket' });
               else if (a === 'export') toast('Transcrição exportada', { sub: 'conversa-' + c.id + '.pdf', icon: 'download' });
-              else if (a === 'spam') {
-                c.status = 'encerrado';
-                c.closedAt = Date.now();
-                rerenderInbox();
-                toast('Marcada como spam e encerrada', { icon: 'shieldAlert', tone: 'crit' });
-              }
             },
-            { width: 260, align: 'right' }
+            { width: 270, align: 'right' }
           );
+        }
         break;
       case 'more-student':
         openMenu(
@@ -4042,6 +5301,19 @@
         break;
       case 'copilot-insert':
         if (S.copilot.insert) {
+          if (S.copilot.insertMode === 'note') {
+            S.noteDraft = S.copilot.insert;
+            S.copilot = { running: false, title: null, body: '', chips: null, insert: null };
+            renderContext();
+            var dn = $('#dock-note');
+            if (dn) {
+              dn.value = S.noteDraft;
+              autoGrowNote(dn);
+              dn.focus();
+            }
+            toast('Nota pronta no painel', { sub: 'Revise e salve com Enter.', icon: 'note' });
+            break;
+          }
           insertInComposer(S.copilot.insert, c);
           S.copilot = { running: false, title: null, body: '', chips: null, insert: null };
           renderContext();
@@ -4056,10 +5328,8 @@
         if (c) location.hash = '#/contatos/' + c.studentId;
         break;
       case 'add-note':
-        S.composer.mode = 'note';
-        renderThread();
-        var b1 = $('#composer-box');
-        if (b1) b1.focus();
+        var dk = $('#dock-note');
+        if (dk) dk.focus();
         break;
       case 'call':
         toast('Discando…', { sub: 'Integração de telefonia simulada.', icon: 'phone' });
@@ -4073,11 +5343,8 @@
       case 'negotiate':
         toast('Simulação enviada ao Financeiro', { sub: 'Proposta de 3x sem juros gerada.', icon: 'banknote' });
         break;
-      case 'balance':
-        toast('Fila balanceada', { sub: '4 conversas redistribuídas entre 3 atendentes disponíveis.', icon: 'refresh' });
-        break;
       case 'export':
-        toast('Exportação gerada', { sub: 'atendimento-' + new Date().toISOString().slice(0, 10) + '.csv', icon: 'download' });
+        toast('Exportação gerada', { sub: 'meu-desempenho-' + new Date().toISOString().slice(0, 10) + '.csv', icon: 'download' });
         break;
       case 'new-conversation':
         toast('Nova conversa', { sub: 'Busque o aluno pelo RA para iniciar.', icon: 'plus', action: 'Buscar', onAction: openPalette });
@@ -4142,12 +5409,7 @@
         return '<button class="chip" data-filter="modalidade" data-value="' + m + '" aria-pressed="' + (S.filters.modalidade === m) + '">' + m + '</button>';
       }).join('') +
       '</div>' +
-      '<p class="label" style="margin-top:12px">Responsável</p><div class="tagrow">' +
-      '<button class="chip" data-filter="responsavel" data-value="nenhum" aria-pressed="' + (S.filters.responsavel === 'nenhum') + '">Sem dono</button>' +
-      D.AGENTS.slice(0, 4).map(function (a) {
-        return '<button class="chip" data-filter="responsavel" data-value="' + a.id + '" aria-pressed="' + (S.filters.responsavel === a.id) + '">' + esc(a.name.split(' ')[0]) + '</button>';
-      }).join('') +
-      '</div></div>' +
+      '</div>' +
       '<div class="pop__foot" style="display:flex;justify-content:space-between;align-items:center">' +
       '<button class="linkbtn" data-pop-clear>Limpar tudo</button>' +
       '<button class="btn btn--xs btn--secondary" data-close-pop>Pronto</button></div>';
@@ -4242,6 +5504,38 @@
         syncPills();
         if (Date.now() - t0 < 300) requestAnimationFrame(follow);
       })();
+      return;
+    }
+    var pin = t.closest('[data-pin]');
+    if (pin) {
+      e.stopPropagation();
+      var pc = conv(pin.dataset.pin);
+      if (pc) togglePin(pc);
+      return;
+    }
+    var fm = t.closest('[data-folder-menu]');
+    if (fm) {
+      folderMenu(fm, fm.dataset.folderMenu);
+      return;
+    }
+    var todo = t.closest('[data-todo]');
+    if (todo) {
+      S.todo = S.todo || {};
+      var tk = S.selected + ':' + todo.dataset.todo;
+      S.todo[tk] = !S.todo[tk];
+      todo.setAttribute('aria-pressed', String(!!S.todo[tk]));
+      todo.querySelector('svg').outerHTML = I(S.todo[tk] ? 'circleCheck' : 'circle', 14);
+      return;
+    }
+    var askBtn = t.closest('[data-ask]');
+    if (askBtn) {
+      askCopilot(askBtn.dataset.ask);
+      return;
+    }
+    var ho = t.closest('[data-hist-order]');
+    if (ho) {
+      S.histOrder = ho.dataset.histOrder;
+      renderContext();
       return;
     }
     var check = t.closest('[data-check]');
@@ -4403,6 +5697,11 @@
         var c = conv(S.selected);
         if (c) macroPopover(e.target, c);
       }
+    } else if (e.target.id === 'dock-note') {
+      S.noteDraft = e.target.value;
+      autoGrowNote(e.target);
+    } else if (e.target.id === 'copilot-ask') {
+      S.ask.q = e.target.value;
     } else if (e.target.id === 'contacts-search') {
       S.contacts.search = e.target.value;
       clearTimeout(e.target._t);
@@ -4428,6 +5727,40 @@
       syncPills();
       syncSegThumbs(document);
       saveWidths();
+      return;
+    }
+    if (e.target.id === 'new-folder-input') {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        var nm = e.target.value.trim();
+        S.newFolder = false;
+        if (nm) {
+          var nf = createFolder(nm);
+          toast('Pasta criada', { icon: 'folderPlus', sub: nf.name + ' · arraste conversas para ela' });
+        }
+        renderViewsColumn();
+        syncPills();
+      } else if (e.key === 'Escape') {
+        e.preventDefault();
+        e.stopPropagation();
+        S.newFolder = false;
+        renderViewsColumn();
+        syncPills();
+      }
+      return;
+    }
+    if (e.target.id === 'dock-note') {
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        saveDockNote();
+      }
+      return;
+    }
+    if (e.target.id === 'copilot-ask') {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        askCopilot(e.target.value);
+      }
       return;
     }
     if (e.target.id === 'composer-box') {
@@ -4504,11 +5837,19 @@
       location.hash = '#/inbox/' + list[Math.max(0, idx - 1)].id;
     } else if (kk === 'a') {
       var c1 = conv(S.selected);
-      if (c1 && !c1.assignee) claim(c1);
-      else if (c1) assignMenu($('[data-act="assign"]') || document.body, c1);
+      if (c1 && !c1.assignee && isOpen(c1)) claim(c1);
+    } else if (kk === 'f') {
+      var cf1 = conv(S.selected);
+      if (cf1 && cf1.assignee === D.ME.id && isOpen(cf1)) transferModal(cf1);
+    } else if (kk === 'p') {
+      var cp1 = conv(S.selected);
+      if (cp1) togglePin(cp1);
+    } else if (kk === 'm') {
+      var cm1 = conv(S.selected);
+      if (cm1 && cm1.assignee === D.ME.id) folderPicker($('[data-act="more"]') || document.body, cm1);
     } else if (kk === 'e') {
       var c2 = conv(S.selected);
-      if (c2 && c2.status !== 'encerrado') closeConv(c2);
+      if (c2 && c2.assignee === D.ME.id && isOpen(c2)) closeConv(c2);
     } else if (kk === 'n') {
       S.composer.mode = 'note';
       renderThread();
@@ -4519,9 +5860,6 @@
       renderThread();
       var bx2 = $('#composer-box');
       if (bx2) bx2.focus();
-    } else if (kk === 's') {
-      var c3 = conv(S.selected);
-      if (c3) snoozeMenu($('[data-act="snooze"]') || document.body, c3);
     } else if (kk === 't') {
       var c4 = conv(S.selected);
       if (c4) tagPopover($('[data-act="tags"]') || document.body, c4);
@@ -4532,6 +5870,77 @@
       e.preventDefault();
       openShortcuts();
     }
+  });
+
+  document.addEventListener(
+    'blur',
+    function (e) {
+      if (e.target.id !== 'new-folder-input' || !S.newFolder) return;
+      var nm = e.target.value.trim();
+      S.newFolder = false;
+      if (nm) createFolder(nm);
+      setTimeout(function () {
+        renderViewsColumn();
+        syncPills();
+      }, 0);
+    },
+    true
+  );
+
+  /* Arrastar uma conversa para uma pasta. "Minha caixa" também recebe: soltar
+     lá tira a conversa da pasta. */
+  var dragId = null;
+  document.addEventListener('dragstart', function (e) {
+    var row = e.target.closest && e.target.closest('.conv[draggable="true"]');
+    if (!row) return;
+    var dc = conv(row.dataset.conv);
+    if (!dc || dc.assignee !== D.ME.id) {
+      e.preventDefault();
+      return;
+    }
+    dragId = row.dataset.conv;
+    e.dataTransfer.effectAllowed = 'move';
+    try {
+      e.dataTransfer.setData('text/plain', dragId);
+    } catch (err) {
+      /* IE/Edge antigo — o id fica em dragId */
+    }
+    row.classList.add('is-dragging');
+    document.body.classList.add('is-dragging-conv');
+    hideTip();
+  });
+  /* A limpeza roda no drop E no dragend: soltar numa pasta redesenha a
+     lista, a linha arrastada sai do DOM e o dragend dela nunca chega aqui. */
+  function endDrag() {
+    dragId = null;
+    document.body.classList.remove('is-dragging-conv');
+    $$('.is-dragging').forEach(function (r) {
+      r.classList.remove('is-dragging');
+    });
+    $$('[data-drop-over]').forEach(function (r) {
+      r.removeAttribute('data-drop-over');
+    });
+  }
+  document.addEventListener('dragend', endDrag);
+  document.addEventListener('dragover', function (e) {
+    if (!dragId) return;
+    var target = e.target.closest && e.target.closest('[data-drop-folder]');
+    $$('[data-drop-over]').forEach(function (r) {
+      if (r !== target) r.removeAttribute('data-drop-over');
+    });
+    if (!target) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    target.setAttribute('data-drop-over', 'true');
+  });
+  document.addEventListener('drop', function (e) {
+    var target = e.target.closest && e.target.closest('[data-drop-folder]');
+    if (!dragId || !target) return;
+    e.preventDefault();
+    var dc = conv(dragId);
+    var fid = target.dataset.dropFolder || null;
+    endDrag();
+    if (dc && dc.folder !== fid) moveToFolder(dc, fid);
   });
 
   document.addEventListener('mouseover', function (e) {
@@ -4623,7 +6032,8 @@
         S.composer.text = '';
         S.composer.mode = 'reply';
         S.copilot = { running: false, title: null, body: '', chips: null, insert: null };
-        if (!inView(c, S.view)) S.view = c.status === 'encerrado' ? 'encerrados' : 'todos';
+        S.ask = { q: '', a: '', running: false };
+        if (!inView(c, S.view) && c.assignee === D.ME.id) S.view = c.status === 'encerrado' ? 'encerrados' : 'minha';
       } else {
         ensureSelection();
       }
@@ -4671,6 +6081,7 @@
 
   function boot() {
     loadWidths();
+    loadOrg();
     try {
       S.viewsCollapsed = localStorage.getItem('atendimento.v1.views') === 'off';
     } catch (e) {
@@ -4680,15 +6091,12 @@
     if (!location.hash) location.hash = '#/inbox';
     route();
     setTimeout(function () {
+      var waiting = countFor('fila');
       toast('Turno iniciado', {
-        sub: countFor('nao-atribuidos') + ' conversas esperando alguém assumir.',
+        sub: countFor('minha') + ' conversas com você · ' + waiting + ' na fila esperando atendimento.',
         icon: 'inbox',
-        action: 'Ver fila',
-        onAction: function () {
-          S.view = 'nao-atribuidos';
-          location.hash = '#/inbox';
-          rerenderInbox();
-        },
+        action: waiting ? 'Atender próximo' : null,
+        onAction: nextUp,
         timeout: 6500,
       });
     }, 900);
